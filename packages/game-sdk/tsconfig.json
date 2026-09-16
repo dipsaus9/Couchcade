@@ -1,0 +1,8 @@
+{
+  "extends": "@couchcade/config/tsconfig/lib.json",
+  "compilerOptions": {
+    // Types for import.meta.glob, which the registry tests use over testing/fixtures/.
+    "types": ["vite/client"]
+  },
+  "include": ["src", "testing", "test", "vitest.config.ts"]
+}
