@@ -1,10 +1,10 @@
 ---
 id: CC-1.4
 title: 'Spike: measure free-tier Durable Object request counting on a real deploy'
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-16 15:30'
+updated_date: '2026-09-16 15:32'
 labels:
   - story
 dependencies: []
@@ -31,7 +31,7 @@ Branch: CC-1.4/free-tier-probe
 - [x] #1 A probe Worker in spikes/free-tier-probe/ sends a known number of incoming messages (at least 1,000) and the Durable Object request count from the dashboard is recorded
 - [x] #2 Whether the Rate Limiting binding enforces limits on the Free plan is recorded
 - [x] #3 A recommended maximum input rate per phone is recorded for CC-3.6
-- [ ] #4 The probe Worker is deleted from the Cloudflare account afterwards
+- [x] #4 The probe Worker is deleted from the Cloudflare account afterwards
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -88,4 +88,14 @@ Correction to the rate-limit note: the exact total is 151 allowed out of 271 hit
 - CC-3.6: cap phone input at 4 messages per second per phone.
 - Host-to-relay messages also count 1:1, so host broadcasts such as controller:state need their own send cap.
 - Follow-up: on 2026-09-17 or 2026-09-18, re-check Billing > Billable usage for 16 Sep. About 1,024 Durable Object requests means 1:1; about 50-60 means 20:1, and then the phone cap can go back up to 15 per second.
+
+AC4 check 2026-09-16: the owner ran pnpm run destroy ('Successfully deleted couchcade-free-tier-probe'). From 15:31:26Z, https://couchcade-free-tier-probe.dipsaus9.workers.dev returns Cloudflare 'error code: 1042' (no Worker behind the route) on 3 tries 20 s apart; before that it returned the Worker's own 404. The account API lists 0 Worker scripts and 0 Durable Object namespaces.
+
+Review gate (dipsaus-ai:story-reviewer, round 1): pass. All criteria met, no scope violations. Advisories: (1) the 20:1 question remains open, so the billing re-check should become a tracked task; (2) the host broadcast send cap should be captured as a task or criterion; (3) account_id is committed in wrangler.jsonc (not a secret, left as is).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The probe Worker (spikes/free-tier-probe: a SQLite-backed Durable Object using the WebSocket Hibernation API, plus a Rate Limiting binding) was deployed to the Free plan and received 1,000 + 20 WebSocket messages. GraphQL analytics counted 1,024 Durable Object requests: 1 per connect, 1 per incoming message and 1 per close. Analytics show raw usage, and Billing > Billable usage showed 'No data', so whether the Free limit counts messages 20:1 is still unknown. Decision (signed off by the orchestrator for the owner): assume 1:1. CC-3.6 caps phone input at 4 messages per second per phone (80,000 of the 100,000 daily requests / 17,280 real-time phone-seconds in a 2-hour night with 8 phones = 4.6, rounded down). Host-to-relay messages also count 1:1, so host broadcasts need their own cap. The Rate Limiting binding works on Free but only loosely (151 of 271 hits allowed against 10 per 60 s): use it for abuse control only. Follow-up: re-check Billable usage for 16 Sep on 17 or 18 Sep (about 1,024 means 1:1, about 50-60 means 20:1, which would allow 15 per second). The probe Worker was deleted and verified gone (error 1042; the account has 0 scripts and 0 namespaces).
+<!-- SECTION:FINAL_SUMMARY:END -->
