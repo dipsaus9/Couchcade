@@ -25,8 +25,12 @@ export interface EchoState {
   ended: boolean;
 }
 
-export function echoGame({ id = "echo", realtime = true, min = 1, max = 8 } = {}) {
-  return defineGame({
+/**
+ * With `leaves`, the game has `onPlayerLeft`: it logs `<id>:left` and ends once fewer than 2
+ * players are still in, like Quick Draw.
+ */
+export function echoGame({ id = "echo", realtime = true, min = 1, max = 8, leaves = false } = {}) {
+  const game = defineGame({
     id,
     title: "Echo",
     players: { min, max },
@@ -60,6 +64,15 @@ export function echoGame({ id = "echo", realtime = true, min = 1, max = 8 } = {}
     },
 
     hostScene: () => Promise.reject(new Error("Test games have no host scene")),
+  });
+  if (!leaves) return game;
+  return defineGame({
+    ...game,
+    onPlayerLeft(state: EchoState, player: Player): EchoState {
+      const log = [...state.log, `${player.id}:left`];
+      const gone = log.filter((entry) => entry.endsWith(":left")).length;
+      return { ...state, log, ended: state.players.length - gone < 2 };
+    },
   });
 }
 

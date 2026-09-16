@@ -5,9 +5,9 @@ import { echoGame, type EchoState } from "./fixtures.ts";
 
 const [sam, noor, mees] = createPlayers(3).map((player) => player.id) as [string, string, string];
 
-function runner(realtime = true) {
-  return createGameRunner(echoGame({ realtime }), {
-    players: createPlayers(2),
+function runner(realtime = true, { leaves = false, players = 2 } = {}) {
+  return createGameRunner(echoGame({ realtime, leaves }), {
+    players: createPlayers(players),
     seed: 42,
     displayLagMs: 0,
   });
@@ -99,5 +99,35 @@ describe("createGameRunner", () => {
       [sam, { screen: "echo", data: { text: "hi" } }],
       [noor, { screen: "echo", data: { text: "" } }],
     ]);
+  });
+
+  it("calls onPlayerLeft once for an in-game player, then drops their inputs and view", () => {
+    const r = runner(false, { leaves: true, players: 3 });
+    r.queue(noor, { type: "say", payload: { text: "queued" }, at: 0 });
+    r.leave(noor);
+    r.leave(noor);
+    r.leave("NOTINGAM");
+    expect(stateOf(r).log).toEqual([`${noor}:left`]);
+    expect(r.queue(noor, { type: "say", payload: { text: "late" }, at: 0 })).toBe(false);
+    r.step();
+    expect(stateOf(r).said).toEqual({});
+    expect([...r.views().keys()]).toEqual([sam, mees]);
+    // Placements still list every player init received, so a leaver keeps their points.
+    expect(r.players.map((player) => player.id)).toEqual([sam, noor, mees]);
+  });
+
+  it("takes the outcome onPlayerLeft leads to", () => {
+    const r = runner(false, { leaves: true });
+    r.leave(sam);
+    expect(r.outcome?.placements).toHaveLength(2);
+    expect(r.step()).toBe(r.outcome);
+  });
+
+  it("drops a leaver's inputs in a game without onPlayerLeft", () => {
+    const r = runner();
+    r.leave(sam);
+    expect(stateOf(r).log).toEqual([]);
+    expect(r.queue(sam, { type: "say", payload: { text: "x" }, at: 0 })).toBe(false);
+    expect(r.outcome).toBeNull();
   });
 });

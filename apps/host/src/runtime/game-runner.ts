@@ -38,9 +38,16 @@ export interface GameRunner {
    * game or the input fails the game's `inputSchema`.
    */
   queue(from: string, input: InputPayload): boolean;
+  /**
+   * A player's seat was freed (expired, left or kicked). Calls the game's `onPlayerLeft` once for
+   * an in-game player, drops their later inputs and stops computing their view. A short drop is
+   * never reported here: games only hear about a player whose seat is gone
+   * (docs/architecture/session-flow.md, owner decision 8).
+   */
+  leave(id: string): void;
   /** One fixed step: queued inputs in arrival order, `onTick` if real-time, then `outcome`. */
   step(): Outcome | null;
-  /** The view of every in-game player, in join order. */
+  /** The view of every in-game player still seated, in join order. */
   views(): Map<string, ControllerView>;
 }
 
@@ -93,6 +100,16 @@ export function createGameRunner(game: CouchcadeGame, options: GameRunnerOptions
       return true;
     },
 
+    leave(id) {
+      const player = byId.get(id);
+      if (player === undefined) return;
+      byId.delete(id);
+      pending = pending.filter((queued) => queued.player.id !== id);
+      if (outcome !== null || !game.onPlayerLeft) return;
+      state = game.onPlayerLeft(state, player);
+      outcome = game.outcome(state);
+    },
+
     step() {
       if (outcome !== null) return outcome;
       tick += 1;
@@ -113,7 +130,8 @@ export function createGameRunner(game: CouchcadeGame, options: GameRunnerOptions
     },
 
     views() {
-      return new Map(players.map((player) => [player.id, game.view(state, player)]));
+      const seated = players.filter((player) => byId.has(player.id));
+      return new Map(seated.map((player) => [player.id, game.view(state, player)]));
     },
   };
 }
