@@ -1,0 +1,4 @@
+# Standalone spike, not part of any root workspace.
+allowBuilds:
+  esbuild: true
+  workerd: true

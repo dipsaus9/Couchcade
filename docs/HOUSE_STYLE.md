@@ -15,6 +15,7 @@ Every game, menu and phone screen on Couchcade uses this one style: a chunky, to
 - [Components](#components)
 - [Pips: player avatars](#pips-player-avatars)
 - [Game worlds](#game-worlds)
+- [Assets and credits](#assets-and-credits)
 - [Screen layouts](#screen-layouts)
 - [Motion, sound and haptics](#motion-sound-and-haptics)
 - [Voice](#voice)
@@ -217,7 +218,7 @@ A row of player chips across the top safe area in join order, with a round count
 
 ### Room code
 
-Always visible on the TV in the bottom-right corner: Pixelify Sans `score` size on a Chalk panel, with the join URL underneath in `small`.
+Always visible on the TV in the bottom-right corner: Pixelify Sans `score` size on a Chalk panel, with the join URL underneath in `small`. In the lobby the panel also shows a QR code for the join URL, so players scan it and only type the code when scanning fails.
 
 ---
 
@@ -266,6 +267,24 @@ These rules keep every game looking like part of one console.
 | Light | Always daytime or warm indoor light; no dark or scary scenes | Party-friendly for all ages |
 | Overlays | Only from `@couchcade/stage` | A game cannot restyle the interface |
 | Animation | 8–12 fps sprite animation, smooth movement | Retro feel, readable motion |
+
+---
+
+## Assets and credits
+
+Art, sound and music are either made for Couchcade or taken from **CC0** packs. Nothing else.
+
+| Allowed | Not allowed |
+|---|---|
+| Original art, sounds and music | Assets, names or characters from existing games, even redrawn or recoloured |
+| CC0 sprites recoloured to the core colours plus the game's scene palette | CC0 sprites used in their original colours |
+| CC0 sounds and music, credited | Assets under any licence other than CC0 (CC-BY, "free for personal use", unknown). The OFL fonts are the only exception |
+
+Rules:
+
+- Recolour every CC0 sprite with `pnpm assets:recolour <input> <scene>`, which maps each pixel to the nearest colour in the core + scene palette. The palette check then treats it like any other sprite.
+- Add one entry per asset to the game's `games/<id>/CREDITS.md`: asset, author, source URL and licence. Platform assets are credited the same way in the app that ships them (for example `apps/host/CREDITS.md`). Game entries are collected into `docs/CREDITS.md`.
+- A game may be inspired by an existing game's mechanics. Its name, characters and look must be its own.
 
 ---
 
@@ -368,6 +387,7 @@ Couchcade talks like a **friendly referee**: short, warm, a little bit cheeky, a
 
 Rules:
 
+- English only. There are no translations.
 - Sentence case, plain verbs, no jargon.
 - Buttons say exactly what happens: "Start game", "Leave room".
 - An action keeps the same name throughout: the button says "Kick", the message says "Kicked".
@@ -462,8 +482,8 @@ export const world = { width: 480, height: 270, maxColors: 16 } as const;
    - `font-family` declarations outside `@couchcade/theme`
    - Sprite PNGs using colours outside the game's palette
    - Sprite sheets whose frame sizes aren't multiples of the world grid
-4. **Visual regression.** Every `ui` and `stage` component has screenshot tests.
-5. **Contrast tests.** Every text/background pairing in `theme` is checked against WCAG AA.
+4. **Contrast tests.** Every text/background pairing in `theme` is checked against WCAG AA.
+5. **Credits check.** Entries in `games/*/CREDITS.md` are validated and collected into `docs/CREDITS.md`.
 6. **Review.** A new game or screen isn't done until it passes the checklist below.
 
 ---
@@ -489,5 +509,7 @@ Copy this into the pull request for any new game or screen.
 - [ ] Motion uses theme tokens; reduced motion works
 - [ ] Every sound has a visual cue; haptics are optional
 - [ ] Copy matches the friendly-referee voice and never mocks players
-- [ ] All art, names and sounds are original
+- [ ] Names are original; art and sounds are original or recoloured CC0 with a CREDITS.md entry
+- [ ] No assets, names or characters from existing games
+- [ ] All copy is in English
 ```
