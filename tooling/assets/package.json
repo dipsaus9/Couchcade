@@ -1,0 +1,26 @@
+{
+  "name": "@couchcade/assets",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The CC0 asset pipeline: recolours sprites onto a scene palette, checks sprites stay on-palette and on the world grid, and validates/aggregates games/*/CREDITS.md into docs/CREDITS.md.",
+  "type": "module",
+  "scripts": {
+    "assets:recolour": "node src/cli.ts",
+    "check-sprites": "node src/check-cli.ts",
+    "credits": "node src/credits-cli.ts",
+    "typecheck": "tsc",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@couchcade/theme": "workspace:*",
+    "pngjs": "catalog:"
+  },
+  "devDependencies": {
+    "@couchcade/config": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/pngjs": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}
