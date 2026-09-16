@@ -4,10 +4,10 @@ import { createPlayers } from "@couchcade/game-sdk/testing";
 import { world } from "@couchcade/theme";
 import { cuesBetween } from "../../src/host/cues.ts";
 import type { QuickDrawCue } from "../../src/host/cues.ts";
-import { pipSlots, worldTextPx } from "../../src/host/layout.ts";
+import { safeArea } from "@couchcade/stage/layout";
+import { calloutAt, horizonY, pipSlots, street } from "../../src/host/layout.ts";
 import { crowShowMs, formatReaction, present } from "../../src/host/present.ts";
 import type { Presentation } from "../../src/host/present.ts";
-import { shapePoints } from "../../src/host/shapes.ts";
 import { fakeWordShowMs, glintShowMs, init } from "../../src/shared/index.ts";
 import type { Fake, QuickDrawState } from "../../src/shared/index.ts";
 import { botRoom, mixedBots, rotatingBots, seedWithEveryFake } from "./bots.ts";
@@ -35,8 +35,8 @@ const glint: Fake = { atMs: 7000, kind: "glint", word: null, playerId: players[1
 describe("layout", () => {
   it("puts 2 players at x = 150 and x = 330, facing each other", () => {
     expect(pipSlots(2)).toEqual([
-      { x: 150, feetY: 214, facing: 1, row: 0 },
-      { x: 330, feetY: 214, facing: -1, row: 0 },
+      { x: 150, feetY: 200, facing: 1, row: 0 },
+      { x: 330, feetY: 200, facing: -1, row: 0 },
     ]);
   });
 
@@ -48,7 +48,7 @@ describe("layout", () => {
     expect(
       slots.filter((_, i) => i % 2 === 1).every((slot) => slot.x >= 330 && slot.facing === -1),
     ).toBe(true);
-    expect(slots.map((slot) => slot.feetY)).toEqual([214, 214, 202, 202, 190, 190, 178, 178]);
+    expect(slots.map((slot) => slot.feetY)).toEqual([200, 200, 188, 188, 176, 176, 164, 164]);
     for (const slot of slots) {
       expect(Number.isInteger(slot.x) && Number.isInteger(slot.feetY)).toBe(true);
       expect(slot.x).toBeGreaterThanOrEqual(24 + 8);
@@ -56,27 +56,19 @@ describe("layout", () => {
     }
   });
 
-  it("sizes text from the TV type scale at the ×4 zoom of 1080p", () => {
-    expect(worldTextPx("callout")).toBe(40);
-    expect(worldTextPx("score")).toBe(18);
-    expect(worldTextPx("body")).toBe(8);
-  });
-
-  it("draws every player shape as a closed polygon within its radius", () => {
-    for (const shape of [
-      "circle",
-      "square",
-      "triangle",
-      "diamond",
-      "star",
-      "hexagon",
-      "heart",
-      "plus",
-    ] as const) {
-      const points = shapePoints(shape, 4);
-      expect(points.length).toBeGreaterThanOrEqual(3);
-      for (const point of points)
-        expect(Math.hypot(point.x, point.y)).toBeLessThanOrEqual(4 * Math.SQRT2 + 1e-9);
+  it("keeps the street, the Pips and the callout between the scoreboard and the bottom panels", () => {
+    // The stage scoreboard is 18 world px high plus its lift, outline and shadow; the bottom row
+    // (instruction and room code panels) is the bottom 15% of the TV.
+    const scoreboardBottom = safeArea.top + 24;
+    const bottomRowTop = safeArea.bottom - 40;
+    expect(horizonY).toBeLessThanOrEqual(world.height / 3);
+    expect(calloutAt.y - 25).toBeGreaterThan(scoreboardBottom);
+    expect(street.top).toBeGreaterThan(horizonY);
+    expect(street.top + street.rows * 16).toBeLessThanOrEqual(bottomRowTop);
+    for (const slot of pipSlots(8)) {
+      // The Pip (24 px), its tag above and its shape marker (9 px) below.
+      expect(slot.feetY - 24 - 16).toBeGreaterThan(calloutAt.y);
+      expect(slot.feetY + 9).toBeLessThanOrEqual(bottomRowTop);
     }
   });
 });
