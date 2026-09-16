@@ -23,6 +23,7 @@ Couchcade is a browser-based party game platform. One shared screen runs the gam
 - [House style](#house-style)
 - [Roadmap](#roadmap)
 - [Contributing](#contributing)
+- [License](#license)
 
 ---
 
@@ -500,3 +501,9 @@ See [`docs/HOUSE_STYLE.md`](docs/HOUSE_STYLE.md) for the full guidelines.
 5. Open a pull request. All CI checks must be green before merging.
 
 All names, art and sounds must be original. Don't use assets, names or characters from existing games.
+
+---
+
+## License
+
+The code is released under the [MIT License](LICENSE). The Fredoka and Pixelify Sans fonts keep their own SIL Open Font License 1.1, shipped as `OFL.txt` next to the font files.
