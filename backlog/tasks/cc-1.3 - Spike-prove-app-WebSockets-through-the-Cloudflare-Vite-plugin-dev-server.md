@@ -1,10 +1,10 @@
 ---
 id: CC-1.3
 title: 'Spike: prove app WebSockets through the Cloudflare Vite plugin dev server'
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-16 14:57'
+updated_date: '2026-09-16 14:58'
 labels:
   - story
 dependencies: []
@@ -56,6 +56,8 @@ Edge cases on the Vite plugin dev server: (1) Vite HMR socket (vite-hmr) open ne
 Fallback, wrangler dev :8787 + Vite proxy :5174 (server.proxy '/parties' ws:true): 100/side 200 msgs 89ms, 1000/side 2000 msgs 446ms, direct :8787 100/side 76ms. All exit 0. It works too, about 3x faster per message than the plugin path (extra Node ws coupling hop), irrelevant at <=15 msg/s per phone. All dev servers and Chrome killed after the runs (lsof on 5173/5174/8787/9333 empty).
 
 Review gate (dipsaus-ai:story-reviewer, round 1): verdict pass. AC1 met, AC2 met, no scope violations, no findings.
+
+Decision signed off by orchestrator on 2026-09-16 (owner delegated spike sign-off)
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
