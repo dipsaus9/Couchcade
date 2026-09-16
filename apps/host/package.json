@@ -1,0 +1,31 @@
+{
+  "name": "@couchcade/host",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The TV app: host passcode, room code and QR code, lobby and the Phaser stage.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "typecheck": "vue-tsc",
+    "test": "vitest run",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@couchcade/game-sdk": "workspace:*",
+    "@couchcade/protocol": "workspace:*",
+    "@couchcade/theme": "workspace:*",
+    "@couchcade/utils": "workspace:*",
+    "partysocket": "catalog:",
+    "phaser": "catalog:",
+    "uqr": "catalog:",
+    "vue": "catalog:"
+  },
+  "devDependencies": {
+    "@couchcade/config": "workspace:*",
+    "@vitejs/plugin-vue": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:",
+    "vue-tsc": "catalog:"
+  }
+}

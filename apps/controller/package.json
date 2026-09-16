@@ -1,0 +1,28 @@
+{
+  "name": "@couchcade/controller",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The phone app: join a room by QR code or code, the lobby and the waiting screens. Served at /.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "vue-tsc",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@couchcade/protocol": "workspace:*",
+    "@couchcade/theme": "workspace:*",
+    "@couchcade/utils": "workspace:*",
+    "partysocket": "catalog:",
+    "vue": "catalog:"
+  },
+  "devDependencies": {
+    "@couchcade/config": "workspace:*",
+    "@vitejs/plugin-vue": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:",
+    "vue-tsc": "catalog:"
+  }
+}
