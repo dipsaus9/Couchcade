@@ -37,7 +37,10 @@ export type PhoneState =
       phase: RoomPhase;
       /** False while the TV is away (`room:host { connected: false }`). */
       hostConnected: boolean;
-      /** False while this phone's socket is reconnecting. */
+      /**
+       * False once this phone's socket has been gone for 1 second, while it reconnects. A shorter
+       * drop keeps the last screen up (runtime/reconnect.ts).
+       */
       online: boolean;
       gameId: string | null;
       /** The last view the host sent, or null before the first one. */

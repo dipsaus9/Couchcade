@@ -29,6 +29,12 @@ export interface ViewSync {
    * with any later change. Phones missing from `views` keep what they have.
    */
   show(gameId: string | null, views: ReadonlyMap<string, ControllerView>): void;
+  /**
+   * Forgets what phone `id` was last sent, so the next `show` includes its view even when it
+   * didn't change. For a phone that reconnected (docs/architecture/session-flow.md, "Phone
+   * reconnect"). It sends nothing itself and the send cap still applies.
+   */
+  forget(id: string): void;
   /** Cancels a pending send. */
   dispose(): void;
 }
@@ -79,6 +85,9 @@ export function createViewSync(options: ViewSyncOptions): ViewSync {
     show(gameId, views) {
       desired = { gameId, views };
       flush();
+    },
+    forget(id) {
+      lastSent.delete(id);
     },
     dispose() {
       cancelTimer?.();

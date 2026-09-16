@@ -5,6 +5,7 @@ import { requestJoin, type FetchFn } from "../join/api.ts";
 import { normaliseName, roomCodeFromSearch, type JoinDraft } from "../join/form.ts";
 import { noTurnstile, type TurnstileProvider } from "../join/turnstile.ts";
 import { keepScreenAwake, lockPortrait } from "../device/screen.ts";
+import { watchReconnect, type ReconnectWatch } from "../runtime/reconnect.ts";
 import { openRoomSocket, type RoomSocket } from "./socket.ts";
 import { initialState, reduce, type PhoneEvent, type PhoneState } from "./state.ts";
 import {
@@ -46,6 +47,7 @@ export function createPhoneSession({
 }: PhoneSessionOptions = {}): PhoneSession {
   const state = shallowRef(initialState(roomCodeFromSearch(search), loadSession(storage)));
   let socket: RoomSocket | null = null;
+  let reconnect: ReconnectWatch | null = null;
   let releaseWakeLock: (() => void) | null = null;
 
   const dispatch = (event: PhoneEvent): void => {
@@ -54,6 +56,13 @@ export function createPhoneSession({
 
   function enterRoom(session: StoredSession, ticket?: string): void {
     releaseWakeLock ??= keepScreenAwake();
+    // A phone that comes back to the page reconnects at once, with a fresh socket that skips the
+    // backoff and rejoins with the stored token.
+    reconnect ??= watchReconnect({
+      isClosed: () => socket?.isClosed() ?? false,
+      reconnectNow: () => enterRoom(session),
+      onLostTooLong: () => dispatch({ type: "socket-lost" }),
+    });
     socket?.close();
     socket = openRoomSocket({
       session,
@@ -65,10 +74,14 @@ export function createPhoneSession({
         // Every (re)connect syncs the room clock again: 5 samples, then 1 every 30 s (CC-1.14).
         if (message.t === "room:welcome") clock.connect((d) => send({ t: "clock:ping", d }));
       },
-      onOpen: () => dispatch({ type: "socket-open" }),
+      onOpen: () => {
+        reconnect?.opened();
+        dispatch({ type: "socket-open" });
+      },
       onLost: () => {
         clock.disconnect();
-        dispatch({ type: "socket-lost" });
+        // "Connection lost" shows only after 1 second without a socket.
+        reconnect?.lost();
       },
       onEnded: (reason) => {
         socket = null;
@@ -78,12 +91,18 @@ export function createPhoneSession({
     });
   }
 
+  function stopReconnecting(): void {
+    reconnect?.dispose();
+    reconnect = null;
+  }
+
   function send(message: PhoneToRelayMessage): void {
     socket?.send(message);
   }
 
   function leaveRoom(): void {
     clock.disconnect();
+    stopReconnecting();
     socket?.close();
     socket = null;
     releaseWakeLock?.();
@@ -131,6 +150,7 @@ export function createPhoneSession({
     send,
     dispose: () => {
       clock.disconnect();
+      stopReconnecting();
       socket?.close();
       socket = null;
       releaseWakeLock?.();

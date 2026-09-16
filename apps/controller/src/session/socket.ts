@@ -33,6 +33,8 @@ export interface RoomSocketOptions {
 
 export interface RoomSocket {
   send(message: PhoneToRelayMessage): void;
+  /** True while the socket is closed and waiting for partysocket's next attempt. */
+  isClosed(): boolean;
   close(): void;
 }
 
@@ -123,6 +125,8 @@ export function openRoomSocket(options: RoomSocketOptions): RoomSocket {
 
   return {
     send: (message) => socket.send(encode(message)),
+    isClosed: () =>
+      socket.readyState === PartySocket.CLOSED || socket.readyState === PartySocket.CLOSING,
     close: () => {
       ended = true;
       stopKeepAlive();

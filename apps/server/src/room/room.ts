@@ -20,7 +20,8 @@ import {
   roomState,
   type LifecycleFacts,
 } from "./lifecycle.ts";
-import { defaultProfile, RoomStorage, type RoomMeta } from "./storage.ts";
+import { arrivalOf, isSeatDue, seatExpiresAt } from "./reconnect.ts";
+import { defaultProfile, RoomStorage, type PlayerRecord, type RoomMeta } from "./storage.ts";
 import {
   hostTag,
   isHostState,
@@ -56,7 +57,8 @@ export interface RoomStatus {
  *
  * - Sockets are accepted with the Hibernation API, and memory is treated as wiped between events.
  *   Per-socket data lives in socket state, room data in SQLite.
- * - Deadlines use one Durable Object alarm. Nothing in this folder waits on a timer.
+ * - Deadlines use one Durable Object alarm: the room's close deadline and every reserved seat's
+ *   2-minute window. Nothing in this folder waits on a timer.
  * - No storage write per message. `onMessage` only checks size, parses, checks the role and
  *   forwards.
  */
@@ -120,7 +122,6 @@ export class Room extends Server {
       connection.close(1008, "Missing identity");
       return;
     }
-    // CC-2.5 (revoked), CC-2.6 (kicked) and CC-3.4 (seat window) refuse a returning player here.
     if (identity.role === "host") {
       this.#connectHost(connection, meta);
     } else {
@@ -162,9 +163,10 @@ export class Room extends Server {
     if (isPhoneState(state)) {
       if (this.#phoneById(state.id, connection.id)) return;
       if (this.#storage.readPlayer(state.id)?.leftAt != null) return;
-      // CC-3.4 keeps the seat for 2 minutes and later sends `expired`.
+      // The seat, colour and score stay reserved for 2 minutes. The alarm releases them after.
       this.#storage.markLeft(state.id, now);
       this.#sendToHost({ t: "player:left", d: { id: state.id, reason: "disconnected" } });
+      await this.#scheduleAlarm(now);
     }
   }
 
@@ -175,11 +177,11 @@ export class Room extends Server {
       return;
     }
     const now = Date.now();
-    const deadline = closeDeadline(this.#facts(meta));
-    if (now >= deadline) {
+    const reserved = this.#releaseDueSeats(now);
+    if (now >= closeDeadline(this.#facts(meta))) {
       await this.#closeRoom();
     } else {
-      await this.ctx.storage.setAlarm(deadline);
+      await this.ctx.storage.setAlarm(this.#nextDeadline(meta, now, reserved));
     }
   }
 
@@ -199,19 +201,37 @@ export class Room extends Server {
       const player = toPlayerInfo(phone.state as PhoneSocketState);
       this.#send(connection, { t: "player:joined", d: { player } });
     }
+    // Seats kept for dropped phones, so a TV that reloaded shows them as away.
+    for (const record of this.#storage.readReservedPlayers()) {
+      this.#send(connection, { t: "player:joined", d: { player: toPlayerInfo(record, false) } });
+    }
     // CC-3.5 sends the stored room:snapshot here.
     if (!previous) this.#sendToPhones({ t: "room:host", d: { connected: true } });
   }
 
   #connectPhone(connection: Socket, meta: RoomMeta, id: string, name: string): void {
     const now = Date.now();
+    // Seats whose window ran out are free before anyone is seated, even if the alarm is late.
+    const reserved = this.#releaseDueSeats(now);
     const previous = this.#phoneById(id, connection.id);
     const record = this.#storage.readPlayer(id);
+
+    // CC-2.5 (revoked, 4008) and CC-2.6 (kicked, 4003) refuse a returning player here, first.
+    const arrival = arrivalOf(record, now);
+    if (arrival === "expired") {
+      connection.close(closeCodes.seatExpired, "Seat expired");
+      return;
+    }
+    // Back inside the seat window, or a second tab: the host already knows this player.
+    const returning = arrival === "returning" && (previous !== undefined || record?.leftAt != null);
 
     const taken = new Set<number>();
     for (const phone of this.#phones()) {
       const state = phone.state as PhoneSocketState;
       if (phone.id !== previous?.id && state.slot !== null) taken.add(state.slot);
+    }
+    for (const seat of reserved) {
+      if (seat.id !== id && seat.slot !== null) taken.add(seat.slot);
     }
     const wanted = (previous?.state as PhoneSocketState | undefined)?.slot ?? record?.slot ?? null;
     // CC-3.10 caps the audience and promotes audience members to free seats.
@@ -236,8 +256,9 @@ export class Room extends Server {
       d: { role: state.role, code: meta.code, phase: meta.phase, you },
     });
     this.#send(connection, { t: "room:host", d: { connected: this.#firstHost() !== undefined } });
-    // CC-3.4 sends player:reconnected instead when the player returns within the seat window.
-    this.#sendToHost({ t: "player:joined", d: { player: you } });
+    // A returning player's host re-sends their current view on player:reconnected.
+    if (returning) this.#sendToHost({ t: "player:reconnected", d: { id } });
+    else this.#sendToHost({ t: "player:joined", d: { player: you } });
   }
 
   // ---- Messages --------------------------------------------------------------------------------
@@ -300,7 +321,8 @@ export class Room extends Server {
         this.#sendToHost({ t: "player:profile", d: message.d, from: state.id });
         return;
       case "player:leave":
-        this.#storage.markLeft(state.id, Date.now());
+        // Leaving frees the seat at once. No seat window.
+        this.#storage.releasePlayer(state.id, Date.now());
         this.#sendToHost({ t: "player:left", d: { id: state.id, reason: "left" } });
         connection.close(1000, "Left the room");
         return;
@@ -334,13 +356,40 @@ export class Room extends Server {
     };
   }
 
-  /** Makes sure the alarm fires no later than the room's current close deadline. */
+  /** Makes sure the alarm fires no later than the room's next deadline. */
   async #scheduleAlarm(now: number): Promise<void> {
     const meta = this.#storage.readMeta();
     if (!meta) return;
-    const deadline = Math.max(now, closeDeadline(this.#facts(meta)));
+    const deadline = this.#nextDeadline(meta, now, this.#storage.readReservedPlayers());
     const current = await this.ctx.storage.getAlarm();
     if (current === null || current > deadline) await this.ctx.storage.setAlarm(deadline);
+  }
+
+  /** The earliest of the close deadline and every reserved seat's expiry, never in the past. */
+  #nextDeadline(meta: RoomMeta, now: number, reserved: readonly PlayerRecord[]): number {
+    let deadline = closeDeadline(this.#facts(meta));
+    for (const { leftAt } of reserved) {
+      if (leftAt !== null) deadline = Math.min(deadline, seatExpiresAt(leftAt));
+    }
+    return Math.max(now, deadline);
+  }
+
+  /**
+   * Releases every seat whose 2-minute window has run out and tells the host with
+   * `player:left { reason: "expired" }`. A later rejoin closes with 4011. Returns the seats that
+   * stay reserved.
+   */
+  #releaseDueSeats(now: number): PlayerRecord[] {
+    const reserved: PlayerRecord[] = [];
+    for (const record of this.#storage.readReservedPlayers()) {
+      if (record.leftAt === null || !isSeatDue(record.leftAt, now)) {
+        reserved.push(record);
+        continue;
+      }
+      this.#storage.releasePlayer(record.id, now);
+      this.#sendToHost({ t: "player:left", d: { id: record.id, reason: "expired" } });
+    }
+    return reserved;
   }
 
   /** Closes every socket with 4004 and deletes everything the room stored. */

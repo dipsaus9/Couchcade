@@ -263,7 +263,7 @@ The room must be asleep whenever nobody is sending anything. These rules are tes
 | Table | Rows | Written when |
 |---|---|---|
 | `meta` | 1: code, created_at, locked, phase, host_seen_at | Create, lock, phase change, host leaves |
-| `players` | 1 per player ever seated: id, name, slot, profile, joined_at, left_at, kicked, revoked | Join, leave, profile change, kick, flood revocation |
+| `players` | 1 per player ever seated: id, name, slot, profile, joined_at, left_at, kicked, revoked, released | Join, leave, seat release (leave or the 2-minute window runs out), profile change, kick, flood revocation |
 | `snapshot` | 0 or 1: round, data, saved_at | `room:snapshot`, once per round |
 
 When the room closes, it calls `ctx.storage.deleteAll()` and deletes its alarm. Nothing survives a closed room.
