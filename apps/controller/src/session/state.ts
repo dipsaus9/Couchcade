@@ -1,0 +1,157 @@
+import {
+  closeCodes,
+  type ControllerView,
+  type PlayerInfo,
+  type RelayToPhoneMessage,
+  type RoomPhase,
+} from "@couchcade/protocol";
+import type { JoinFailure } from "../join/api.ts";
+import type { JoinDraft } from "../join/form.ts";
+import type { StoredSession } from "./storage.ts";
+
+/** Why the phone left a room for good. The phone doesn't reconnect after any of these. */
+export type EndReason =
+  | "kicked"
+  | "room-closed"
+  | "flooding"
+  | "replaced"
+  | "seat-expired"
+  | "rejoin-refused";
+
+/** A message on the join screen: why the last join failed or why the phone left a room. */
+export type Notice =
+  | { kind: "join-failed"; failure: JoinFailure }
+  | { kind: "ended"; reason: EndReason; code: string };
+
+export type PhoneState =
+  | { status: "join"; draft: JoinDraft; submitting: boolean; notice: Notice | null }
+  /** Joined through the API (or resuming a stored session), socket not welcomed yet. */
+  | { status: "connecting"; session: StoredSession }
+  | {
+      status: "room";
+      session: StoredSession;
+      you: PlayerInfo;
+      role: "player" | "audience";
+      phase: RoomPhase;
+      /** False while the TV is away (`room:host { connected: false }`). */
+      hostConnected: boolean;
+      /** False while this phone's socket is reconnecting. */
+      online: boolean;
+      gameId: string | null;
+      /** The last view the host sent, or null before the first one. */
+      view: ControllerView | null;
+    };
+
+export type PhoneEvent =
+  | { type: "join-submitted"; draft: JoinDraft }
+  | { type: "join-failed"; failure: JoinFailure }
+  | { type: "joined"; session: StoredSession }
+  | { type: "socket-open" }
+  | { type: "socket-lost" }
+  | { type: "message"; message: RelayToPhoneMessage }
+  | { type: "ended"; reason: EndReason };
+
+/** Which screen the phone shows. Game controllers arrive with CC-1.16. */
+export type PhoneScreen = "join" | "connecting" | "lobby" | "waiting";
+
+/**
+ * The first state after the page loads. A stored session for the same room resumes it: a reload
+ * keeps the player's seat. A QR link to another room starts a fresh join instead.
+ */
+export function initialState(urlCode: string | null, stored: StoredSession | null): PhoneState {
+  if (stored && (urlCode === null || urlCode === stored.code)) {
+    return { status: "connecting", session: stored };
+  }
+  return {
+    status: "join",
+    draft: { code: urlCode ?? "", name: "", codeFromUrl: urlCode !== null },
+    submitting: false,
+    notice: null,
+  };
+}
+
+export function reduce(state: PhoneState, event: PhoneEvent): PhoneState {
+  switch (event.type) {
+    case "join-submitted":
+      return { status: "join", draft: event.draft, submitting: true, notice: null };
+    case "join-failed":
+      if (state.status !== "join") return state;
+      return {
+        ...state,
+        submitting: false,
+        notice: { kind: "join-failed", failure: event.failure },
+      };
+    case "joined":
+      return { status: "connecting", session: event.session };
+    case "socket-open":
+    case "socket-lost":
+      if (state.status !== "room") return state;
+      return { ...state, online: event.type === "socket-open" };
+    case "message":
+      return onMessage(state, event.message);
+    case "ended": {
+      if (state.status === "join") return state;
+      const { code } = state.session;
+      return {
+        status: "join",
+        draft: { code, name: state.status === "room" ? state.you.name : "", codeFromUrl: false },
+        submitting: false,
+        notice: { kind: "ended", reason: event.reason, code },
+      };
+    }
+  }
+}
+
+function onMessage(state: PhoneState, message: RelayToPhoneMessage): PhoneState {
+  if (state.status === "join") return state;
+  switch (message.t) {
+    case "room:welcome": {
+      const { role, phase, you } = message.d;
+      // On a reconnect the last view stays up until the host sends the current one.
+      const previous = state.status === "room" ? state : null;
+      return {
+        status: "room",
+        session: state.session,
+        you,
+        role,
+        phase,
+        hostConnected: previous?.hostConnected ?? true,
+        online: true,
+        gameId: previous?.gameId ?? null,
+        view: previous?.view ?? null,
+      };
+    }
+    case "room:host":
+      if (state.status !== "room") return state;
+      return { ...state, hostConnected: message.d.connected };
+    case "controller:state":
+      if (state.status !== "room") return state;
+      return { ...state, gameId: message.d.gameId, view: message.d.view };
+    case "player:promoted":
+      if (state.status !== "room" || message.d.id !== state.you.id) return state;
+      return { ...state, role: "player", you: { ...state.you, slot: message.d.slot } };
+    case "clock:pong":
+      // Clock sync arrives with CC-1.14.
+      return state;
+  }
+}
+
+export function screenOf(state: PhoneState): PhoneScreen {
+  if (state.status !== "room") return state.status;
+  const { view, gameId, phase } = state;
+  if (view === null) return phase === "lobby" ? "lobby" : "waiting";
+  return gameId === null && view.screen === "lobby" ? "lobby" : "waiting";
+}
+
+const endReasonByCloseCode: Record<number, EndReason> = {
+  [closeCodes.kicked]: "kicked",
+  [closeCodes.roomClosed]: "room-closed",
+  [closeCodes.flooding]: "flooding",
+  [closeCodes.replaced]: "replaced",
+  [closeCodes.seatExpired]: "seat-expired",
+};
+
+/** The end reason for a close code, or null when the phone should reconnect. */
+export function endReasonForClose(code: number): EndReason | null {
+  return endReasonByCloseCode[code] ?? null;
+}
