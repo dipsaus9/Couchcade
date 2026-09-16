@@ -1,0 +1,22 @@
+{
+  "name": "@couchcade/theme",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The house style in code: colour, type, shape and motion tokens, CSS variables, Phaser colours and scene palettes. Tier 1.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@couchcade/config": "workspace:*",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}

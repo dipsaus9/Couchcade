@@ -1,0 +1,8 @@
+{
+  "extends": "@couchcade/config/tsconfig/lib.json",
+  "compilerOptions": {
+    // Types for import.meta.glob, which registers the scene palettes.
+    "types": ["vite/client"]
+  },
+  "include": ["src", "test", "vitest.config.ts"]
+}
