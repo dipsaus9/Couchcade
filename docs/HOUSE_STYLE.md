@@ -59,7 +59,7 @@ Six colours carry the entire interface.
 
 Rules:
 
-- Text is always Ink on light colours, or Chalk with an Ink text shadow on Turf and Signal.
+- Text is always Ink on light colours, or Chalk with a thin Ink outline (2px on phone, 3px on TV) plus the Ink text shadow on Turf and Signal. Plain Chalk on Turf (2.6:1) or Signal (3.4:1) fails WCAG AA; the outline makes it pass (owner decision, 16 September 2026).
 - Sunny is reserved for the single most important action on a screen.
 - Turf and Signal carry meaning (go/stop). Don't use them as decoration.
 
@@ -186,8 +186,8 @@ All interface components live in `@couchcade/ui` (Vue, phone and menus) and `@co
 | Variant | Fill | Label | Use |
 |---|---|---|---|
 | `primary` | Sunny | Ink | The one main action on a screen: Start game, Join |
-| `go` | Turf | Chalk + Ink shadow | Ready, Tap!, Throw |
-| `stop` | Signal | Chalk + Ink shadow | Leave room, Kick |
+| `go` | Turf | Chalk + Ink outline + Ink shadow | Ready, Tap!, Throw |
+| `stop` | Signal | Chalk + Ink outline + Ink shadow | Leave room, Kick |
 | `quiet` | Chalk | Ink | Secondary actions: How to play, Back |
 
 All buttons: pill radius, outline, `depth-rest`, `depth-pressed` on press, Sunny 4px focus ring with 4px offset, triggered on `pointerdown` during gameplay.
