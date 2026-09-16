@@ -8,7 +8,7 @@ The first playable Couchcade game. Everyone stands in a dusty desert street, the
 
 **For agents.** Everything below is binding for CC-10.2 to CC-10.8. [platform.md](../architecture/platform.md), [HOUSE_STYLE.md](../HOUSE_STYLE.md) and [platform-screens.md](../design/platform-screens.md) still apply. Where this spec and a story disagree, stop and flag it.
 
-Status: waiting for owner approval (CC-10.1). The owner answered the open questions on 2026-09-16.
+Status: approved by the owner on 2026-09-16 (CC-10.1), including the fake-out design.
 
 ---
 
