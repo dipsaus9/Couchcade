@@ -2,7 +2,7 @@
 
 **Your phone is the controller. The TV is the arcade.**
 
-Couchcade is a browser-based party game platform. One shared screen runs the game, everyone joins on their phone with a four-letter room code, and nobody installs anything. The games are original, short and physical, inspired by Wii Sports and retro arcade classics.
+Couchcade is a browser-based party game platform. One shared screen runs the game, everyone joins on their phone by scanning a QR code, and nobody installs anything. The games are short and physical, inspired by Wii Sports and retro arcade classics but with names of their own.
 
 ---
 
@@ -48,14 +48,26 @@ Both the host screen and every phone connect **outward** to a Cloudflare Worker 
 - **Phones are thin controllers.** The host tells each phone what to show; the phone sends back input events.
 - **Events, not streams.** Phones process sensor data locally and send one message per action, such as `throw { speed, angle, spin }`.
 
+### Who it's for
+
+Design for this setup first:
+
+| | |
+|---|---|
+| Players | Usually 2–4, sometimes more. Rooms hold up to 8. |
+| Phones | A mix of iPhone (Safari) and Android (Chrome). Every feature must work on both. |
+| Big screen | A laptop browser running the host, shown on the TV over HDMI or cast to a Chromecast. Timing games calibrate for the display lag. |
+| Language | English only. There is no translation layer. |
+
 ### Join flow
 
-1. The host clicks **Host a game**. An invisible Turnstile check runs, and `POST /api/rooms` returns a room code and a signed join ticket.
-2. The host connects to `wss://<domain>/ws/<code>?ticket=<ticket>`.
-3. A player opens the site, enters the code and a name, passes Turnstile, receives a ticket and connects.
-4. The relay issues a reconnect token (stored in `sessionStorage`) so a phone that locks its screen rejoins as the same player.
-5. The first player is the **VIP** and can start the game. The host can kick players and lock the room.
-6. Rooms hold up to 8 players. Extra joiners become audience.
+1. The host opens `/host` and enters the **host passcode**. Only people who know it can create rooms. An invisible Turnstile check runs, and `POST /api/rooms` checks the passcode and returns a room code and a signed host ticket.
+2. The host connects to `wss://<domain>/ws/<code>?ticket=<ticket>`. The TV shows a **QR code** for the join URL (`/?room=CODE`) and the **4-letter room code** next to it.
+3. A player scans the QR code, which opens the site with the room code already filled in. Players who can't scan open the site and type the 4-letter code instead.
+4. The player enters a name, passes Turnstile, receives a player ticket and connects. Joining is open: players need no passcode and no account.
+5. The relay issues a reconnect token (stored in `sessionStorage`) so a phone that locks its screen rejoins as the same player.
+6. The first player is the **VIP** and can start the game. The host can kick players and lock the room.
+7. Rooms hold up to 8 players. Extra joiners become audience.
 
 ### Messages
 
@@ -74,17 +86,28 @@ All messages are defined in `@couchcade/protocol`, validated on both ends and ca
 
 ## Games
 
-| Game | Inspiration | Phone input | Status |
-|---|---|---|---|
-| **Quick Draw** | Western reaction duel | Tap the moment the TV says draw; early is a foul | MVP |
-| **Pixel Derby** | Track & Field button mashing | Tap fast, manage your stamina | MVP |
-| **Strike Night** | Bowling | Hold, swing your phone, release; twist for spin | MVP |
-| **Bumper Sumo** | Arena brawlers | Tilt to steer, shake to dash | Planned |
-| **Duck Season** | Light-gun shooters | Point your phone at the TV, tap to shoot | Planned |
-| **Paddle Panic** | Four-sided Pong | Tilt or drag your paddle | Planned |
-| **Bandeja** | Tennis and padel | Swing timing, forehand or backhand | Planned |
+Fourteen games are planned. Each has its own epic in the backlog, and the names below are the approved names.
 
-Every motion control has a touch fallback. All names, art and sounds are original.
+| Game | Inspired by | Phone input | Players | Epic |
+|---|---|---|---|---|
+| **Quick Draw** | 1-2-Switch "Quick Draw", Kirby Super Star "Samurai Kirby" | Tap when the TV shouts DRAW; early is a foul | 2 (duel), up to 8 as a bracket | CC-10 |
+| **Target Range** | Wii Sports Resort "Archery" | Aim with the phone like a bow, drag down to draw, let go to shoot | 1–8 at once | CC-11 |
+| **Strike Night** | Wii Sports "Bowling" | Hold the grip, swing, release; twist for spin | 1–4 in turns | CC-12 |
+| **Putt Club** | Wii Sports "Golf" putting, Mario Golf | Hold the grip and swing like a putter | 1–4 in turns | CC-13 |
+| **Dinger Derby** | Wii Sports "Baseball", home run derby modes | Hold the grip and swing when the ball arrives | 1–8 in rotating turns | CC-14 |
+| **Double Top** | Pub darts, Wii Party darts | Point the phone to aim, flick forward to throw | 2–8 in turns | CC-15 |
+| **Tangle** | Achtung, die Kurve!, Tron light cycles | Hold left or right to steer | 2–8 at once | CC-16 |
+| **Bumper Sumo** | Mario Party "Bumper Balls" | Tilt to roll, shake to dash | 2–8 at once | CC-17 |
+| **Lob Squad** | Scorched Earth, Worms | Drag back like a slingshot for angle and power, release to fire | 2–8 in turns | CC-18 |
+| **Blast Block** | Bomberman | Virtual d-pad and a bomb button | 2–8 at once | CC-19 |
+| **Pixel Derby** | Konami "Track & Field", "Hyper Sports" | Alternate two big buttons; ease off to recover stamina | 2–8 at once | CC-20 |
+| **Duck Season** | Duck Hunt (NES Zapper), Wii Remote pointer | Point the phone at the TV, tap to shoot | 1–4 at once | CC-21 |
+| **Paddle Panic** | Pong, Atari "Warlords" | Drag slider for the paddle; optional tilt | 2–4 at once | CC-22 |
+| **Bandeja** | Wii Sports "Tennis", padel | Swing at the right moment, forehand or backhand | 2–4, singles or doubles | CC-23 |
+
+Quick Draw is the first playable game. Every motion control has a touch fallback.
+
+"Inspired by" names what a game plays like, never what it copies. Game names are original. Art and sound are original or come from CC0 packs recoloured to the house style palettes and credited in the game's `CREDITS.md`. Never use assets, names or characters from existing games. See [Assets and credits](docs/HOUSE_STYLE.md#assets-and-credits).
 
 ---
 
@@ -99,15 +122,19 @@ Every motion control has a touch fallback. All names, art and sounds are origina
 | Host rendering | Phaser 4 (custom build) |
 | Controller UI | Vue 3.5 |
 | Relay and API | Cloudflare Workers + Durable Objects (SQLite-backed, WebSocket Hibernation API) |
+| Rooms on Durable Objects | partyserver |
+| Reconnecting WebSocket client | partysocket |
+| Virtual joystick | nipplejs |
+| 2D physics | Planck.js (`packages/physics`, fixed step) |
 | Local Worker runtime | `@cloudflare/vite-plugin` (runs `workerd`) |
 | Validation | Zod 4 (`zod/mini` on the phone) |
 | Bot protection | Cloudflare Turnstile + Workers Rate Limiting binding |
-| Testing | Vitest 4.1 (unit, browser mode, visual), `@cloudflare/vitest-plugin`, Playwright, fast-check, axe-core |
+| Testing | Vitest 4.1 (unit), `@cloudflare/vitest-plugin`, Playwright (E2E); fast-check and axe-core where a story needs them |
 | Budgets | size-limit, Lighthouse CI |
 | Import boundaries | dependency-cruiser |
 | CI/CD | GitHub Actions + Wrangler |
 
-> Every choice is free. See [`docs/TECH_STACK.md`](docs/TECH_STACK.md) for the research behind it, the alternatives that were rejected, and the open questions for Phase 0. Vite+ is postponed until 1.0; the configs stay plain Vite, Vitest and Oxc so a later move is cheap.
+> Every choice is free. See [`docs/TECH_STACK.md`](docs/TECH_STACK.md) for the research behind it, the alternatives that were rejected, and the open questions for the CC-1 spikes. Vite+ is postponed until 1.0; the configs stay plain Vite, Vitest and Oxc so a later move is cheap.
 
 ---
 
@@ -129,9 +156,10 @@ couchcade/
 │   │   ├── src/controller/    # Vue components (built from @couchcade/ui)
 │   │   ├── src/shared/        # Rules, scoring, messages: pure functions
 │   │   ├── src/index.ts       # Exports the CouchcadeGame definition
-│   │   └── test/              # Rules, contract, replays, visuals
-│   ├── pixel-derby/
-│   └── strike-night/
+│   │   ├── test/              # Unit tests: rules, contract, replay
+│   │   └── CREDITS.md         # Credits for every CC0 asset the game uses
+│   ├── strike-night/
+│   └── …                      # One package per game, 14 planned
 ├── packages/
 │   ├── theme/                 # House style tokens → CSS variables + Phaser colours
 │   ├── ui/                    # Vue components: buttons, panels, chips, Pips
@@ -141,8 +169,9 @@ couchcade/
 │   │   └── testing/           # testGameContract(), fake room, input replayer
 │   ├── utils/                 # Pure helpers: room codes, math, easing, seeded RNG, timing
 │   ├── motion/                # Sensor permissions, calibration, gesture detection
+│   ├── physics/               # Deterministic 2D physics on Planck.js
 │   └── config/                # Shared tsconfig bases and Vite/Vitest presets
-├── e2e/                       # Playwright multi-device tests
+├── e2e/                       # Playwright multi-device tests, one bot match per game
 ├── tooling/                   # check-style, budgets, sensor trace recorder
 ├── docs/
 │   ├── HOUSE_STYLE.md         # Visual and interaction guidelines
@@ -175,8 +204,8 @@ pnpm dev
 
 This starts the Worker (API, relay and static assets) in the local `workerd` runtime, plus the host and controller dev servers.
 
-- Host: open `/host` on your laptop
-- Controller: open the root URL on your phone (same network, or use the dev tunnel below)
+- Host: open `/host` on your laptop and enter `HOST_PASSCODE`
+- Controller: scan the QR code on the host screen, or open the root URL on your phone and type the room code (same network, or use the dev tunnel below)
 
 ### Local secrets
 
@@ -187,6 +216,8 @@ This starts the Worker (API, relay and static assets) in the local `workerd` run
 TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
 # Any long random string for local development
 TICKET_SIGNING_SECRET=change-me-to-a-long-random-string
+# The passcode the host enters to create a room
+HOST_PASSCODE=change-me
 ```
 
 The controller and host use the matching Turnstile test site key in development, so no real challenges are shown locally.
@@ -211,11 +242,12 @@ Every package exposes the same script names, so root commands run across the who
 |---|---|
 | `pnpm dev` | Starts server, host and controller |
 | `pnpm check` | Checks formatting, lints and type-checks |
-| `pnpm test` | Runs unit and integration tests with coverage thresholds |
-| `pnpm e2e` | Runs Playwright E2E, game scene and visual tests |
+| `pnpm test` | Runs unit and integration tests |
+| `pnpm e2e` | Runs the Playwright multi-device E2E tests, including one bot-plays-a-match test per game |
 | `pnpm check:style` | Fails on colours or fonts outside `@couchcade/theme`, off-palette sprites, `v-html` and `new Date()` in `shared/` |
 | `pnpm check:deps` | Enforces import boundaries |
 | `pnpm budgets` | Runs size-limit and Lighthouse CI |
+| `pnpm assets:recolour <input> <scene>` | Maps a CC0 sprite onto the core + scene palette |
 | `pnpm build` | Builds everything |
 | `pnpm run deploy` | Builds and deploys the Worker with Wrangler (`pnpm deploy` is a built-in pnpm command, so use `run`) |
 
@@ -276,36 +308,32 @@ export interface CouchcadeGame<TInput, TState> {
 }
 ```
 
-3. Register the game in the host's game registry.
+3. Export the definition from `src/index.ts`. The host's registry discovers every `games/*/src/index.ts` on its own, so there is no shared registry file to edit.
 4. Before merging, the game must have:
-   - Unit and property tests for its rules
-   - A passing `testGameContract(game)` suite
-   - At least three recorded replays
-   - A Playwright scene test where a bot plays a full match
+   - Unit tests for its rules, including a passing `testGameContract(game)` suite and one recorded replay
+   - One Playwright E2E test where bot phones play a full match
    - A touch fallback for every motion input
+   - A `CREDITS.md` entry for every CC0 asset it uses
    - A house style review against [`docs/HOUSE_STYLE.md`](docs/HOUSE_STYLE.md)
 
 ---
 
 ## Testing
 
-Every package and game has tests, and coverage thresholds are enforced per package.
+The test bar is deliberately lean:
 
-| Area | Test types | Tools | Coverage |
-|---|---|---|---|
-| `utils` | Unit, property-based | Vitest, fast-check | 95% |
-| `protocol` | Valid and invalid fixtures per message, size cap, round-trips | Vitest | All message types |
-| `theme` | Token snapshots, WCAG AA contrast checks, generated output | Vitest | 95% |
-| `game-sdk` | Lifecycle, throttling, registry, testing helpers | Vitest | 90% |
-| `motion` | Recorded sensor traces from real phones replayed through gesture detection | Vitest | 90% |
-| `ui` | Component interaction, accessibility, visual regression | Vitest browser mode, axe-core | 85% |
-| `stage` | Visual snapshots at fixed seed | Playwright | All components |
-| `apps/server` | Room lifecycle, hibernation, reconnects, cleanup, security rules | `@cloudflare/vitest-plugin` | 90% |
-| Game rules | Unit and property tests | Vitest, fast-check | 90% |
-| Game contract | `testGameContract(game)` | game-sdk/testing | Required |
-| Game replays | Input logs replayed to an exact final state | game-sdk/testing | 3+ per game |
-| Game scenes | Headless boot, bot plays a full match, FPS sampled | Playwright | Required |
-| E2E | Host + 4 phones: create, join, play, disconnect, rejoin, play again, leave | Playwright (Chromium + WebKit) | Critical paths |
+- **Unit tests for game and platform logic.** Rules, state, protocol, relay behaviour and helpers are tested where the logic lives.
+- **One bot-plays-a-match E2E test per game.** A host and bot phones play a full match in Playwright and a winner is asserted.
+- **No coverage thresholds.** No package fails CI on a coverage percentage. A story's acceptance criteria say which tests it needs.
+
+| Area | What is tested | Tools |
+|---|---|---|
+| Platform packages (`utils`, `protocol`, `theme`, `game-sdk`, `motion`, `physics`, …) | Unit tests for their logic; `motion` replays recorded sensor traces | Vitest, fast-check where useful |
+| `ui` | Component behaviour and accessibility | Vitest, axe-core |
+| `apps/server` | Room lifecycle, forwarding, hibernation rules, security rules | `@cloudflare/vitest-plugin` |
+| Game rules | Unit tests for scoring and win conditions, `testGameContract(game)`, one recorded replay | Vitest, game-sdk/testing |
+| Game match | Bot phones play a full match against the host, one test per game | Playwright |
+| Platform E2E | Host creates a room and phones join | Playwright (Chromium + WebKit) |
 
 ### Recording sensor traces
 
@@ -323,8 +351,8 @@ Playwright can't emulate motion sensors, so `@couchcade/motion` reads sensors th
 Pull request
  ├─ check                         lint, format, types
  ├─ check:style + check:deps      house style and import boundaries
- ├─ test                          unit + integration + coverage thresholds
- ├─ e2e                           E2E + game scenes + visual regression, against the local Worker
+ ├─ test                          unit + integration
+ ├─ e2e                           multi-device E2E + one bot match per game, against the local Worker
  ├─ budgets                       size-limit + Lighthouse CI (assert only)
  └─ security                      pnpm audit + CodeQL
 Merge to main
@@ -332,7 +360,6 @@ Merge to main
 ```
 
 - There are no preview deploys: Cloudflare doesn't create preview URLs for Workers with Durable Objects.
-- Visual baselines are generated in the pinned Playwright Docker image, never on a Mac.
 - Traces and reports are uploaded only when a job fails, and kept for 7 days.
 
 ---
@@ -343,7 +370,7 @@ Couchcade has no accounts, no chat, no email forms and no stored user content, s
 
 | Threat | Defence |
 |---|---|
-| Bots creating rooms | Turnstile on **Host a game**, 3 rooms per IP per minute, 1 active room per host session |
+| Strangers or bots creating rooms | Host passcode required to create a room, rate-limited passcode attempts, Turnstile, 3 rooms per IP per minute, 1 active room per host session |
 | Guessing room codes | Turnstile on join, 10 join attempts per IP per minute, codes only valid while the host is connected, interactive challenge after 3 wrong codes |
 | Direct WebSocket connections | Signed HMAC ticket required (60-second expiry, bound to room and role); `Origin` must match |
 | Message flooding | Per-socket token bucket (20/s, burst 40); violators are disconnected and their reconnect token is revoked |
@@ -380,6 +407,7 @@ Permissions-Policy: accelerometer=(self), gyroscope=(self), camera=(), microphon
 cd apps/server
 npx wrangler secret put TURNSTILE_SECRET_KEY
 npx wrangler secret put TICKET_SIGNING_SECRET
+npx wrangler secret put HOST_PASSCODE
 ```
 
 ### Reporting a vulnerability
@@ -452,7 +480,7 @@ Rules to stay inside the limits:
 8. Delete rooms after 30 minutes idle or 4 hours total.
 9. Create rooms with `locationHint: "weur"`.
 
-A 2-hour game night uses roughly 15,000 Durable Object requests if the 20:1 ratio applies on Free, and more than the daily limit if it doesn't. Phase 0 measures this before any game is built. See [`docs/TECH_STACK.md`](docs/TECH_STACK.md#the-request-budget) for the numbers and the fallback.
+A 2-hour game night uses roughly 15,000 Durable Object requests if the 20:1 ratio applies on Free, and more than the daily limit if it doesn't. The free-tier probe spike (CC-1.4) measures this before any game is built. See [`docs/TECH_STACK.md`](docs/TECH_STACK.md#the-request-budget) for the numbers and the fallback.
 
 Limits last verified 16 September 2026. Check the Cloudflare pricing docs before relying on them.
 
@@ -483,12 +511,36 @@ See [`docs/HOUSE_STYLE.md`](docs/HOUSE_STYLE.md) for the full guidelines.
 
 ## Roadmap
 
-- [ ] **Phase 0: Foundations.** Walking skeleton (host + phone over the local dev server), free-tier measurement on a real deploy, monorepo, CI, relay with hibernation, security baseline (Turnstile, tickets, rate limits, headers), first deploy
-- [ ] **Phase 1: Platform core + house style.** `theme`, `ui`, `stage`, `protocol`, `game-sdk`, `utils`; lobby with Pips, VIP, kick and lock; reconnects; budgets and visual regression
-- [ ] **Phase 2: Quick Draw + Pixel Derby.** Rounds, reaction timing, throttled real-time input, first playtest
-- [ ] **Phase 3: Strike Night.** Motion package, sensor traces, physics
-- [ ] **Phase 4: Polish and launch.** Music and sound, attract mode, host-refresh recovery, audience mode
-- [ ] **Phase 5: Later.** Bumper Sumo, Duck Season, Paddle Panic, Bandeja, tournaments, WebRTC
+The roadmap is the backlog: one epic per area, each broken into stories in [`backlog/tasks/`](backlog/tasks/). Run `backlog task list --plain` for the current status.
+
+### Platform
+
+- [ ] **CC-1: Platform foundations and playable skeleton.** Monorepo, relay, host and controller shells, game SDK contract, clock sync, CI and deploy, ending with Quick Draw playable on the live site
+- [ ] **CC-2: Security baseline and moderation.** Turnstile, rate limits, name rules, flood protection, security headers, host kick and lock
+- [ ] **CC-3: Session flow and game SDK extensions.** Game menu, results, reconnects, recovery, real-time input helpers, lag compensation, TV lag calibration, physics, create-game template
+- [ ] **CC-4: House style: design, theme, UI kit and stage.** Design canvas, theme tokens, fonts, UI kit, controller input components, stage overlays, CC0 asset pipeline, style checks
+- [ ] **CC-5: Motion controls.** Sensor adapter with the iOS permission flow, calibration, gesture detectors, touch fallbacks, trace recorder
+- [ ] **CC-6: Pips player avatars.** Parts spec, generator, Interface and World Pips, lobby customiser
+- [ ] **CC-7: Sound, music and haptics.** CC0 effects and chiptune loops, haptics on Android, volume and reduced-motion settings
+- [ ] **CC-8: Party mode.** Chains short games with running standings and a final podium
+- [ ] **CC-9: Polish and launch.** Budgets, monitoring, attract mode, friendly errors, game night guide
+
+### Games
+
+- [ ] **CC-10: Quick Draw**
+- [ ] **CC-11: Target Range**
+- [ ] **CC-12: Strike Night**
+- [ ] **CC-13: Putt Club**
+- [ ] **CC-14: Dinger Derby**
+- [ ] **CC-15: Double Top**
+- [ ] **CC-16: Tangle**
+- [ ] **CC-17: Bumper Sumo**
+- [ ] **CC-18: Lob Squad**
+- [ ] **CC-19: Blast Block**
+- [ ] **CC-20: Pixel Derby**
+- [ ] **CC-21: Duck Season**
+- [ ] **CC-22: Paddle Panic**
+- [ ] **CC-23: Bandeja**
 
 ---
 
@@ -496,14 +548,14 @@ See [`docs/HOUSE_STYLE.md`](docs/HOUSE_STYLE.md) for the full guidelines.
 
 1. Create a branch from `main`.
 2. Keep changes inside the right package and follow the dependency direction.
-3. Add or update tests; coverage thresholds must pass.
+3. Add or update unit tests for the game or platform logic you change. A new game also needs its bot-plays-a-match E2E test.
 4. Run `pnpm check`, `pnpm test` and `pnpm check:style` locally.
 5. Open a pull request. All CI checks must be green before merging.
 
-All names, art and sounds must be original. Don't use assets, names or characters from existing games.
+Names must be original. Art and sounds must be original, or CC0 assets recoloured to the house style palettes with an entry in the game's `CREDITS.md`. Don't use assets, names or characters from existing games. All copy is in English.
 
 ---
 
 ## License
 
-The code is released under the [MIT License](LICENSE). The Fredoka and Pixelify Sans fonts keep their own SIL Open Font License 1.1, shipped as `OFL.txt` next to the font files.
+The code is released under the [MIT License](LICENSE). The Fredoka and Pixelify Sans fonts keep their own SIL Open Font License 1.1, shipped as `OFL.txt` next to the font files. CC0 assets don't require attribution, but each one is credited in its game's `CREDITS.md`, and those entries are collected into `docs/CREDITS.md`.
