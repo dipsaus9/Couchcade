@@ -1,0 +1,12 @@
+{
+  "parallelism": { "maxAgents": 3 },
+  "worktree": {
+    "path": ".worktrees",
+    "install": "pnpm install --frozen-lockfile",
+    "includeGitignored": ["apps/server/.dev.vars"]
+  },
+  "verify": [],
+  "pr": { "mode": "create" },
+  "review": { "enabled": true, "model": "sonnet", "maxRounds": 3 },
+  "backlog": { "dir": "backlog", "prefix": "CC" }
+}
