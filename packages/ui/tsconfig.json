@@ -1,0 +1,8 @@
+{
+  "extends": "@couchcade/config/tsconfig/vue.json",
+  "compilerOptions": {
+    // Vitest browser mode types for the custom commands in test/.
+    "types": ["vite/client", "@vitest/browser-playwright"]
+  },
+  "include": ["src", "test", "vitest.config.ts"]
+}

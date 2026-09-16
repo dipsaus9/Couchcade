@@ -4,7 +4,7 @@ title: Stream aim orientation with recentring and a drag fallback
 status: To Do
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-16 12:28'
+updated_date: '2026-09-16 16:44'
 labels:
   - story
 dependencies:
@@ -31,8 +31,8 @@ Branch: CC-5.5/aim-gesture
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 Yaw and pitch are emitted as -1..1 relative to a recentre point
-- [ ] #2 Aim is sent through the CC-3.6 batching helper at ≤ 15 Hz
-- [ ] #3 The drag fallback emits the same shape
+- [ ] #2 The drag fallback emits the same shape
+- [ ] #3 Aim is sampled at up to 15 Hz and sent packed through the CC-3.6 batching helper at most 4 messages per second (docs/architecture/motion.md)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -40,4 +40,6 @@ Branch: CC-5.5/aim-gesture
 <!-- SECTION:NOTES:BEGIN -->
 Verify: pnpm check && pnpm test
 Tune thresholds with traces from CC-5.9 when available.
+
+Amended 2026-09-16 (motion.md conflict 1): 15 Hz is the sampling rate; the platform budget allows at most 4 messages per second.
 <!-- SECTION:NOTES:END -->
