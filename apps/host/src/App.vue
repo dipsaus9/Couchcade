@@ -1,11 +1,15 @@
 <script setup lang="ts">
+import { roomClock } from "@couchcade/game-sdk/clock";
 import { onBeforeUnmount, ref } from "vue";
+import { localNow } from "./runtime/timing.ts";
 import LobbyScreen from "./screens/lobby/LobbyScreen.vue";
+import MenuScreen from "./screens/menu/MenuScreen.vue";
 import PasscodeScreen from "./screens/passcode/PasscodeScreen.vue";
 import { useHostSession } from "./session/use-host-session.ts";
 
 const { screen, openRoom, endRoom } = useHostSession();
 const origin = window.location.origin;
+const roomNow = () => roomClock.toHostTime(localNow());
 
 // Screens are laid out on a 1920×1080 TV frame, like the design canvas, and scaled to the window.
 const frameWidth = 1920;
@@ -34,6 +38,12 @@ onBeforeUnmount(() => window.removeEventListener("resize", fit));
       :connection="screen.connection"
       :origin="origin"
       @end="endRoom"
+    />
+    <MenuScreen
+      v-else-if="screen.name === 'menu'"
+      :lobby="screen.lobby"
+      :menu="screen.menu"
+      :room-now="roomNow"
     />
     <PasscodeScreen
       v-else-if="screen.name === 'passcode'"

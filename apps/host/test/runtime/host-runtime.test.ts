@@ -3,13 +3,16 @@ import type { CouchcadeGame } from "@couchcade/game-sdk/contract";
 import { createRegistry } from "@couchcade/game-sdk/registry";
 import type { HostToRelayMessage, RelayToHostMessage } from "@couchcade/protocol";
 import { describe, expect, it } from "vitest";
+import { countdownMs } from "../../src/screens/menu/menu.ts";
 import { createHostRuntime } from "../../src/runtime/host-runtime.ts";
 import type { GameStage } from "../../src/runtime/stage.ts";
 import {
   createVirtualTime,
   echoGame,
+  backAction,
   inputMessage,
   lobbyWith,
+  pickAction,
   startAction,
   type EchoState,
 } from "./fixtures.ts";
@@ -45,6 +48,12 @@ function setup({ games = [echoGame()] as CouchcadeGame[], sceneFails = false } =
   const lobby = lobbyWith(3);
   const [vip, second] = lobby.players.map((player) => player.id) as [string, string];
   const handle = (message: RelayToHostMessage, state = lobby) => runtime.handle(message, state);
+  /** The VIP opens the menu, picks `gameId` and the countdown runs out. */
+  const play = (gameId = "echo") => {
+    handle(startAction(vip));
+    handle(pickAction(vip, gameId));
+    time.advance(countdownMs);
+  };
   const ofType = <T extends HostToRelayMessage["t"]>(t: T) =>
     sent.filter((message): message is Extract<HostToRelayMessage, { t: T }> => message.t === t);
   return {
@@ -57,6 +66,7 @@ function setup({ games = [echoGame()] as CouchcadeGame[], sceneFails = false } =
     vip,
     second,
     handle,
+    play,
     ofType,
     changes: () => changes,
   };
@@ -71,57 +81,140 @@ const pong = (d: { id: number; t0: number }): RelayToHostMessage => ({
   d: { ...d, t1: Math.round(d.t0) + 3000 },
 });
 
+const welcome = (phase: "menu" | "lobby"): RelayToHostMessage => ({
+  t: "room:welcome",
+  d: { role: "host", code: "BEAN", phase, locked: false },
+});
+
 const echoState = (runtime: ReturnType<typeof setup>["runtime"]) =>
   runtime.running?.runner.state as EchoState;
 
 describe("createHostRuntime", () => {
-  it("lets only the VIP start a game", () => {
-    const { runtime, handle, second, vip, sent } = setup();
+  it("gives the VIP the game buttons in the lobby and follows the VIP when they drop", () => {
+    const { handle, vip, second, lobby, ofType, time } = setup();
+    const third = lobby.players[2]!.id;
+    handle({ t: "player:joined", d: { player: lobby.players[2]! } });
+    expect(ofType("controller:state").at(-1)?.d).toEqual({
+      gameId: null,
+      views: [
+        { to: [vip], view: { screen: "lobby", data: { vip: true } } },
+        { to: [second, third], view: { screen: "lobby", data: { vip: false } } },
+      ],
+    });
+
+    const dropped = {
+      ...lobby,
+      players: lobby.players.map((p) => (p.id === vip ? { ...p, connected: false } : p)),
+    };
+    handle({ t: "player:left", d: { id: vip, reason: "disconnected" } }, dropped);
+    time.advance(667);
+    expect(ofType("controller:state")).toHaveLength(2);
+    expect(ofType("controller:state").at(-1)?.d.views).toEqual([
+      { to: [vip], view: { screen: "lobby", data: { vip: false } } },
+      { to: [second], view: { screen: "lobby", data: { vip: true } } },
+    ]);
+    // Only the new VIP can open the menu now.
+    handle(startAction(vip), dropped);
+    handle(startAction(second), dropped);
+    expect(ofType("room:phase")).toEqual([{ t: "room:phase", d: { phase: "menu" } }]);
+  });
+
+  it("opens the menu only for the VIP: TV phase, the VIP's list and vip-choosing for others", () => {
+    const { runtime, handle, second, vip, sent, ofType, changes, lobby } = setup({
+      games: [echoGame(), echoGame({ id: "big", min: 4 })],
+    });
     handle(startAction(second));
-    expect(runtime.running).toBeNull();
+    handle(pickAction(second, "echo"));
+    expect(runtime.phase).toBe("lobby");
     expect(sent).toEqual([]);
 
     handle(startAction(vip));
-    expect(runtime.running?.game.id).toBe("echo");
+    expect(runtime.phase).toBe("menu");
+    expect(changes()).toBe(1);
+    expect(ofType("room:phase")).toEqual([{ t: "room:phase", d: { phase: "menu" } }]);
+    expect(runtime.menu?.games.map(({ id, fits }) => [id, fits])).toEqual([
+      ["big", false],
+      ["echo", true],
+    ]);
+    expect(ofType("controller:state").at(-1)?.d).toEqual({
+      gameId: null,
+      views: [
+        {
+          to: [vip],
+          view: {
+            screen: "menu",
+            data: {
+              games: [
+                ["big", "Echo", 0],
+                ["echo", "Echo", 1],
+              ],
+              picked: null,
+              startsAt: null,
+            },
+          },
+        },
+        {
+          to: lobby.players.slice(1).map((player) => player.id),
+          view: { screen: "vip-choosing", data: { name: lobby.players[0]!.name } },
+        },
+      ],
+    });
   });
 
-  it("starts the first registered game with the seated players and a seed", async () => {
+  it("starts the picked game with the seated players and a seed when the countdown ends", async () => {
     const games = [echoGame({ id: "zebra" }), echoGame({ id: "aardvark" })];
-    const { runtime, handle, vip, lobby, ofType, stageLog, changes } = setup({ games });
+    const { runtime, handle, vip, lobby, ofType, stageLog, time } = setup({ games });
     handle(startAction(vip));
+    handle(pickAction(vip, "zebra"));
+    expect(runtime.menu?.countdown?.gameId).toBe("zebra");
+    time.advance(countdownMs - 1);
+    expect(runtime.running).toBeNull();
+    time.advance(1);
     await settle();
 
-    expect(runtime.running?.game.id).toBe("aardvark");
+    expect(runtime.running?.game.id).toBe("zebra");
+    expect(runtime.phase).toBe("playing");
+    expect(runtime.menu).toBeNull();
     expect(echoState(runtime).players).toEqual(lobby.players.map((player) => player.id));
     expect(echoState(runtime).seed).toBe(7);
-    expect(ofType("room:phase")).toEqual([{ t: "room:phase", d: { phase: "playing" } }]);
-    expect(ofType("controller:state")[0]?.d.gameId).toBe("aardvark");
-    expect(stageLog).toEqual(["start aardvark 3"]);
-    expect(changes()).toBe(1);
+    expect(ofType("room:phase").map((message) => message.d.phase)).toEqual(["menu", "playing"]);
+    expect(ofType("controller:state").at(-1)?.d.gameId).toBe("zebra");
+    expect(stageLog).toEqual(["start zebra 3"]);
   });
 
-  it("ignores start while a game runs, with no games, or when the player count doesn't fit", () => {
-    const empty = setup({ games: [] });
-    empty.handle(startAction(empty.vip));
-    expect(empty.runtime.running).toBeNull();
-    expect(empty.warnings).toEqual(["no games registered"]);
+  it("cancels the countdown on back-to-menu", () => {
+    const { runtime, handle, vip, time } = setup();
+    handle(startAction(vip));
+    handle(pickAction(vip, "echo"));
+    time.advance(1000);
+    handle(backAction(vip));
+    expect(runtime.menu?.countdown).toBeNull();
+    time.advance(countdownMs * 2);
+    expect(runtime.running).toBeNull();
+    expect(runtime.phase).toBe("menu");
+  });
 
+  it("ignores picks of games that don't fit and menu actions while a game runs", () => {
     const tooFew = setup({ games: [echoGame({ min: 4 })] });
     tooFew.handle(startAction(tooFew.vip));
+    tooFew.handle(pickAction(tooFew.vip, "echo"));
+    tooFew.time.advance(countdownMs);
     expect(tooFew.runtime.running).toBeNull();
-    expect(tooFew.sent).toEqual([]);
+    expect(tooFew.runtime.menu?.countdown).toBeNull();
 
     const busy = setup();
-    busy.handle(startAction(busy.vip));
+    busy.play();
     const runner = busy.runtime.running?.runner;
     busy.handle(startAction(busy.vip));
+    busy.handle(pickAction(busy.vip, "echo"));
+    busy.time.advance(countdownMs);
     expect(busy.runtime.running?.runner).toBe(runner);
-    expect(busy.ofType("room:phase")).toHaveLength(1);
+    expect(busy.ofType("room:phase")).toHaveLength(2);
   });
 
   it("ticks at a fixed 60 Hz once the scene has loaded", async () => {
-    const { runtime, handle, vip, time } = setup();
-    handle(startAction(vip));
+    const { runtime, play, time } = setup();
+    play();
     time.advance(500);
     expect(runtime.running?.runner.tick).toBe(0);
 
@@ -133,8 +226,8 @@ describe("createHostRuntime", () => {
   });
 
   it("still runs the game when the scene fails to load, with a warning", async () => {
-    const { runtime, handle, vip, time, warnings } = setup({ sceneFails: true });
-    handle(startAction(vip));
+    const { runtime, play, time, warnings } = setup({ sceneFails: true });
+    play();
     await settle();
     time.advance(1001);
     expect(runtime.running?.runner.tick).toBe(60);
@@ -142,8 +235,8 @@ describe("createHostRuntime", () => {
   });
 
   it("applies inputs in arrival order before the tick and drops ones failing the inputSchema", async () => {
-    const { runtime, handle, vip, second, time, warnings } = setup();
-    handle(startAction(vip));
+    const { runtime, handle, play, vip, second, time, warnings } = setup();
+    play();
     await settle();
     handle(inputMessage(second, { type: "say", payload: { text: "one" } }));
     handle(inputMessage(vip, { type: "say", payload: { text: 2 } }));
@@ -159,9 +252,10 @@ describe("createHostRuntime", () => {
   });
 
   it("sends at most one controller:state per tick and no more than 1.5 per second", async () => {
-    const { handle, vip, time, ofType } = setup();
-    handle(startAction(vip));
+    const { handle, play, vip, time, ofType } = setup();
+    play();
     await settle();
+    const beforeGame = ofType("controller:state").length;
     // A new view every tick for 6 seconds.
     for (let tick = 0; tick < 360; tick++) {
       handle(inputMessage(vip, { type: "say", payload: { text: String(tick) } }));
@@ -169,12 +263,14 @@ describe("createHostRuntime", () => {
       time.advance(1000 / 60);
       expect(ofType("controller:state").length - before).toBeLessThanOrEqual(1);
     }
-    expect(ofType("controller:state").length).toBeLessThanOrEqual(1 + Math.ceil(6000 / 667));
+    expect(ofType("controller:state").length - beforeGame).toBeLessThanOrEqual(
+      1 + Math.ceil(6000 / 667),
+    );
   });
 
   it("returns host and phones to the lobby when the game has an outcome", async () => {
-    const { runtime, handle, vip, second, time, ofType, stageLog, changes, lobby } = setup();
-    handle(startAction(vip));
+    const { runtime, handle, play, vip, second, time, ofType, stageLog, changes, lobby } = setup();
+    play();
     await settle();
     time.advance(1000);
     handle(inputMessage(second, { type: "end" }));
@@ -182,15 +278,25 @@ describe("createHostRuntime", () => {
 
     expect(runtime.running).toBeNull();
     expect(stageLog).toEqual(["start echo 3", "stop echo"]);
-    expect(changes()).toBe(2);
-    expect(ofType("room:phase").map((message) => message.d.phase)).toEqual(["playing", "lobby"]);
+    // Menu opened, game picked, game started, game ended.
+    expect(changes()).toBe(4);
+    expect(runtime.phase).toBe("lobby");
+    expect(ofType("room:phase").map((message) => message.d.phase)).toEqual([
+      "menu",
+      "playing",
+      "lobby",
+    ]);
 
     time.advance(1000);
     const last = ofType("controller:state").at(-1);
     expect(last?.d).toEqual({
       gameId: null,
       views: [
-        { to: lobby.players.map((player) => player.id), view: { screen: "lobby", data: null } },
+        { to: [vip], view: { screen: "lobby", data: { vip: true } } },
+        {
+          to: lobby.players.slice(1).map((player) => player.id),
+          view: { screen: "lobby", data: { vip: false } },
+        },
       ],
     });
 
@@ -201,7 +307,7 @@ describe("createHostRuntime", () => {
   });
 
   it("syncs the host to the room clock on welcome and judges inputs on game time", async () => {
-    const { runtime, handle, vip, time, ofType } = setup();
+    const { runtime, handle, play, time, vip, ofType } = setup();
     handle({ t: "room:welcome", d: { role: "host", code: "BEAN", phase: "lobby", locked: false } });
     const [ping] = ofType("clock:ping");
     expect(ping).toBeDefined();
@@ -211,7 +317,7 @@ describe("createHostRuntime", () => {
       handle(pong(ofType("clock:ping")[i]!.d));
     }
 
-    handle(startAction(vip));
+    play();
     await settle();
     const startRoomTime = time.now() + 3000;
     time.advance(1000);
@@ -234,9 +340,29 @@ describe("createHostRuntime", () => {
     expect(ofType("controller:state").at(-1)?.d.gameId).toBeNull();
   });
 
-  it("stops the loop and the scene on dispose", async () => {
-    const { runtime, handle, vip, time, stageLog } = setup();
+  it("keeps the menu open when its socket reconnects, and tells the relay if it forgot", () => {
+    const { runtime, handle, vip, ofType } = setup();
     handle(startAction(vip));
+    handle(welcome("menu"));
+    expect(ofType("room:phase")).toHaveLength(1);
+    handle(welcome("lobby"));
+    expect(ofType("room:phase").at(-1)).toEqual({ t: "room:phase", d: { phase: "menu" } });
+    expect(runtime.phase).toBe("menu");
+  });
+
+  it("stops the countdown, the loop and the scene on dispose", () => {
+    const { runtime, handle, vip, time } = setup();
+    handle(pickAction(vip));
+    expect(runtime.menu?.countdown?.gameId).toBe("echo");
+    runtime.dispose();
+    time.advance(countdownMs);
+    expect(runtime.running).toBeNull();
+    expect(time.pending).toBe(0);
+  });
+
+  it("stops the loop and the scene on dispose", async () => {
+    const { runtime, play, time, stageLog } = setup();
+    play();
     await settle();
     runtime.dispose();
     expect(stageLog.at(-1)).toBe("stop echo");
