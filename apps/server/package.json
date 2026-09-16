@@ -1,0 +1,28 @@
+{
+  "name": "@couchcade/server",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The Cloudflare Worker and the Room Durable Object: routing, presence and message forwarding.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "typecheck": "tsc",
+    "test": "vitest run",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "@couchcade/protocol": "workspace:*",
+    "@couchcade/utils": "workspace:*",
+    "partyserver": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "catalog:",
+    "@cloudflare/vitest-plugin": "catalog:",
+    "@cloudflare/workers-types": "catalog:",
+    "@couchcade/config": "workspace:*",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:",
+    "wrangler": "catalog:"
+  }
+}
