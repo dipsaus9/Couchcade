@@ -1,0 +1,22 @@
+{
+  "name": "@couchcade/utils",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Pure helpers every package can use: room codes, seeded RNG. Tier 0: no runtime dependencies.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@couchcade/config": "workspace:*",
+    "fast-check": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
