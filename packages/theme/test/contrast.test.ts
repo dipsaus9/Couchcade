@@ -41,8 +41,9 @@ describe("text pairs pass WCAG AA", () => {
   it.each(checked.filter((pair) => pair.halo).map((pair) => [label(pair), pair] as const))(
     "%s keeps the halo edge at 3:1 against the background",
     (_, pair) => {
-      // Read as a narrow border instead, the halo is part of the letter. Haloed text is only used
-      // at `action` size or larger, which is large text, so 3:1 applies.
+      // Read as a narrow border instead, the halo is part of the letter, so its edge must stand out
+      // from the background: 3:1, as for large text (haloed text is `action` size or larger) and
+      // for graphical objects under WCAG 1.4.11.
       expect(contrastRatio(hex(pair.halo!), hex(pair.background))).toBeGreaterThanOrEqual(AA_LARGE);
     },
   );
