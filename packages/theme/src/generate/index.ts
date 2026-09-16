@@ -5,6 +5,8 @@
 import { tokens as houseTokens } from "../tokens.ts";
 import type { Hex, Tokens } from "../tokens.ts";
 
+export * from "./fonts.ts";
+
 const HEX = /^#[0-9A-F]{6}$/i;
 const CSS_EASING =
   /^(linear|ease(-in|-out|-in-out)?|step-start|step-end|cubic-bezier\(.*\)|steps\(.*\))$/;

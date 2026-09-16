@@ -1,0 +1,20 @@
+{
+  "name": "@couchcade/fonts",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Fetches the upstream OFL Fredoka and Pixelify Sans variable fonts and subsets them to an English-only WOFF2 for packages/theme/fonts/ (CC-4.3). Run once; re-run only when the charset or weights change.",
+  "type": "module",
+  "scripts": {
+    "fonts:subset": "node src/cli.ts",
+    "typecheck": "tsc",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@couchcade/config": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/subset-font": "catalog:",
+    "subset-font": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

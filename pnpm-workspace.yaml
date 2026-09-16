@@ -57,3 +57,7 @@ catalog:
   "@vue/test-utils": ^2.5.0
   "@lhci/cli": ~0.15.1
   dependency-cruiser: ^18.3.0
+
+  # Fonts (CC-4.3)
+  subset-font: ^2.7.0 # harfbuzzjs (WASM) subsetting, no python/fonttools needed
+  "@types/subset-font": ^2.3.0
