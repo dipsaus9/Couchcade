@@ -1,10 +1,10 @@
 ---
 id: CC-1.1
 title: Write the platform architecture doc in docs/architecture/platform.md
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-16 15:28'
+updated_date: '2026-09-16 15:32'
 labels:
   - story
   - owner-gate
@@ -33,7 +33,7 @@ Branch: CC-1.1/platform-architecture-doc
 - [x] #2 The doc contains a Mermaid diagram of host/relay/phone traffic and a Mermaid diagram of package dependencies
 - [x] #3 The conventions section covers: root scripts defined once in the scaffold, wildcard subpath exports per package, lockfile conflicts resolved by rebase + pnpm install, per-game CREDITS.md and scene palette files
 - [x] #4 The dev topology section records the decision from CC-1.3
-- [ ] #5 Owner approval is recorded in the task notes as "Approved by owner: <YYYY-MM-DD>" before the story is Done
+- [x] #5 Owner approval is recorded in the task notes as "Approved by owner: <YYYY-MM-DD>" before the story is Done
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -57,4 +57,14 @@ Verify: 7 Mermaid diagrams render with @mermaid-js/mermaid-cli 11 (0 failures); 
 Review gate (dipsaus-ai:story-reviewer, round 1): pass. AC1-AC4 met, AC5 pending owner approval (owner gate), no scope violations. Advisory: the doc splits the middle tier into core (game-sdk, physics, audio) and kit (stage, ui, motion, may import core); CC-1.19 AC1 still states one flat band and should be aligned when CC-1.19 is picked up.
 
 Owner decisions (2026-09-16), relayed by the orchestrator: (1) Clock: option A, the Room Durable Object answers clock pings and all devices sync to the room clock. (2) Mid-game joiners: option A, seat and colour right away, playing from the next game. (3) Deploys: option B, every merge to main deploys right away, no DEPLOY_FREEZE variable; the owner accepts that a deploy can drop a round in progress. platform.md updated: open decisions section removed, decisions table rows 15-17 added, DEPLOY_FREEZE removed. Doc approval itself is still pending.
+
+Approved by owner: 2026-09-16
+
+Budget section updated with CC-1.4 results as agreed at approval: 1 request per connect, incoming message (phone and host) and close; 20:1 unconfirmed so 1:1 stays; phone cap 4 msg/s (>= 250 ms apart); host controller:state cap 1.5 msg/s (>= 667 ms apart, on change, coalesced): 80,000 - 8 x 7,200 s x 0.3 x 4 = 10,880 left, / 7,200 s = 1.51, so 1.5/s = 10,800; together 79,920 <= 80,000 with a 20,000 reserve covering about 13,000 of turn-based input, keep-alive, clock and room traffic. Rate Limiting binding works on Free but loosely (151 of 271 allowed against 10/60 s), abuse control only.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Shipped docs/architecture/platform.md, approved by the owner on 2026-09-16: decisions table (including the owner's choices of room clock, mid-game joiners seated for the next game, and deploy on every merge), package tiers and import rules, relay routing and hibernation rules, JSON envelope and full message catalogue with close codes and HTTP API, room lifecycle and join/ticket/rejoin flow, game contract with registry and test kit, clock sync, dev and deploy topology recording the CC-1.3 decision, free-tier budget rules updated with CC-1.4 measurements (1:1 counting, phone cap 4/s, host cap 1.5/s, loose rate limiting on Free), and repo conventions. 7 Mermaid diagrams render; all links resolve. Epic CC-1 stays open.
+<!-- SECTION:FINAL_SUMMARY:END -->
