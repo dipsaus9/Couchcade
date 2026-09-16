@@ -369,6 +369,10 @@ importers:
         version: 3.5.42(typescript@6.0.3)
 
   packages/motion:
+    dependencies:
+      '@couchcade/game-sdk':
+        specifier: workspace:*
+        version: link:../game-sdk
     devDependencies:
       '@couchcade/config':
         specifier: workspace:*

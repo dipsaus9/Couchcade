@@ -19,7 +19,10 @@ describe("package exports", () => {
     expect(root.synthetic).toBe(sensors.synthetic);
   });
 
-  it("have no npm dependencies (motion.md adapter rule 9)", () => {
-    expect(pkg).not.toHaveProperty("dependencies");
+  it("have no npm dependencies, only workspace packages (motion.md adapter rule 9)", () => {
+    // Gestures stream through @couchcade/game-sdk/input (CC-5.5); nothing comes from npm.
+    for (const version of Object.values(pkg.dependencies)) {
+      expect(version).toBe("workspace:*");
+    }
   });
 });
