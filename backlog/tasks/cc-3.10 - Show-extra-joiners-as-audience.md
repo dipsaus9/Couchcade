@@ -4,7 +4,7 @@ title: Show extra joiners as audience
 status: To Do
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-16 15:58'
+updated_date: '2026-09-16 16:02'
 labels:
   - story
 dependencies:
@@ -30,10 +30,10 @@ Branch: CC-3.10/audience-mode
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The 9th and later joiners become audience
-- [ ] #2 Audience phones show a "Watching" screen
-- [ ] #3 Audience members take a free slot when a player leaves between games
-- [ ] #4 When 16 phones (8 players + 8 audience) are in the room, a further join returns 409 room-full and the phone shows the approved Room is full error screen
+- [ ] #1 Audience phones show a "Watching" screen
+- [ ] #2 Audience members take a free slot when a player leaves between games
+- [ ] #3 When 16 phones (8 players + 8 audience) are in the room, a further join returns 409 room-full and the phone shows the approved Room is full error screen
+- [ ] #4 The 9th to 16th joiners become audience
 <!-- AC:END -->
 
 ## Implementation Notes
