@@ -1,0 +1,21 @@
+{
+  "name": "@couchcade/motion",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Phone motion controls: the sensor adapter and permission request, calibration, gestures and touch fallbacks. Tier 3 kit: no npm dependencies.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@couchcade/config": "workspace:*",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
