@@ -4,7 +4,7 @@ title: Write the platform architecture doc in docs/architecture/platform.md
 status: In Progress
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-16 15:21'
+updated_date: '2026-09-16 15:28'
 labels:
   - story
   - owner-gate
@@ -55,4 +55,6 @@ Inputs: README.md, docs/TECH_STACK.md, docs/HOUSE_STYLE.md, planning decisions o
 Verify: 7 Mermaid diagrams render with @mermaid-js/mermaid-cli 11 (0 failures); 27 relative links and anchors resolve (0 broken). Budget section uses the conservative 1 incoming message = 1 DO request assumption; the per-phone cap R = 15 msg/s is one line marked 'to be confirmed by CC-1.4'. Open decisions for the owner: clock reference (recommend room clock), late joins during a game (recommend seat + next game), deploy freeze switch (recommend DEPLOY_FREEZE repo variable).
 
 Review gate (dipsaus-ai:story-reviewer, round 1): pass. AC1-AC4 met, AC5 pending owner approval (owner gate), no scope violations. Advisory: the doc splits the middle tier into core (game-sdk, physics, audio) and kit (stage, ui, motion, may import core); CC-1.19 AC1 still states one flat band and should be aligned when CC-1.19 is picked up.
+
+Owner decisions (2026-09-16), relayed by the orchestrator: (1) Clock: option A, the Room Durable Object answers clock pings and all devices sync to the room clock. (2) Mid-game joiners: option A, seat and colour right away, playing from the next game. (3) Deploys: option B, every merge to main deploys right away, no DEPLOY_FREEZE variable; the owner accepts that a deploy can drop a round in progress. platform.md updated: open decisions section removed, decisions table rows 15-17 added, DEPLOY_FREEZE removed. Doc approval itself is still pending.
 <!-- SECTION:NOTES:END -->
