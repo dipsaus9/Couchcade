@@ -2,7 +2,7 @@
 
 This is the threat model for Couchcade and the defences the CC-2 stories build. It covers who might abuse a friends-only party game on a public `workers.dev` URL, what each defence is, where it runs, and which test proves it.
 
-**For the owner.** Read [Decisions at a glance](#decisions-at-a-glance), [Open decisions for the owner](#open-decisions-for-the-owner) and [Owner checklist](#owner-checklist). That takes about 15 minutes. The rest is detail for the stories.
+**For the owner.** Read [Decisions at a glance](#decisions-at-a-glance) and [Owner checklist](#owner-checklist). That takes about 15 minutes. The rest is detail for the stories.
 
 **For agents.** Everything after the owner sections is binding, like [platform.md](platform.md). This doc adds security detail to platform.md and doesn't repeat it. Where a rule here isn't named in a story's acceptance criteria, the story that owns the file builds it and adds the test anyway. The [threat table](#threats-defences-and-tests) marks those rules with "added by this doc". Where this doc, platform.md and a story disagree, stop and flag it.
 
@@ -13,7 +13,6 @@ Status: draft, waiting for owner approval (CC-2.1).
 ## Contents
 
 - [Decisions at a glance](#decisions-at-a-glance)
-- [Open decisions for the owner](#open-decisions-for-the-owner)
 - [Owner checklist](#owner-checklist)
 - [What we protect, and from whom](#what-we-protect-and-from-whom)
 - [Threats, defences and tests](#threats-defences-and-tests)
@@ -35,7 +34,7 @@ Status: draft, waiting for owner approval (CC-2.1).
 
 ## Decisions at a glance
 
-Approving this doc approves these. The row marked "open" and some numbers in the detail sections depend on the choices in the next section.
+Approving this doc approves these. Rows 15 to 18 were open choices that the owner decided on 16 September 2026.
 
 | # | Decision | In plain words |
 |---|---|---|
@@ -46,49 +45,17 @@ Approving this doc approves these. The row marked "open" and some numbers in the
 | 5 | The Worker checks everything before a room is called | Rate limit, Turnstile, passcode, name and ticket are all checked in the Worker, cheapest first. A rejected request never costs a Durable Object request. |
 | 6 | Rate limits are speed bumps, not quotas | CC-1.4 showed the binding lets several times the limit through on Free. We use it only to slow abuse. Limits are per IP address (per /64 block for IPv6) and never stored. |
 | 7 | Tickets are typed, room-bound and short | A 60-second ticket opens one socket for one room and role. A rejoin token can't be used as a ticket. Kicked and flooding players are blocked by the room itself. |
-| 8 | Flooding sockets are closed and can't come back (open) | Each socket has a token bucket. A socket that empties it is closed and its rejoin token stops working. The host's Kick and Lock room are the backstop. See open decision 1 for the numbers. |
+| 8 | Flooding sockets are closed and can't come back | Each socket has a token bucket. A socket that empties it is closed and its rejoin token stops working. The host's Kick and Lock room are the backstop. |
 | 9 | Games treat every input as untrusted | The relay drops messages a role may not send and overwrites `from`. The schema proves an input's shape. The game rules decide whether the move is allowed right now. |
 | 10 | Names are short, Latin and filtered | 1 to 12 characters after NFKC, Latin letters with accents, digits, space and `' - . _`. No emoji. An NL and EN blocklist runs on a folded form. Kick is the backstop because no list catches everything. |
 | 11 | User text is only ever text | No `v-html`, and the README's strict CSP with no inline scripts. Static files get their headers from a generated `_headers` file, so page loads still skip the Worker. |
 | 12 | No personal data kept | No cookies, IPs only as rate-limit keys in memory, automatic request logs off, and no tokens, names or passcodes in any log line. |
 | 13 | The supply chain is locked down with free tools | pnpm release age and blocked install scripts, frozen lockfile, Renovate, SHA-pinned actions, CodeQL and `pnpm audit`. Turnstile is the only third-party script on any page. |
 | 14 | Accounts matter most | A stolen GitHub or Cloudflare login could ship bad code to every guest's phone. Both accounts use two-factor sign-in, and the deploy token only has Workers permissions. |
-
----
-
-## Open decisions for the owner
-
-Each of these changes a number or a promise that the README or a story already states. The recommendation is what this doc assumes if you approve without comment.
-
-### 1. How big is a phone's flood bucket?
-
-The README, platform.md and CC-2.5 say 20 messages per second with a burst of 40, for every socket. Every incoming message costs 1 Durable Object request (CC-1.4). So one misbehaving phone that stays just under 20 per second costs about 72,000 requests an hour and uses up the whole day in about 80 minutes, without ever being disconnected.
-
-A legitimate phone never needs that. The batching helper caps input at 4 per second, and the busiest honest second is a reconnect during real-time play: 5 clock samples plus 4 inputs plus a tap.
-
-- **Recommended: phones get 5 per second with a burst of 15. The host keeps 20 with a burst of 40.** A phone flooding at 5 per second costs 18,000 requests an hour, which leaves the host hours to notice and kick. This amends CC-2.5 criterion 1 and one line in platform.md. If CC-1.4's 20:1 ratio is confirmed later, the phone bucket rises with the phone cap.
-- Keep 20 and 40 for everyone. Simpler, but one phone can empty the day.
-
-### 2. Is 10 joins per minute per IP enough on shared Wi-Fi?
-
-CC-2.3 limits join attempts to 10 per IP per minute. At a party every phone on the home Wi-Fi shares one public IP. Eight friends scanning the QR code at once, plus a typo, a rejected name and someone who reloads, gets close to 10 at the worst possible moment.
-
-- **Recommended: 20 join attempts per IP per minute.** Turnstile, not the rate limit, is what stops bots. Amends CC-2.3 criterion 2.
-- Keep 10. The binding counts loosely, so in practice more get through, but we can't rely on that.
-
-### 3. Keep the "interactive challenge after 3 wrong codes"?
-
-The README promises it, but no story builds it. It needs a second Turnstile widget and a per-IP count of wrong codes in the Worker. Code guessing is already impractical. There are 331,776 codes and a code only works while its TV is connected. At the nominal limit, one IP needs about 11 days of non-stop guessing, each guess passing Turnstile, for an even chance of hitting a room that lives for an evening.
-
-- **Recommended: drop it from the README.** Revisit only if the logs show guessing.
-- Keep it and add a story to CC-2.
-
-### 4. Cap the audience?
-
-Platform.md makes the 9th and later joiners audience, with no upper limit. Every socket costs keep-alive and clock requests (about 264 an hour when idle) and gets its own flood bucket. One person holding the code can open dozens of audience sockets until the host locks the room. CC-9.4 already has a "Room is full" screen that nothing triggers.
-
-- **Recommended: at most 16 phones per room, 8 players and 8 audience.** The join API returns 409 `room-full`. This amends the HTTP API table and the room status check in platform.md, and CC-3.10.
-- No cap. Lock room is the only limit.
+| 15 | Phones keep the 20 per second flood bucket (owner, 2026-09-16) | Phones and the host both get 20 messages per second with a burst of 40, as the README and CC-2.5 say. One phone flooding just under that could use the whole day in about 80 minutes. The owner accepts that: the host can kick and lock, and the worst case is a day offline. |
+| 16 | 20 join attempts per IP per minute (owner, 2026-09-16) | Raised from 10, because every phone at a party shares the home Wi-Fi address. Turnstile, not the rate limit, stops bots. |
+| 17 | No extra challenge after wrong codes (owner, 2026-09-16) | The README's "interactive challenge after 3 wrong codes" is dropped. Codes only work while the TV is connected and each guess needs Turnstile, so guessing is already impractical. Revisit only if the logs show guessing. |
+| 18 | At most 16 phones per room (owner, 2026-09-16) | 8 players and 8 audience. The 17th join gets 409 `room-full`, which shows the "Room is full" screen. Every extra socket costs keep-alive and clock requests and gets its own flood bucket. |
 
 ---
 
@@ -139,11 +106,11 @@ These are the parts no story can do for you.
 |---|---|---|
 | **Passcode brute force** | 4-word passcode (about 3.7 × 10¹⁵ options). Turnstile before the passcode check. 5 passcode attempts per IP per minute. Constant-time compare. Passcode only in a POST body, never logged, never saved by the host app. | Wrong passcode returns 401, missing passcode returns 401 (CC-1.10). Invalid Turnstile token returns 403 before the passcode is checked (CC-2.2). The 6th attempt in a minute returns 429 (CC-2.3). The compare goes through `timingSafeEqual` (unit test, CC-1.10, added by this doc). |
 | **Room creation spam** | Everything above, then 3 room creations per IP per minute before the room is called. Rooms without a TV close after 30 minutes. A refreshed TV rejoins its room instead of creating a new one. | The 4th creation in a minute returns 429 and the Durable Object isn't called (CC-2.3). Idle room expires through the alarm (CC-1.9). A reloaded host keeps its room (CC-3.5 E2E). |
-| **Room code guessing** | Codes work only while the TV is connected. Turnstile on every join. 10 join attempts per IP per minute (open decision 2). A code that doesn't match `^[A-HJ-NP-Z]{4}$` returns 404 without calling a room. | Missing Turnstile token returns 403 (CC-2.2). The 11th attempt returns 429 and no room is called (CC-2.3). A room without a connected host returns 404 (CC-1.10, added by this doc). A malformed code returns 404 without a room call (CC-1.10, added by this doc). |
+| **Room code guessing** | Codes work only while the TV is connected. Turnstile on every join. 20 join attempts per IP per minute. A code that doesn't match `^[A-HJ-NP-Z]{4}$` returns 404 without calling a room. | Missing Turnstile token returns 403 (CC-2.2). The 21st attempt returns 429 and no room is called (CC-2.3). A room without a connected host returns 404 (CC-1.10, added by this doc). A malformed code returns 404 without a room call (CC-1.10, added by this doc). |
 | **Direct WebSocket access** | Signed ticket required, checked in the Worker: `k` is `ticket`, not expired, room matches the path. `Origin` must equal the site's origin. Upgrade rate limit. The Worker strips incoming `x-cc-*` headers. `/internal/*` paths are never routed from outside. | Upgrades with no ticket, a bad signature, an expired ticket or another room's ticket get 401 and no room call (CC-1.10). Wrong `Origin` gets 403 (CC-1.10, added by this doc). A player ticket with a forged `x-cc-role: host` header connects as a player (CC-1.10, added by this doc). `POST /internal/create` from outside doesn't reach a room (CC-1.10, added by this doc). |
 | **Stolen or reused tokens** | A rejoin token can't pass as a ticket, because `k` differs. The room refuses kicked and revoked player ids and seats past the 2-minute window. The newest connection for a player wins. Rejoin rate limit. | A rejoin token used as a ticket gets 401 (CC-1.10, added by this doc). A kicked player's rejoin closes with 4003 (CC-2.6). A revoked player's rejoin closes with 4008 (CC-2.5). A late rejoin closes with 4011 (CC-3.4). |
-| **Flooding** | Token bucket per socket (open decision 1), counting every frame that reaches the handler, including dropped ones. Violators close with 4008 and their rejoin token is revoked. The host kicks and locks. | A test floods a socket and asserts the close and the revocation (CC-2.5). Kick closes with 4003 and a locked room returns 423 to new joins (CC-2.6). |
-| **Quota burn through extra sockets** | Keep-alive answered without waking the room. Rooms close after 30 minutes idle or 4 hours. At most 16 phones per room (open decision 4). | Hibernation and alarm tests (CC-1.9). The 17th join returns 409 (CC-3.10, if decision 4 is approved). |
+| **Flooding** | Token bucket per socket, 20 per second with a burst of 40, counting every frame that reaches the handler, including dropped ones. Violators close with 4008 and their rejoin token is revoked. The host kicks and locks. | A test floods a socket and asserts the close and the revocation (CC-2.5). Kick closes with 4003 and a locked room returns 423 to new joins (CC-2.6). |
+| **Quota burn through extra sockets** | Keep-alive answered without waking the room. Rooms close after 30 minutes idle or 4 hours. At most 16 phones per room, 8 players and 8 audience. | Hibernation and alarm tests (CC-1.9). The 17th join returns 409 `room-full` (CC-3.10, added by this doc). |
 | **Malformed or oversized messages** | 1 KB cap before parsing. Envelope and per-type schema on both ends. Binary frames dropped. Invalid messages dropped silently and counted against the bucket. | `encode` and `decode` reject over 1 KB, with valid and invalid fixtures per message (CC-1.8). The room drops an oversized and a malformed frame without forwarding (CC-1.9, added by this doc). |
 | **Messages a role may not send** | The room drops types the sender's role can't send, overwrites `from`, and drops audience `input`. The host drops inputs that fail the game's `inputSchema` and ignores `ui:action` start and pick from anyone but the VIP. Game rules check turn and phase. | Phone input reaches only the host (CC-1.9). A phone sending `room:kick` or a forged `from` has no effect (CC-1.9, added by this doc). Invalid inputs are dropped (CC-1.15). A non-VIP start is ignored (CC-1.15, added by this doc). |
 | **Offensive or malicious names** | NFKC, 1 to 12 characters, character allowlist, NL and EN blocklist on a folded form, checked by the Worker before a ticket is issued. Kick as backstop. | Length and allowlist tests, blocklist rejection with the referee-voice message, fast-check properties for normalisation (CC-2.4). |
@@ -196,7 +163,7 @@ The passcode limit counts every attempt, not only wrong ones. The binding can on
 
 **`POST /api/rooms/:code/join`**
 
-1. Join limit, 10 per IP per minute (open decision 2). Else 429.
+1. Join limit, 20 per IP per minute. Else 429.
 2. Code matches `^[A-HJ-NP-Z]{4}$`. Else 404. Body is JSON under 1 KB and matches the schema. Else 400.
 3. Name rules. Else 400. This runs before Turnstile so a rejected name doesn't spend the token. The phone runs the same check first.
 4. Turnstile, action `join`. Else 403.
@@ -223,7 +190,7 @@ All limits use the Workers Rate Limiting binding with a 60-second period, declar
 |---|---|---|---|
 | `RL_PASSCODE` | Every `POST /api/rooms` | 5 | CC-2.3 criterion 3, amended to count every attempt |
 | `RL_CREATE` | Room creations that passed the passcode | 3 | CC-2.3 criterion 1 |
-| `RL_JOIN` | Every join attempt | 10, or 20 (open decision 2) | CC-2.3 criterion 2 |
+| `RL_JOIN` | Every join attempt | 20 | CC-2.3 criterion 2, raised from 10 by the owner |
 | `RL_REJOIN` | Every rejoin | 30 | This doc |
 | `RL_UPGRADE` | Every `/ws` upgrade | 30 | This doc, platform.md step 4 |
 
@@ -239,7 +206,7 @@ Rules:
 ### Why this is enough
 
 - **Passcode.** At 5 attempts a minute, even multiplied by the binding's looseness and a hundred IPs, a 4-word passcode holds for more than a million years. The limits matter only for a weak passcode, which is why the checklist asks for 4 words.
-- **Codes.** 24⁴ is 331,776 codes. One IP at 10 guesses a minute makes 14,400 guesses a day and needs about 11 days for an even chance at one live room. Each guess also needs a Turnstile pass.
+- **Codes.** 24⁴ is 331,776 codes. One IP at 20 guesses a minute makes 28,800 guesses a day and needs about 6 days for an even chance at one live room. Each guess also needs a Turnstile pass.
 - **The real cost is the quota.** Each join attempt that passes Turnstile costs 1 Durable Object request for the status check, even for a wrong code. A bot that solves Turnstile at the loose limit could use up a day's requests. Turnstile is what prevents that, and if it fails, the outcome is a day offline.
 
 ---
@@ -249,7 +216,7 @@ Rules:
 Built in `apps/server/src/room/flood.ts` (CC-2.5). Platform.md's hibernation rules still apply: the bucket lives in `connection.setState()` and the room never uses timers.
 
 1. **Bucket.** Tokens refill from the time since the last message, computed on each message. No timer.
-2. **Sizes.** Host: 20 per second, burst 40. Phones: 5 per second, burst 15 if open decision 1 is approved, otherwise 20 and 40.
+2. **Sizes.** Host and phones: 20 per second, burst 40 (owner decision, 16 September 2026).
 3. **What counts.** Every frame that reaches `onMessage`, including frames dropped for size, bad JSON, schema or role. The raw keep-alive `ping` never reaches the handler, so it can't count.
 4. **Violation.** Close with 4008, set `revoked` on the player row, send `player:left { reason: "kicked" }` to the host. Platform.md has no separate flooding reason, and `kicked` frees the seat like a kick does. The phone shows the connection-lost screen and doesn't reconnect.
 5. **After a violation.** The rejoin token no longer works. The person can still join again as a new player through `/join`, with Turnstile and the join limit. If they do it again, the host locks the room. We don't ban IPs, because that means storing them.
@@ -260,11 +227,10 @@ What one socket can cost per hour, at 1 request per incoming message:
 | Sending | Requests per hour | Whole day's 100,000 used in |
 |---|---|---|
 | Honest phone at the real-time cap, 4 per second | 14,400 | about 7 hours |
-| Flooding just under 5 per second | 18,000 | about 5.5 hours |
 | Flooding just under 20 per second | 72,000 | about 80 minutes |
 | Idle socket, keep-alive and clock only | about 264 | never, in one evening |
 
-A bucket can't go below the honest cap, so no per-socket limit makes a hostile player free. It only buys the host time to notice and kick.
+No per-socket limit can go below the honest cap, so none makes a hostile player free. At 20 per second a flooding phone that stays under the limit can use the day in about 80 minutes. The owner accepted that on 16 September 2026. The host's Kick and Lock room are the answer, and the worst case is a day offline.
 
 ---
 
@@ -437,4 +403,4 @@ The README's privacy promises hold: no cookies, no analytics, IPs only in memory
 These defences have no story yet. They need a new CC-2 story, planned with `backlog-plan`:
 
 1. **Repository security setup.** Turn on CodeQL default setup, Dependabot alerts and private vulnerability reporting. Add branch protection on `main`. Add `pnpm audit --prod --audit-level high` to CI. Confirm the settings with `gh api` and record the output in the story notes.
-2. **Decision updates.** Once the owner answers the open decisions, amend CC-2.3, CC-2.5, CC-3.10, platform.md and the README to match. Also reword CC-2.3 criterion 3 to "more than 5 passcode attempts per IP per minute return 429", because the limit counts every attempt (see [Check order](#check-order-per-endpoint)).
+2. **Decision updates.** Apply the owner decisions of 16 September 2026: CC-2.3 criterion 2 becomes 20 join attempts, CC-3.10 and the platform.md HTTP API table and room status check get the 16-phone cap and 409 `room-full`, and the README drops the interactive challenge after 3 wrong codes. CC-2.5 is unchanged. Also reword CC-2.3 criterion 3 to "more than 5 passcode attempts per IP per minute return 429", because the limit counts every attempt (see [Check order](#check-order-per-endpoint)).
