@@ -1,24 +1,25 @@
 # Quick Draw 🤠
 
-**Wait for DRAW, then tap first. Tap early and it's a foul.**
+**Wait for DRAW, then tap first. Tap early, or on a fake, and it's a foul.**
 
-The first playable Couchcade game. Everyone stands in a dusty desert street, the TV goes quiet, and the first player to tap their phone after DRAW! wins the round. A match lasts about a minute.
+The first playable Couchcade game. Everyone stands in a dusty desert street, the TV goes quiet, and the first player to tap their phone after DRAW! wins the round. Sometimes the TV tries to fool you first. A match lasts about a minute.
 
-**For the owner.** Read [At a glance](#at-a-glance) and [Open questions for the owner](#open-questions-for-the-owner). That takes about 5 minutes.
+**For the owner.** Read [At a glance](#at-a-glance), [Owner decisions](#owner-decisions-2026-09-16) and [Fake-outs](#fake-outs). That takes about 5 minutes.
 
-**For agents.** Everything after the open questions is binding for CC-10.2 to CC-10.8. [platform.md](../architecture/platform.md), [HOUSE_STYLE.md](../HOUSE_STYLE.md) and [platform-screens.md](../design/platform-screens.md) still apply. Where this spec and a story disagree, stop and flag it.
+**For agents.** Everything below is binding for CC-10.2 to CC-10.8. [platform.md](../architecture/platform.md), [HOUSE_STYLE.md](../HOUSE_STYLE.md) and [platform-screens.md](../design/platform-screens.md) still apply. Where this spec and a story disagree, stop and flag it.
 
-Status: waiting for owner approval (CC-10.1).
+Status: waiting for owner approval (CC-10.1). The owner answered the open questions on 2026-09-16.
 
 ---
 
 ## Contents
 
 - [At a glance](#at-a-glance)
-- [Open questions for the owner](#open-questions-for-the-owner)
+- [Owner decisions (2026-09-16)](#owner-decisions-2026-09-16)
 - [Inspiration](#inspiration)
 - [Rules and scoring](#rules-and-scoring)
 - [Round flow and timings](#round-flow-and-timings)
+- [Fake-outs](#fake-outs)
 - [Phone controller](#phone-controller)
 - [Input message schema](#input-message-schema)
 - [TV scene](#tv-scene)
@@ -34,36 +35,23 @@ Status: waiting for owner approval (CC-10.1).
 
 | | |
 |---|---|
-| Pitch | A western standoff. The TV shouts DRAW! at a random moment, and the fastest tap wins the round. |
-| Players | 2 to 8. Everyone draws at the same time, so nobody sits out a round ([question 1](#open-questions-for-the-owner)). |
+| Pitch | A western standoff with toy popguns. The TV shouts DRAW! at a random moment, and the fastest tap wins the round. |
+| Players | 2 to 8. Everyone draws at the same time, so nobody sits out a round. |
 | Phone | One big action. It turns red for "Wait for DRAW" and the player taps it without looking. No motion sensors. |
 | TV | A 480×270 desert street with the players' Pips facing off, a scoreboard and the DRAW! callout. |
 | Round | About 10 seconds: get ready, a random wait, DRAW!, result. |
+| Fake-outs | From round 2, most standoffs have 1 or 2 fakes: a look-alike word such as DRIP!, a crow's caw, or a glint off a popgun. |
 | Winning | The fastest valid tap scores 1 point. First to 3 points wins. The match stops after 9 rounds at most. |
-| Fouls | Tapping before DRAW!, or less than 100 ms after it, is a foul. You're out of that round. No point is taken away. |
-| Fairness | Each phone stamps its tap with the shared room clock, so Wi-Fi or 4G speed doesn't matter. Everyone watches the same TV, so its delay is the same for all players. |
-| Cost | About 12 requests per round with 8 players. Well within the caps: 0.1 messages per second per phone and about 0.3 per second from the TV. |
+| Fouls | Tapping before DRAW!, on a fake, or less than 100 ms after DRAW! is a foul. You're out of that round. No point is taken away. |
+| Fairness | Each phone stamps its tap with the shared room clock, so Wi-Fi or 4G speed doesn't matter. A fake never comes within 1 second of DRAW!. |
+| Cost | About 11 requests per round with 8 players, fakes included. Well within the caps: 0.1 messages per second per phone and about 0.2 per second from the TV. |
 | Assets | CC0 packs from Kenney and OpenGameArt, recoloured to the approved desert palette. A few small props are drawn from scratch. |
 
-## Open questions for the owner
+## Owner decisions (2026-09-16)
 
-**1. With 3 to 8 players: everyone at once, or a bracket?**
-The README says "2 (duel), up to 8 as a bracket". A bracket of duels makes 6 of 8 players watch most of the match and needs extra bracket screens.
-- **Recommended: everyone draws at once.** Every round works the same for 2 or 8 players, nobody waits, the match stays around a minute, and CC-10.2 has one code path. Samurai Kirby in *Kirby's Return to Dream Land Deluxe* also lets up to 4 players draw at once.
-- If you pick the bracket, [Rules and scoring](#rules-and-scoring) changes to "duels of first to 3, winners advance". A follow-up story then adds bracket screens, and matches get about 3 times longer.
-- Either way, the Players column in the README should match your choice. That edit is a follow-up, because this story only touches this spec.
-
-**2. What do the Pips draw?**
-The house style asks for party-friendly scenes and Pips that never look angry.
-- **Recommended: toy cork popguns** that pop out a "BANG!" flag. The losers look surprised and a puff of dust blows past. Nobody gets hit.
-- Alternative: cartoon revolvers with a muzzle flash. That's closer to the western films, but less friendly for kids.
-
-**3. Fake-out calls in the first version?**
-1-2-Switch has a "Fake Draw" mode, where the announcer says words like "Flowers" to trick players into firing early.
-- **Recommended: leave them out for now.** Get the plain duel right first, then decide after the owner playtest (CC-10.7). Adding fake-outs later only adds a decoy callout during the wait.
-- Alternative: build them in now as a round type from round 3 onwards.
-
-The rest of this spec assumes the recommended answers.
+1. **Everyone draws at once.** There's no bracket. Every round works the same for 2 to 8 players. The README's "up to 8 as a bracket" needs a follow-up edit to match.
+2. **The Pips draw toy cork popguns** that pop out a "BANG!" flag. Nobody gets hit: the losers look surprised and a puff of dust blows past.
+3. **Fake-out calls are in the first version.** See [Fake-outs](#fake-outs).
 
 ---
 
@@ -97,12 +85,12 @@ Research on fair timing:
 
    | Result | When | Point |
    |---|---|---|
-   | `foul` | `reactionMs < 100`. That includes every tap before DRAW!. | No |
+   | `foul` | `reactionMs < 100`. That includes every tap before DRAW! and every tap on a fake. A foul within 1,000 ms after a fake is shown as "fooled". | No |
    | `valid` | `100 <= reactionMs <= 1500` | 1 point if fastest |
    | `slow` | `reactionMs > 1500`, or no tap when the round resolves | No |
 
 5. **Round winner.** The player with the lowest valid `reactionMs` scores 1 point. If several players share the same whole millisecond, they all score. If nobody has a valid tap, nobody scores.
-6. **Fouls** cost only the round. There is no penalty on points, because one tap per round already makes spamming pointless.
+6. **Fouls** cost only the round: no point that round, and points are never taken away. Fakes make fouls common, and a points penalty would drag scores down and make matches drag on. In a duel, a foul already hands the round to the other player if they draw in time. One tap per round also makes spamming pointless.
 7. **Match end.** The match ends after the round in which any player reaches **3 points**, or after **round 9**.
 8. **Placements** (`outcome`). Sort by points, most first. Break ties with the player's fastest valid reaction in the match, fastest first. Players still tied share a place. `score` is the points total.
 9. **Players leaving.** When a seat expires (`onPlayerLeft`), that player keeps their points but can't score again. If fewer than 2 players remain, the match ends at once with the current placements.
@@ -122,13 +110,51 @@ stateDiagram-v2
 | Phase | Length | TV | Phone |
 |---|---|---|---|
 | `intro` | 1,500 ms | "Round 2" chip lifts, a tumbleweed rolls past, bottom panel: "Tap your phone when the TV shouts DRAW" | Previous result, or "Watch the TV" in round 1. Taps do nothing. |
-| `standoff` | Random, 2,000 ms plus a memoryless wait (below). About 3.5 s on average, 8 s at most. | Music stops, wind loop, Pips blink. Bottom panel: "Wait for it…". A player who fouls gets FOUL! over their Pip right away. | Red "Wait for DRAW". A tap is sent at once. |
+| `standoff` | Random, 2,000 ms plus a memoryless wait (below). About 3.5 s on average, 8 s at most. | Music stops, wind loop, Pips blink, [fake-outs](#fake-outs) from round 2. Bottom panel: "Wait for it…", or "Only DRAW! counts" from round 2. A player who fouls gets FOUL! over their Pip right away. | Red "Wait for DRAW". A tap is sent at once. |
 | `draw` | Until every player has a result, or DRAW! + 2,000 ms | DRAW! callout at full size on its first frame, plus the DRAW sting | Unchanged. A tapped phone shows the disabled state locally. |
 | `result` | 3,000 ms | Winner pops their flag, times appear over every Pip ("0.243"), bottom panel: "Noor wins the round" | The player's own result |
 
-**The random wait must not be guessable.** A plain random pick between 2 and 5 seconds lets a player count to 5 and tap, because DRAW! can't come later. Use a memoryless wait instead: after the first 2,000 ms, every 60 Hz tick has a 1 in 90 chance of DRAW!, capped at 8,000 ms in total. The average extra wait is 1.5 s, and waiting longer never tells a player that DRAW! is close. The chance comes from the seeded RNG in `TState`. It's all integer maths, so replays stay exact.
+**The random wait must not be guessable.** A plain random pick between 2 and 5 seconds lets a player count to 5 and tap, because DRAW! can't come later. Use a memoryless wait instead: after the first 2,000 ms, every 60 Hz tick has a 1 in 90 chance of DRAW!, capped at 8,000 ms in total. The host rolls those ticks ahead when the standoff starts and stores the result as `drawAtMs`, so the fakes can be placed around it. The average extra wait is 1.5 s, and waiting longer never tells a player that DRAW! is close. The chance comes from the seeded RNG in `TState`. It's all integer maths, so replays stay exact.
 
 A round lasts about 10 seconds on average and 15 at most. A 2-player match usually lasts 3 to 5 rounds (30 to 50 s). An 8-player match lasts at most 9 rounds (about 90 s).
+
+## Fake-outs
+
+Owner decision 3, inspired by 1-2-Switch's "Fake Draw". Only the word DRAW! counts. Everything else the TV does during the standoff is a fake.
+
+| Fake | On the TV | Sound |
+|---|---|---|
+| Look-alike word | A callout in the same style and place as DRAW!, shown for 600 ms: `DRIP!`, `DRUM!`, `DROP!`, `DRY!`, `DREAM!` or `DRIFT!` | A fake sting: a different, shorter jingle that sounds like the DRAW sting |
+| Crow | A crow lands on the cactus and flaps once | A crow's caw |
+| Glint | The sun glints off one Pip's popgun: a 16×16 sparkle for 300 ms | A short ting |
+
+**How often.** At the start of each standoff, after picking the DRAW! time, the seeded RNG picks the fakes:
+
+- Round 1 never has fakes, so new players learn the plain game first. The bottom panel in round 2's intro says "Watch out for fakes".
+- From round 2: no fake in 30% of standoffs, 1 fake in 50% and 2 fakes in 20%.
+- Kind: a word in 50% of fakes, the crow in 25% and the glint in 25%. A word isn't used twice in a match until all six have been shown.
+- Timing: each fake lands on a random tick at least 1,000 ms after the standoff starts, 1,000 ms before DRAW! and 1,000 ms from any other fake. A fake that doesn't fit is dropped. Fakes never make a standoff longer, so a short standoff simply has fewer.
+
+**Scoring.** A tap on a fake is a tap before DRAW!, so it's a normal foul: out of the round, no point, nothing taken away (rule 6). A foul within 1,000 ms after a fake gets the "fooled" message.
+
+**Fairness.**
+
+- Fakes don't change the clock rules. A tap is judged only against `drawAtMs` in room time, so a fake can't turn a valid tap into a foul or the other way round. The 100 ms floor after DRAW! stays the same.
+- The 1,000 ms gap before DRAW! matters. Reactions to a fake take about 200 to 600 ms, so they always land before DRAW! and count as fouls. Without the gap, a fake 50 ms before DRAW! would give a fast time to someone who fell for it.
+- Everyone sees the same fake at the same moment on one TV, and the phone never shows fakes, so network speed doesn't help or hurt.
+- Fakes are part of `TState` and drawn from the seeded RNG, so replays and snapshots reproduce them exactly.
+
+**Readability.** Every player reads the same TV from the couch:
+
+- Word fakes use the full `callout` size (160 px at 1080p). No fake contains "DRAW", and each differs from it by at least 2 letters or in length.
+- There's only one callout on screen at a time. A fake word disappears after 600 ms, and DRAW! stays up until the result.
+- The crow and the glint are small world animations, not overlays, so a DRAW! callout is never hidden behind them.
+- No full-screen flashes. With reduced motion, the crow appears without flapping and the sparkle doesn't twinkle.
+- The TV never speaks. Neither DRAW! nor the fakes have a voice, so no voice recordings are needed and the game still works with the sound off.
+
+**Audio.** Three new sounds: the fake sting, the crow caw and the ting (see the [asset shortlist](#cc0-asset-shortlist)). Each has its own visual. Only the real DRAW sting plays with DRAW!, so players listening instead of watching can be fooled too.
+
+**Budget.** Fakes send nothing. They're animations and sounds on the TV only. Each phone still sends at most 1 tap per round. The phone learns about a foul in the round's result view, so fakes add no `controller:state` messages. See the [budget check](#budget-check).
 
 ---
 
@@ -148,18 +174,19 @@ The phone never shows DRAW!. The TV is the only signal. A phone view goes throug
 | `qd-result`, won | Chalk, "Watch the TV" | "You won the round!" | "0.243 s · 2 points" | `celebrate` |
 | `qd-result`, lost | Chalk, "Watch the TV" | "Noor was faster" | "Your time 0.301 s" | none |
 | `qd-result`, foul | Chalk, "Watch the TV" | "Too early, that's a foul" | "Wait for DRAW next time" | `foul` |
+| `qd-result`, fooled | Chalk, "Watch the TV" | "That was a fake, that's a foul" | "Only DRAW counts" | `foul` |
 | `qd-result`, slow | Chalk, "Watch the TV" | "Too slow this time" | "Tap as soon as you see DRAW" | none |
 
 - Every line stays under 40 characters. Names are at most 12 characters, so "Noor was faster" is at most 23.
 - The tapped state is local and immediate. The phone switches to disabled on `pointerdown`, before any network traffic, so a second tap can't be sent.
-- The host only sends views when they change: `qd-watch` once at the start, then `qd-standoff` and `qd-result` each round. A foul during `standoff` changes that player's view to `qd-result` early. It's merged into the host's next send window.
+- The host only sends views when they change: `qd-watch` once at the start, then exactly one `qd-standoff` and one `qd-result` batch per round. A foul during `standoff` doesn't send an early view. The phone stays on "Tapped!" and the TV shows FOUL! at once.
 - View data (`TView`), kept well under 1 KB:
 
 ```ts
 type QuickDrawView =
   | { round: number; target: 3; points: number }                                    // qd-watch, qd-standoff
   | { round: number; target: 3; points: number;
-      result: "won" | "lost" | "foul" | "slow"; ms: number | null; winner: string | null }; // qd-result, winner = a name
+      result: "won" | "lost" | "foul" | "fooled" | "slow"; ms: number | null; winner: string | null }; // qd-result, winner = a name
 ```
 
 ## Input message schema
@@ -193,12 +220,12 @@ On the wire, with `at` added by the send helper and `from` by the relay (about 7
 | World | 480×270, integer scaled, horizon in the upper third (about y = 90). Side view down a dusty main street. |
 | Scene palette | `desert` as approved in HOUSE_STYLE: `#F1CF8B` sand, `#E0A15E` mesas, `#8FD3F4` sky, `#37B26C` cactus. Sky and Turf are already core colours, so the world uses 8 unique colours of the 16 allowed. CC-10.5 writes `packages/theme/src/scenes/quick-draw.ts`. Adding a colour needs review. |
 | Players | World Pips (16×24, from `@couchcade/stage`). With 2 players they stand at x = 150 and x = 330, facing each other. With 3 to 8, even slots stand on the left and odd slots on the right, facing across the street, staggered 12 px in depth. |
-| Props | Two cacti, rocks, mesas on the horizon, a tumbleweed during `intro`, a popgun per Pip, a "BANG!" flag and a dust puff on `result`. |
+| Props | Two cacti, rocks, mesas on the horizon, a tumbleweed during `intro`, a popgun per Pip, a "BANG!" flag and a dust puff on `result`. For fakes: a crow (3 frames) and a popgun sparkle (16×16, 3 frames). |
 | Overlays | All from `@couchcade/stage` (CC-4.6): scoreboard with player chips and points, round counter chip, callouts, bottom instruction panel, room code panel. |
-| Callouts | `DRAW!` at the start of `draw`. `FOUL!` over a Pip when it fouls. The winner's name goes in the bottom panel, not in a callout. |
+| Callouts | `DRAW!` at the start of `draw`. Fake words during `standoff` (see [Fake-outs](#fake-outs)). `FOUL!` over a Pip when it fouls. The winner's name goes in the bottom panel, not in a callout. |
 | Motion | `DRAW!` is fully readable on its first frame. The pop and 4 px shake play after it, never before. Reduced motion: no shake, no scaling. |
 | Expressions | Pips are neutral during the standoff. On `result` the winner looks happy and the others look surprised. Nobody looks sad or angry at a foul. |
-| Sound | Music loop in `intro` and `result`, stopped during `standoff` for tension. Wind loop during `standoff`. DRAW sting on the `DRAW!` tick. One pop per valid tap in reaction order on `result`. `foul` and `celebrate` tokens from `@couchcade/audio`. Every sound has a visual cue. |
+| Sound | Music loop in `intro` and `result`, stopped during `standoff` for tension. Wind loop during `standoff`. DRAW sting on the `DRAW!` tick. Fake sting, crow caw or ting with each fake. One pop per valid tap in reaction order on `result`. `foul` and `celebrate` tokens from `@couchcade/audio`. Every sound has a visual cue. |
 
 ---
 
@@ -237,16 +264,17 @@ Caps from [platform.md](../architecture/platform.md#the-caps): phones at most 4 
 | Per round, 8 players | Requests |
 |---|---|
 | `input` taps, at most 1 per phone | 8 |
-| `controller:state` (`qd-standoff` batch, `qd-result` batch, sometimes one foul batch in between) | 2 to 3 |
+| `controller:state` (one `qd-standoff` batch, one `qd-result` batch) | 2 |
 | `room:snapshot` at the end of the round | 1 |
-| **Total** | **about 12 per 10-second round** |
+| Fake-outs (animations and sounds on the TV only) | 0 |
+| **Total** | **about 11 per 10-second round** |
 
 | Check | Quick Draw | Cap | Fits |
 |---|---|---|---|
 | Messages per phone | 1 per round, about 0.1 per second | 4 per second | Yes, 40 times under |
-| Host `controller:state` | 2 to 3 per round, about 0.3 per second. Every change is at least 1,500 ms apart except merged fouls. | 1.5 per second, 667 ms apart | Yes |
-| One match, 8 players, 9 rounds at most | about 110 requests, plus 2 `room:phase` | none | |
-| One hour of only Quick Draw, 8 players | about 4,300 requests | platform.md plans about 7,500 per hour for 8 phones in turn-based games | Yes. Quick Draw counts as a turn-based game and uses nothing of the real-time budget. |
+| Host `controller:state` | 2 per round, about 0.2 per second. The two sends are always at least 2,000 ms apart. | 1.5 per second, 667 ms apart | Yes |
+| One match, 8 players, 9 rounds at most | about 100 requests, plus 2 `room:phase` | none | |
+| One hour of only Quick Draw, 8 players | about 4,000 requests | platform.md plans about 7,500 per hour for 8 phones in turn-based games | Yes. Quick Draw counts as a turn-based game and uses nothing of the real-time budget. |
 
 `realtime` is `true` because `onTick` drives the phases. Taps still go through the batching helper, but at 1 per round each one goes out at once.
 
@@ -262,7 +290,7 @@ Quick Draw adds no new platform code. Anything missing below belongs to the owni
 | `@couchcade/game-sdk` clock | `toHostTime` inside `send`, the synced check on the phone | CC-1.14 |
 | `@couchcade/game-sdk/input` | Batching helper and caps (1 tap per round passes straight through) | CC-3.6 |
 | `@couchcade/game-sdk/testing` | `testGameContract`, `createFakeRoom`, `replay` with one recorded match | CC-1.13 |
-| `@couchcade/utils` | `createRng(seed)` for the standoff wait | CC-1.7 |
+| `@couchcade/utils` | `createRng(seed)` for the standoff wait and the fake-outs | CC-1.7 |
 | `@couchcade/protocol` | `PlayerInfo`, `ControllerView`, `JsonValue` types | CC-1.8 |
 | `@couchcade/ui` | Big action, player chip, local `press` haptic | CC-4.4, CC-7.5 |
 | `@couchcade/stage` | `StageScene`, scoreboard, callouts, room code panel, World Pips | CC-4.6, CC-6.4 |
@@ -282,11 +310,12 @@ Every sprite is recoloured with `pnpm assets:recolour <input> desert` and credit
 | Sand ground, rocks, cacti (16×16 pixel tiles) | [Desert Shooter Pack](https://kenney.nl/assets/desert-shooter-pack) (500+ sprites, also on [OpenGameArt](https://opengameart.org/content/desert-shooter-pack)) | Kenney | [CC0](https://kenney.nl/assets/desert-shooter-pack) |
 | Popgun pop, dust puff thud | [Impact Sounds](https://kenney.nl/assets/impact-sounds) (130 files) | Kenney | [CC0](https://kenney.nl/assets/impact-sounds) |
 | Pop backup (2 shots, springs) | [100 CC0 SFX](https://opengameart.org/content/100-cc0-sfx) | rubberduck | [CC0](https://opengameart.org/content/100-cc0-sfx) |
-| DRAW sting, round win jingle | [Music Jingles](https://kenney.nl/assets/music-jingles) (85 files) | Kenney | [CC0](https://kenney.nl/assets/music-jingles) |
-| Intro tick | [Interface Sounds](https://kenney.nl/assets/interface-sounds) (100 files) | Kenney | [CC0](https://kenney.nl/assets/interface-sounds) |
+| DRAW sting, fake sting (a similar jingle from the same pack), round win jingle | [Music Jingles](https://kenney.nl/assets/music-jingles) (85 files) | Kenney | [CC0](https://kenney.nl/assets/music-jingles) |
+| Intro tick, glint ting | [Interface Sounds](https://kenney.nl/assets/interface-sounds) (100 files) | Kenney | [CC0](https://kenney.nl/assets/interface-sounds) |
 | Standoff wind loop | [Wind Whoosh Loop](https://opengameart.org/content/wind-whoosh-loop) | SketchMan3 | [CC0](https://opengameart.org/content/wind-whoosh-loop) |
+| Crow caw (fake-out) | [Crow caw](https://opengameart.org/content/crow-caw) | zeroisnotnull | [CC0](https://opengameart.org/content/crow-caw) |
 | Game music loop (check it's 110 to 130 BPM) | [Chiploop](https://opengameart.org/content/chiploop) | iamoneabe | [CC0](https://opengameart.org/content/chiploop) |
 
-Drawn from scratch (small, no CC0 source needed): mesa silhouettes, tumbleweed (4 frames), popgun with "BANG!" flag (3 frames), dust puff (4 frames). Anything the Desert Shooter Pack lacks is drawn from scratch too.
+Drawn from scratch (small, no CC0 source needed): mesa silhouettes, tumbleweed (4 frames), popgun with "BANG!" flag (3 frames), dust puff (4 frames), crow (3 frames), popgun sparkle (3 frames). Anything the Desert Shooter Pack lacks is drawn from scratch too.
 
 Rejected: OpenGameArt [Cowboy](https://opengameart.org/content/cowboy) (its terms aren't CC0-compatible, and Pips replace characters), [Wind Loop](https://opengameart.org/content/wind-loop) (CC BY 3.0, not allowed), [Desert Loop](https://opengameart.org/content/desert-loop) (CC0, but its style doesn't fit a western).
