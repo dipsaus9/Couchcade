@@ -92,6 +92,9 @@ importers:
 
   apps/controller:
     dependencies:
+      '@couchcade/game-sdk':
+        specifier: workspace:*
+        version: link:../../packages/game-sdk
       '@couchcade/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
@@ -172,6 +175,9 @@ importers:
       vue-tsc:
         specifier: 'catalog:'
         version: 3.3.11(typescript@6.0.3)
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
 
   apps/server:
     dependencies:
