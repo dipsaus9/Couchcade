@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "Couchcade platform-neutral library (no DOM, no Node, no Workers globals)",
+  "extends": "./base.json",
+  "compilerOptions": {
+    "lib": ["ES2023"]
+  }
+}

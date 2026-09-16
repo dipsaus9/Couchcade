@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "Couchcade browser app or package (Vue SFCs, DOM, Vite client types)",
+  "extends": "./base.json",
+  "compilerOptions": {
+    "types": ["vite/client"],
+    "jsx": "preserve",
+    "jsxImportSource": "vue"
+  },
+  "vueCompilerOptions": {
+    "strictTemplates": true
+  }
+}

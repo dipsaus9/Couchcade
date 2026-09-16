@@ -1,0 +1,27 @@
+{
+  "name": "@couchcade/config",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Shared tsconfig bases and Vite/Vitest presets. Import it from config files only, never from src/.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./tsconfig/*": "./tsconfig/*",
+    "./*": "./*/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "catalog:",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}
