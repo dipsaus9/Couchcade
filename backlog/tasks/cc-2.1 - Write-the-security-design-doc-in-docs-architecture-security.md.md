@@ -1,10 +1,10 @@
 ---
 id: CC-2.1
 title: Write the security design doc in docs/architecture/security.md
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-16 15:54'
+updated_date: '2026-09-16 15:55'
 labels:
   - story
   - owner-gate
@@ -30,7 +30,7 @@ Branch: CC-2.1/security-design-doc
 <!-- AC:BEGIN -->
 - [x] #1 The doc has a threat → defence → test table covering passcode brute force, room code guessing, direct WebSocket access, flooding, malformed messages, names, XSS and supply chain
 - [x] #2 It records where Turnstile runs now that hosting needs a passcode
-- [ ] #3 Owner approval is recorded in the task notes as "Approved by owner: <YYYY-MM-DD>" before the story is Done
+- [x] #3 Owner approval is recorded in the task notes as "Approved by owner: <YYYY-MM-DD>" before the story is Done
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -52,4 +52,12 @@ Open decisions for the owner (recommendations in the doc): 1 phone flood bucket 
 Follow-ups: new CC-2 story for repo security setup (CodeQL default setup, Dependabot alerts, private vulnerability reporting, branch protection, pnpm audit in CI); amend CC-2.3, CC-2.5, CC-3.10, platform.md and README after the owner decides.
 
 Owner decisions, 2026-09-16 (relayed by the orchestrator; not the doc approval): 1 phones keep the 20/s flood bucket with burst 40, same as the host; 2 join limit raised to 20 per IP per minute; 3 the README's interactive challenge after 3 wrong codes is dropped (README edit done separately); 4 at most 16 phones per room (8 players + 8 audience), 409 room-full. The open-decisions section is removed from security.md and the decisions are rows 15-18. AC3 (owner approval) is still open.
+
+Approved by owner: 2026-09-16
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Shipped docs/architecture/security.md, the approved threat model for Couchcade with the host passcode. It covers assets and attackers for a friends-only game on a public workers.dev URL, a threat, defence and test table mapped to stories (passcode brute force, room creation spam, code guessing, direct WebSocket access, token reuse, flooding, quota burn, malformed messages, role checks, names, XSS, supply chain, credentials, secrets), where Turnstile runs (create and join only, with action checks, failing closed), the check order per endpoint, rate limits keyed per IP or IPv6 /64, flood protection costs, passcode, ticket, message, name, CSP/header, privacy and CI rules, and an incident table. Owner decisions of 2026-09-16: flood bucket stays 20/s burst 40 for every socket, join limit 20 per IP per minute, no interactive challenge after wrong codes, at most 16 phones per room with 409 room-full. Follow-ups: a CC-2 story for repo security settings (CodeQL, Dependabot alerts, private vulnerability reporting, branch protection, pnpm audit in CI) and amendments to CC-2.3, CC-3.10 and platform.md.
+<!-- SECTION:FINAL_SUMMARY:END -->
