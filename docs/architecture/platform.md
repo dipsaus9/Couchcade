@@ -6,7 +6,7 @@ This is the design every platform and game story builds on. It covers how the TV
 
 **For agents.** The sections after the decisions table are binding. Where this doc and a story disagree, stop and flag it. README.md, [TECH_STACK.md](../TECH_STACK.md) and [HOUSE_STYLE.md](../HOUSE_STYLE.md) still apply. This doc adds detail and doesn't repeat them.
 
-Status: draft for owner approval (CC-1.1). Written 16 September 2026.
+Status: approved by the owner on 16 September 2026 (CC-1.1). The free-tier budget section was updated with the CC-1.4 results the same day, as agreed at approval.
 
 ---
 
@@ -47,7 +47,7 @@ These are settled by the README, TECH_STACK, the CC-1.3 spike, the owner or this
 | 11 | Layered packages, checked in CI | Code only imports "downwards" (apps, then games, then shared packages, then `utils`). A CI check fails the build otherwise. |
 | 12 | Local dev uses the Cloudflare Vite plugin | Decided by spike CC-1.3: the real Worker and room run inside the Vite dev server. No second server process. |
 | 13 | Deploy from GitHub Actions on merge | Every merge to `main` builds, deploys to `workers.dev` and runs a smoke test that creates a room. |
-| 14 | Plan for the worst case on the free tier | Until CC-1.4 measures it, we assume every incoming message costs one of the 100,000 daily Durable Object requests. The budget section shows how long a game night lasts under that assumption. |
+| 14 | Plan for the worst case on the free tier | CC-1.4 measured 1 request per connect, per incoming message and per close, from phones and the host alike. The cheaper 20:1 count is unconfirmed, so we plan on 1:1. Phones send at most 4 messages per second and the host at most 1.5, so one 2-hour night with 8 players fits in a day. |
 | 15 | One shared room clock (owner, 2026-09-16) | The room on Cloudflare answers clock pings with its own time, and the TV and every phone sync to it. That costs 1 request per sample instead of 2 through the TV, and one network hop is more accurate. Games only see game time. |
 | 16 | Mid-game joiners play from the next game (owner, 2026-09-16) | Someone who joins while a game is running gets a seat, colour and Pip straight away and waits on a "Next game soon" screen. The running game is untouched. |
 | 17 | Every merge deploys right away (owner, 2026-09-16) | There is no deploy freeze. A deploy disconnects every socket. Phones and the TV reconnect and the room restores from the last round snapshot, but a round in progress can be lost. The owner accepts that. |
@@ -590,7 +590,7 @@ Rules for game code:
 2. The host creates a seed, calls `init(seatedPlayers, seed)`, sends `room:phase { phase: "playing" }` and starts the scene with `HostSceneData`.
 3. Every tick at a fixed 60 Hz step: apply queued inputs in arrival order, call `onTick` if `realtime`, then check `outcome`.
 4. Inputs that fail `inputSchema` are dropped. Inputs from audience never arrive, because the relay drops them.
-5. After each tick the host computes `view` for every seated player, diffs against what it last sent, and sends at most one `controller:state` with the changed entries. If the changed entries don't fit in 1 KB, it splits them over several messages, which costs extra requests, and logs a dev warning.
+5. After each tick the host computes `view` for every seated player, diffs against what it last sent, and sends at most one `controller:state` with the changed entries, no more than 1.5 times per second (see the [budget rules](#free-tier-budget-rules)). If the changed entries don't fit in 1 KB, it splits them over several messages, which costs extra requests, and logs a dev warning.
 6. When `outcome` returns placements, the host shows results (CC-3.3), sends `room:phase`, and returns host and phones to the lobby or menu.
 
 ### How the phone shows a controller (CC-1.16)
@@ -729,52 +729,63 @@ flowchart LR
 
 Couchcade runs on the Workers Free plan and must cost €0. When a daily limit is reached, requests fail until 00:00 UTC (02:00 in the Netherlands in summer). Nothing is ever charged. The limits themselves are in [TECH_STACK.md](../TECH_STACK.md#verified-free-limits).
 
-### The assumption we plan with
+### What CC-1.4 measured
 
-Until CC-1.4 measures it on a real deploy, **every WebSocket message that arrives at a Room Durable Object counts as one request against the 100,000 per day**. So do keep-alive frames answered by auto-response, every upgrade that reaches a room, and every Worker call into a room. Messages the room sends out are free.
+The CC-1.4 probe ran on a real deploy on 16 September 2026.
 
-If CC-1.4 shows that 20 incoming messages count as one request on Free, the message-driven numbers below shrink twenty-fold. The rules stay the same.
+- **Every message that arrives at a room costs 1 request.** Sending 1,020 messages showed up as 1,024 Durable Object requests in analytics: 1 per connect, 1 per incoming message and 1 per close. That includes messages from the host, not only from phones. Messages the room sends out are free.
+- **The 20:1 ratio is unconfirmed on Free.** The billing page had no data yet, so we keep planning with 1 incoming message = 1 request. Keep-alive frames answered by auto-response count as requests in this plan too.
+- **The Rate Limiting binding works on Free, but loosely.** Against a limit of 10 per 60 seconds, it let 151 of 271 requests through. Use it to slow abuse down, never as an exact quota.
 
-### The number to confirm
+If the 20:1 ratio is confirmed later, the phone cap can go up to 15 messages per second. The host cap and the rules stay the same.
 
-Per-phone input cap during real-time play: **R = 15 messages per second** (to be confirmed by CC-1.4).
+### The caps
 
-That line is the one to update when CC-1.4 reports. The batching helper (CC-3.6) reads R from one constant in `@couchcade/game-sdk/input`. The TECH_STACK fallback, if the 1:1 count is confirmed, is R = 5.
+We plan for one design night per day: **2 hours, 8 phones, 30% of the time in real-time games**. We keep 20,000 of the 100,000 daily requests as a reserve for connects, keep-alive, clock sync, turn-based input and room management. That leaves **80,000 for real-time input and host broadcasts**.
+
+**Phones: at most 4 input messages per second, at least 250 ms apart.** Real-time play on the design night is 8 × 7,200 s × 0.3 = 17,280 phone-seconds. 80,000 / 17,280 = 4.6, rounded down to 4. At that cap, phones use 17,280 × 4 = 69,120.
+
+**Host: at most 1.5 `controller:state` messages per second, at least 667 ms apart.** The host sends all night, not only in real-time games. 80,000 − 69,120 = 10,880 left, and 10,880 / 7,200 s = 1.51, rounded down to 1.5. At that cap, the host uses 7,200 × 1.5 = 10,800.
+
+Together that is 69,120 + 10,800 = 79,920, inside the 80,000. The reserve covers the rest of the night: about 8,100 turn-based inputs (8 phones × 5,040 s × 0.2 per second), about 4,800 keep-alive and clock samples (9 devices × 2 hours × 264), and a few hundred connects, closes and room messages. That's about 13,000 of the 20,000.
+
+Both caps live as constants in `@couchcade/game-sdk/input`, which the batching helper (CC-3.6) and the host runtime (CC-1.15) read.
 
 ### Cost of each activity
 
 | Activity | Requests |
 |---|---|
 | Create a room | 1 per code attempt |
-| Join | 1 status check + 1 upgrade |
+| Join | 1 status check + 1 upgrade, and 1 when the socket closes |
 | Rejoin after a disconnect | 1 upgrade (the rejoin API doesn't reach the room) |
 | Keep-alive `ping`, every 25 s per device | 144 per device per hour |
 | Clock sync: 5 samples on connect, then 1 every 30 s | 5 per connect + 120 per device per hour |
 | Turn-based input, about 1 action every 5 s per phone | about 720 per phone per hour |
-| Host `controller:state`, only on change | about 1,800 per hour turn-based (0.5 per second), 7,200 during real-time play (2 per second) |
-| Real-time input at the cap | 3,600 × R per phone per hour |
+| Real-time input at the phone cap | 14,400 per phone per hour |
+| Host `controller:state`, only on change | about 1,800 per hour in turn-based games, at most 5,400 per hour at the host cap |
 | Profile edits, kick, lock, phase, snapshot | a handful per game |
 
 ### How long the daily budget lasts
 
-These numbers are for one room, host plus phones, and assume real-time phones send at the cap the whole time. That overstates real play, because phones send only when the input changes.
+These numbers are for one room, host plus phones, with phones at 4 per second during real-time play and the host at its 1.5 per second cap the whole time. That overstates real play, because both send only when something changes.
 
-| Scenario | R = 15 | R = 5 | R = 2 |
-|---|---|---|---|
-| 4 phones, turn-based games only (about 6,000 per hour, R doesn't apply) | about 16 hours | about 16 hours | about 16 hours |
-| 4 phones, real-time the whole time | 27 minutes | 74 minutes | 2 hours 40 minutes |
-| 8 phones, real-time the whole time | 14 minutes | 39 minutes | 89 minutes |
-| 4 phones, 3-hour night, 30% real-time | over the limit | about 85,000, fits | about 46,000, fits |
+| Scenario | Requests | Result |
+|---|---|---|
+| Design night: 8 phones, 2 hours, 30% real-time | about 93,000 | Fits, about 7,000 left |
+| 4 phones, 3-hour night, 30% real-time | about 78,000 | Fits |
+| 4 phones, turn-based games only | about 9,600 per hour | About 10 hours |
+| 4 phones, real-time the whole time | about 64,000 per hour | About 90 minutes |
+| 8 phones, real-time the whole time | about 123,000 per hour | About 49 minutes |
 
-So with the conservative count, a 15 messages per second cap doesn't fit a real-time-heavy night, and R = 5 fits one 3-hour night. CC-1.4 decides which column applies.
+One design night per day fits. A second long real-time night on the same day doesn't until the 20:1 ratio is confirmed.
 
 ### Rules
 
 1. Accept sockets with the Hibernation API (partyserver `hibernate: true`). No `setTimeout` or `setInterval` in the room. Use alarms.
 2. Reject bad requests in the Worker (origin, ticket, rate limit, Turnstile, name) before any room is called.
 3. Address rooms with `env.Room.get(idFromName(code), { locationHint: "weur" })` and `stub.fetch()`. Never `getServerByName` on a hot path, because it adds a request.
-4. Phones send input only when it changes, at most R messages per second, through the batching helper. Release and fire events flush immediately.
-5. The host sends at most one `controller:state` per tick, containing only views that changed. Views never carry per-frame data.
+4. Phones send input only when it changes, through the batching helper: at most 4 messages per second, at least 250 ms apart. A release or fire event goes out at once if 250 ms have passed since the last send, otherwise at the 250 ms mark.
+5. The host sends `controller:state` only when a view changed, at most 1.5 times per second, at least 667 ms apart. The first change after a quiet period goes out on the next tick. Changes inside the 667 ms window are merged into one message with the latest view per phone. Views never carry per-frame data.
 6. Answer keep-alive with `setWebSocketAutoResponse()`. Clock samples double as the dev overlay's round-trip time, so the overlay adds no messages.
 7. No storage write per message. Snapshot once per round, never per frame.
 8. Phones send `player:profile` once when the player closes the customiser, not on every change.
@@ -782,6 +793,7 @@ So with the conservative count, a 15 messages per second cap doesn't fit a real-
 10. Close rooms after 30 minutes idle, 30 minutes without the TV, or 4 hours total.
 11. Keep Workers Logs sampled (`head_sampling_rate` below 1) and never log per message.
 12. When the limit is hit anyway, the apps show the "quota reached" screen from CC-9.4. We don't count requests ourselves. That would cost requests.
+13. Use the Rate Limiting binding only to slow abuse down (CC-2.3). It counts loosely on Free, so never rely on it for an exact quota.
 
 ---
 
@@ -855,7 +867,7 @@ Never hand-merge `pnpm-lock.yaml`. When two branches both change dependencies:
 | Clock sync | CC-1.14, then CC-3.7 and CC-3.8 |
 | Game runtime on host and phone | CC-1.15, CC-1.16 |
 | E2E harness, deploy, import boundaries | CC-1.17, CC-1.18, CC-1.19 |
-| CC-1.4 budget measurement | Updates the R line in [Free-tier budget rules](#free-tier-budget-rules) |
+| CC-1.4 budget measurement | Measured facts and caps recorded in [Free-tier budget rules](#free-tier-budget-rules) |
 | Session flow, reconnect, recovery, audience | CC-3.1 to CC-3.11 |
 | Theme, UI kit, stage, assets, style checks | CC-4.x |
 | Motion | CC-5.x |
