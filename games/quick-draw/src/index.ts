@@ -29,6 +29,5 @@ export default defineGame({
   snapshot,
   restore,
 
-  // The TV scene arrives with CC-10.4, which swaps this for import("./host/scene.ts").
-  hostScene: () => Promise.reject(new Error("The Quick Draw TV scene isn't built yet")),
+  hostScene: () => import("./host/scene.ts").then((module) => module.default),
 });

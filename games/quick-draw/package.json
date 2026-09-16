@@ -7,17 +7,21 @@
   "sideEffects": false,
   "scripts": {
     "typecheck": "tsc",
-    "test": "vitest run"
+    "test": "playwright install chromium-headless-shell && vitest run"
   },
   "dependencies": {
     "@couchcade/game-sdk": "workspace:*",
     "@couchcade/protocol": "workspace:*",
+    "@couchcade/theme": "workspace:*",
     "@couchcade/utils": "workspace:*",
+    "phaser": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@couchcade/config": "workspace:*",
+    "@vitest/browser-playwright": "catalog:",
     "fast-check": "catalog:",
+    "playwright": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:"

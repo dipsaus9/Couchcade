@@ -1,0 +1,17 @@
+{
+  "name": "@couchcade/e2e",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Playwright multi-device tests: one TV and several phones against the local dev server.",
+  "type": "module",
+  "scripts": {
+    "e2e": "playwright install chromium-headless-shell webkit && playwright test",
+    "typecheck": "tsc"
+  },
+  "devDependencies": {
+    "@couchcade/config": "workspace:*",
+    "@playwright/test": "catalog:",
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
+  }
+}
