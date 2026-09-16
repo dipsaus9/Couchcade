@@ -1,0 +1,37 @@
+{
+  "name": "@couchcade/ui",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The Clubhouse UI kit for phones and menus: buttons, panels, player chips and the big action. Tier 3 kit: imports core, theme, protocol and utils only.",
+  "type": "module",
+  "sideEffects": [
+    "*.vue"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*/index.ts"
+  },
+  "scripts": {
+    "typecheck": "vue-tsc",
+    "test": "playwright install chromium-headless-shell && vitest run"
+  },
+  "dependencies": {
+    "@couchcade/theme": "workspace:*"
+  },
+  "devDependencies": {
+    "@couchcade/config": "workspace:*",
+    "@vitejs/plugin-vue": "catalog:",
+    "@vitest/browser-playwright": "catalog:",
+    "@vue/test-utils": "catalog:",
+    "axe-core": "catalog:",
+    "playwright": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:",
+    "vue": "catalog:",
+    "vue-tsc": "catalog:"
+  },
+  "peerDependencies": {
+    "vue": "catalog:"
+  }
+}
