@@ -5,8 +5,8 @@ import type { SocketIdentity } from "../src/room/identity.ts";
 import { createWorker, roomStub, type TicketVerifier } from "../src/worker.ts";
 
 /**
- * A stand-in for CC-1.10's verifier: the ticket is the identity as JSON. It lets tests connect
- * through the real Worker routing without signed tickets.
+ * A stand-in for the signed ticket verifier: the ticket is the identity as JSON. It lets room tests
+ * connect through the real Worker routing without signing tickets.
  */
 export const jsonTickets: TicketVerifier = async (ticket) => {
   if (!ticket) return null;
@@ -39,6 +39,7 @@ export function upgradeRequest(code: string, ticket: string, init: RequestInit =
   const url = `${origin}/ws/${code}?v=1&ticket=${encodeURIComponent(ticket)}`;
   const headers = new Headers(init.headers);
   headers.set("Upgrade", "websocket");
+  if (!headers.has("Origin")) headers.set("Origin", origin);
   return new Request(url, { ...init, headers });
 }
 
@@ -167,4 +168,18 @@ export async function joinPhone(
   await socket.expect("room:host");
   if (host) await host.expect("player:joined");
   return { socket, id: identity.playerId, welcome: welcome.d };
+}
+
+/** An env whose Room namespace records the code of every room it is asked for. */
+export function watchRooms(base: Cloudflare.Env = env): { env: Cloudflare.Env; rooms: string[] } {
+  const rooms: string[] = [];
+  const Room = {
+    idFromName: (name: string) => {
+      rooms.push(name);
+      return base.Room.idFromName(name);
+    },
+    get: (id: DurableObjectId, options?: DurableObjectNamespaceGetDurableObjectOptions) =>
+      base.Room.get(id, options),
+  } as unknown as Cloudflare.Env["Room"];
+  return { env: { ...base, Room }, rooms };
 }
