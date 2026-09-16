@@ -1,0 +1,16 @@
+{
+  "name": "@couchcade/spike-free-tier-probe",
+  "private": true,
+  "type": "module",
+  "description": "Throwaway probe for CC-1.4: Durable Object request counting and the Rate Limiting binding on the Workers Free plan",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "send": "node scripts/send-messages.mjs",
+    "rate-limit": "node scripts/rate-limit.mjs",
+    "analytics": "node scripts/analytics.mjs",
+    "destroy": "wrangler delete --force"
+  },
+  "devDependencies": {
+    "wrangler": "4.131.2"
+  }
+}
