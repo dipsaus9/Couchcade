@@ -1,0 +1,23 @@
+{
+  "name": "spike-dev-websocket",
+  "private": true,
+  "type": "module",
+  "description": "Throwaway spike (CC-1.3): app WebSockets through the Cloudflare Vite plugin dev server",
+  "scripts": {
+    "dev": "vite --port 5173 --strictPort",
+    "dev:wrangler": "wrangler dev --port 8787",
+    "dev:proxy": "vite --config vite.proxy.config.ts --port 5174 --strictPort",
+    "typecheck": "tsc",
+    "relay-test": "node relay-test.mjs",
+    "edge-cases": "node edge-cases.mjs",
+    "browser-test": "node browser-test.mjs"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "1.54.9",
+    "@cloudflare/workers-types": "5.20260914.1",
+    "partyserver": "0.5.10",
+    "typescript": "6.0.3",
+    "vite": "8.3.0",
+    "wrangler": "4.131.2"
+  }
+}
