@@ -1,10 +1,10 @@
 ---
 id: CC-4.9
 title: 'Build the CC0 asset pipeline: palette recolour, palette check and credits'
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-16 21:24'
+updated_date: '2026-09-16 21:27'
 labels:
   - story
 dependencies:
@@ -64,3 +64,13 @@ Delivery notes (CC-4.9):
 - Tests use PNGs generated in-memory with pngjs (test/png-fixtures.ts) rather than checked-in binaries. 43 tests in tooling/assets; full pnpm check/test/check:deps/build pass on the branch.
 - Implied bookkeeping outside the file-level References (per WORKER_BRIEF): pnpm-lock.yaml, and the pngjs/@types/pngjs catalog additions in pnpm-workspace.yaml.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added tooling/assets, the CC0 asset pipeline. pnpm assets:recolour <input> <scene> (root script already delegated per CC-1.5) remaps every non-transparent pixel of a PNG sprite onto the core + <scene> palette from @couchcade/theme by OKLab nearest-colour distance (pngjs, pure JS, no native build), overwriting the file in place and preserving alpha. A palette/frame-size check (checkSpriteImage/checkGameAssets/checkAllGameAssets, tooling/assets/src/check.ts + check-cli.ts) fails on any non-transparent pixel outside a sprite's allowed core+scene colours and on frame dimensions that aren't multiples of the 16x24 world grid (inferred from HOUSE_STYLE's World Pip spec, flagged for owner confirmation since the doc names no other literal grid unit). games/<id>/CREDITS.md tables (asset, author, http(s) source, CC0 licence) are parsed, validated (credits.ts) and aggregated into docs/CREDITS.md (credits-cli.ts); a missing CREDITS.md is only an error when the game's assets/ folder has files, so games/quick-draw (no assets yet) passes cleanly. docs/CREDITS.md is generated and committed ("No CC0 assets are in use yet." today) with a drift test against regeneration.
+
+Because packages/theme/src/scenes/index.ts registers scenes with Vite's import.meta.glob (throws under plain Node), the Node CLI loads scene files directly via readdirSync + per-file dynamic import by filesystem path (scene-loader.ts), reimplementing the registry's own validation (no malformed hex, no duplicate scene id, core+scene <=16 colours).
+
+43 tests in tooling/assets, all using PNGs generated in-memory with pngjs (no binary fixtures). pnpm check, test, check:deps and build all pass on the merged branch. Reviewed by dipsaus-ai:story-reviewer: pass, round 1, no scope violations; one advisory (confirm the 16x24 world-grid constant with the owner).
+<!-- SECTION:FINAL_SUMMARY:END -->
