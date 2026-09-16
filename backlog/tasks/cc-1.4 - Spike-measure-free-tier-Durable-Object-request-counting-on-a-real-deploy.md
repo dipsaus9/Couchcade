@@ -4,7 +4,7 @@ title: 'Spike: measure free-tier Durable Object request counting on a real deplo
 status: In Progress
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-16 14:57'
+updated_date: '2026-09-16 15:27'
 labels:
   - story
 dependencies: []
@@ -44,4 +44,41 @@ Owner confirmed Cloudflare login on 2026-09-16: `npx wrangler login` done, `wran
 2026-09-16 first deploy attempt (wrangler 4.131.2) blocked: Cloudflare API error 10034 'You need to verify your email address to use Workers'. Nothing was uploaded (account script list is empty). Side effect: wrangler deploy non-interactively registered the account's workers.dev subdomain as 'couchcade-spike-free-tier-probe' (derived from the package name), so the Worker URL would be couchcade-free-tier-probe.couchcade-spike-free-tier-probe.workers.dev and the later production Worker would get couchcade.couchcade-spike-free-tier-probe.workers.dev unless the subdomain is changed. Probe code is committed and passes wrangler deploy --dry-run. GraphQL Analytics API works with the wrangler OAuth token (durableObjectsInvocationsAdaptiveGroups, durableObjectsPeriodicGroups queried successfully). Cloudflare pricing docs state the 20:1 ratio is billing-only and 'does not affect Durable Object metrics and analytics, which reflect actual usage', so analytics will show raw message counts.
 
 2026-09-16 resume: owner chose workers.dev subdomain 'dipsaus9' and reports the email is verified. The agent's attempts to change the subdomain through the API and to re-run wrangler deploy were both refused by the Claude Code permission classifier (category: DNS / Domain / Cert Changes). Neither action ran. Needs the owner to change the subdomain in the dashboard and to allow the deploy (or run it).
+
+2026-09-16 probe run. The owner changed the account subdomain to dipsaus9 and deployed https://couchcade-free-tier-probe.dipsaus9.workers.dev (version 3771c0d3-fd69-4fbc-906b-bc30145625ab). The first attempt at 15:01Z failed with a TLS handshake error until the new subdomain's certificate was live at 15:01:57Z.
+
+Messages sent (scripts/send-messages.mjs, one socket per room, each message sent after the previous ack):
+- room probe-1000: 1,000 sent, 1,000 acked, 15:02:04Z to 15:02:27Z
+- room probe-20: 20 sent, 20 acked, 15:02:27Z to 15:02:28Z
+
+GraphQL Analytics (durableObjectsInvocationsAdaptiveGroups, filtered by namespace 6e9c850d614746569d37182504857640), complete at 15:24Z (about 22 minutes of lag):
+- probe-1000: http 1 + hibernation 1,001 = 1,002 requests
+- probe-20: http 1 + hibernation 21 = 22 requests
+- total 1,024 Durable Object requests, 0 errors
+
+Reading: each socket costs 1 request for the upgrade, 1 per incoming message, and 1 for the webSocketClose event (1,001 = 1,000 messages + close; 21 = 20 + close). durableObjectsPeriodicGroups showed outboundWebsocketMsgCount 1,001 and 21, but inboundWebsocketMsgCount 0 for hibernated sockets, so that counter is not usable. Cloudflare's pricing docs say the 20:1 ratio is billing-only and analytics 'reflect actual usage', so these raw counts cannot show whether the Free daily limit applies 20:1. Only a quota or billing view can.
+
+Gotcha: filtering by scriptName returned nothing. For the first minutes, Worker analytics showed scriptName '__unknown__' for this new Worker. Filter by namespaceId instead (scripts/analytics.mjs now does).
+
+Rate Limiting binding on Free (simple limit 10 per 60 s, key 'probe', scripts/rate-limit.mjs):
+- The binding deploys fine on the Free plan.
+- 15:02:28Z, 30 sequential hits on one keep-alive connection: 22 x 200, then 8 x 429.
+- 15:02:50Z, 30 hits: again 22 allowed, 8 limited.
+- 15:04:17Z to 15:04:21Z, 4 more rounds of 30: each 22 allowed, 8 limited.
+- 15:04:40Z, 60 hits in one process: all 60 limited.
+- 15:04:43Z, 30 curl calls, each on a new connection: 19 allowed, 11 limited, interleaved.
+
+Conclusion: the binding works and does enforce on Free, but loosely. Counters are local to the Cloudflare machine and eventually consistent. Across bursts and connections, well over 10 per 60 s got through (roughly 100 of 181 hits in 2 minutes). Use it for abuse control only, never as an exact quota, as the docs warn. About 270 Worker requests were used for this test; they do not count against the Durable Object limit.
+
+Recommended CC-3.6 input rate: 4 messages per second per phone during real-time play (minimum 250 ms between sends; release/fire flushes still count), sending only changed input.
+
+Arithmetic, on the safe assumption that every incoming message is a full Durable Object request (measured: 1 request per message, plus 1 per connect and 1 per close):
+- Daily budget: 100,000 Durable Object requests.
+- Keep 20,000 in reserve for connects, closes, reconnects after deploys, host-to-relay messages and turn-based messages. That leaves 80,000 for phone input.
+- One 2-hour game night, 8 phones, 30% real-time (the TECH_STACK typical case): 8 x 7,200 s x 0.3 = 17,280 real-time phone-seconds.
+- 80,000 / 17,280 = 4.6 messages per second, rounded down to 4. Check: 17,280 x 4 = 69,120, under 80,000.
+- Worst case (8 phones fully real-time at 4 per second = 32 requests per second): 80,000 / 32 = 2,500 s, about 42 minutes of pure real-time play per day.
+- If the dashboard proves 20:1 on Free, TECH_STACK's 15 per second stays valid (worst case 972,000 messages / 20 = 48,600 requests). Make the rate a single config constant so it can be raised.
+
+Implication outside CC-3.6: host-to-relay messages also count 1:1. A per-tick controller:state from the host at 10 per second would be 72,000 per 2 hours by itself, so the host send rate needs its own cap (follow-up).
 <!-- SECTION:NOTES:END -->
