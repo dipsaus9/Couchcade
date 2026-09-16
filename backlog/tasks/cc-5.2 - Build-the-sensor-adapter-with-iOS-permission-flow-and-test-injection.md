@@ -4,7 +4,7 @@ title: Build the sensor adapter with iOS permission flow and test injection
 status: In Progress
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-16 22:27'
+updated_date: '2026-09-16 22:33'
 labels:
   - story
 dependencies:
@@ -34,11 +34,11 @@ Branch: CC-5.2/sensor-adapter
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 requestPermission() is only called from a user gesture and reports granted, denied or unsupported
-- [ ] #2 Events pause when the page is hidden and resume when visible
-- [ ] #3 The adapter can be replaced by a fake in tests
-- [ ] #4 event.interval is exposed for diagnostics
-- [ ] #5 package.json uses wildcard subpath exports
+- [x] #1 requestPermission() is only called from a user gesture and reports granted, denied or unsupported
+- [x] #2 Events pause when the page is hidden and resume when visible
+- [x] #3 The adapter can be replaced by a fake in tests
+- [x] #4 event.interval is exposed for diagnostics
+- [x] #5 package.json uses wildcard subpath exports
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -54,4 +54,10 @@ Branch: CC-5.2/sensor-adapter
 
 <!-- SECTION:NOTES:BEGIN -->
 Verify: pnpm check && pnpm test
+
+Scaffolding implied by the new package (tsconfig.json, vitest.config.ts, src/index.ts, test/sensors/, test/exports.test.ts) was added to References with exact paths. pnpm-lock.yaml changed only for the new workspace package.
+AC2 follows motion.md adapter rule 5: on hidden the adapter removes its devicemotion listener and keeps the started listeners; it doesn't re-add it by itself. Once visible, the Tap to resume handler calls request() and start(), which resumes every started listener (starting the same listener twice doesn't duplicate it).
+AC1: request() calls DeviceMotionEvent.requestPermission() synchronously (no await first), nothing else calls it, and where navigator.userActivation exists and isn't active it isn't called at all (reports unsupported, same as the browser's NotAllowedError would).
+E2E hook: createFakeAdapter() fits the window.__couchcadeMotion adapter shape from e2e/src/motion.ts (setPermission, push, play(trace, { speed })); fake.test.ts assigns it to that shape without a cast. No change to the e2e contract was needed.
+Also shipped per motion.md: waitForCapability (1 s real-data check), trace v1 reader traceSamples, synthetic.still and synthetic.swing (motion.md test layer 1 names CC-5.2 for these).
 <!-- SECTION:NOTES:END -->
