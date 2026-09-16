@@ -46,6 +46,29 @@ describe("checkSpriteImage", () => {
     const violations = checkSpriteImage(image, palette);
     expect(violations.map((v) => v.kind).toSorted()).toEqual(["frame-size", "off-palette"]);
   });
+
+  // World grid = 8px (orchestrator decision, 2026-09-16; HOUSE_STYLE doesn't define it, owner to
+  // confirm): common CC0 pack frame sizes (Kenney-style 16x16 tiles, 32x32 props, 24x24
+  // characters) must pass, since a 16x24-only grid would reject all of them.
+  const commonFrameSizes: readonly (readonly [number, number])[] = [
+    [16, 16],
+    [32, 32],
+    [24, 24],
+    [16, 24], // the World Pip's own size still passes
+  ];
+  for (const [width, height] of commonFrameSizes) {
+    it(`passes a common CC0 frame size ${width}x${height}`, () => {
+      const image = decodePng(solidPng(width, height, [0, 0, 0, 255]));
+      expect(checkSpriteImage(image, palette)).toEqual([]);
+    });
+  }
+
+  it("still flags a frame size that isn't a multiple of 8", () => {
+    const image = decodePng(solidPng(15, 24, [0, 0, 0, 255]));
+    const violations = checkSpriteImage(image, palette);
+    expect(violations).toHaveLength(1);
+    expect(violations[0]).toMatchObject({ kind: "frame-size" });
+  });
 });
 
 describe("checkGameAssets / checkAllGameAssets (fixture repo)", () => {
