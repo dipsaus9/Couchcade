@@ -1,7 +1,12 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { cruise, format } from "dependency-cruiser";
-import type { ICruiseResult, IViolation } from "dependency-cruiser";
+import type {
+  ICruiseOptions,
+  ICruiseResult,
+  IForbiddenRuleType,
+  IViolation,
+} from "dependency-cruiser";
 import extractDepcruiseOptions from "dependency-cruiser/config-utl/extract-depcruise-options";
 
 /** The workspace folders the boundaries cover. spikes/ is throwaway and stays out. */
@@ -26,10 +31,21 @@ export interface CheckDepsResult {
   report: string;
 }
 
+/** A rule with `to.reachable` follows imports transitively instead of checking one import. */
+function isReachableRule(rule: IForbiddenRuleType): boolean {
+  const { to } = rule as { to?: object };
+  return to !== undefined && "reachable" in to;
+}
+
 /**
  * Cruises the workspace folders that exist in `rootDir` and validates them against the rules.
  * dependency-cruiser parses .ts with `typescript` and .vue with `@vue/compiler-sfc` (from `vue`),
  * both devDependencies here. Without the Vue compiler it would silently skip .vue files.
+ *
+ * It cruises twice. Import rules see type-only imports too, so a type that points up a tier still
+ * fails. Reachable rules ask what ships at runtime, so they run on a second cruise without
+ * type-only imports, which the build erases: game-sdk's contract type-imports phaser, and that
+ * never reaches a phone.
  */
 export async function checkDeps({
   rootDir,
@@ -40,9 +56,28 @@ export async function checkDeps({
     return { violations: [], errorCount: 0, report: "check:deps: no workspace folders to check\n" };
   }
 
-  const options = await extractDepcruiseOptions(configFile);
-  const cruised = await cruise(roots, { ...options, baseDir: rootDir });
-  const result = cruised.output as ICruiseResult;
+  const options: ICruiseOptions = await extractDepcruiseOptions(configFile);
+  const forbidden = options.ruleSet?.forbidden ?? [];
+  const reachableRules = forbidden.filter(isReachableRule);
+
+  const result = await cruiseWith(roots, {
+    ...options,
+    baseDir: rootDir,
+    ruleSet: { ...options.ruleSet, forbidden: forbidden.filter((rule) => !isReachableRule(rule)) },
+  });
+  if (reachableRules.length > 0) {
+    const runtime = await cruiseWith(roots, {
+      ...options,
+      baseDir: rootDir,
+      tsPreCompilationDeps: false,
+      ruleSet: { forbidden: reachableRules },
+    });
+    const { summary } = result;
+    summary.violations = [...summary.violations, ...runtime.summary.violations];
+    summary.error += runtime.summary.error;
+    summary.warn += runtime.summary.warn;
+    summary.info += runtime.summary.info;
+  }
   const { output } = await format(result, { outputType: "err" });
 
   return {
@@ -50,4 +85,12 @@ export async function checkDeps({
     errorCount: result.summary.error,
     report: String(output),
   };
+}
+
+async function cruiseWith(
+  roots: readonly string[],
+  options: ICruiseOptions,
+): Promise<ICruiseResult> {
+  const cruised = await cruise([...roots], options);
+  return cruised.output as ICruiseResult;
 }

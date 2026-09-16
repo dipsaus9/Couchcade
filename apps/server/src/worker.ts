@@ -50,7 +50,7 @@ export interface WorkerOptions {
 }
 
 /** Every room lives in western Europe, close to the living room. */
-export const roomLocationHint: DurableObjectLocationHint = "weur";
+const roomLocationHint: DurableObjectLocationHint = "weur";
 
 /**
  * The stub for room `code`. Always use this, never partyserver's `getServerByName`, which costs an

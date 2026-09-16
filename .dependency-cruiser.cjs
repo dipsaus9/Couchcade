@@ -25,6 +25,7 @@ const KIT = ["stage", "ui", "motion"];
 const ALL_PACKAGES = ["utils", ...TIER_1, ...CORE, ...KIT, "config"];
 
 const PHASER = npm("phaser");
+const PLANCK = npm("planck");
 const VUE = npm("vue", "@vue/[^/]+");
 
 /** @type {import("dependency-cruiser").IConfiguration} */
@@ -159,14 +160,23 @@ module.exports = {
       to: { path: [PHASER, pkg("stage", "physics", "audio")] },
     },
 
-    // Rule 6: apps reach a game only through its src/index.ts (and its lazy loaders).
+    // Rule 6: the host reaches a game only through src/index.ts, the phone only through the
+    // game's controller entry src/controller/index.ts (owner decision, 16 September 2026).
     {
-      name: "apps-reach-games-through-index",
+      name: "host-reaches-games-through-index",
       comment:
-        "Apps import a game only through games/<id>/src/index.ts. The host never imports src/controller/, the controller never src/host/.",
+        "apps/host imports a game only through games/<id>/src/index.ts. It never imports src/controller/.",
       severity: "error",
-      from: { path: "^apps/" },
+      from: { path: "^apps/host/" },
       to: { path: "^games/", pathNot: "^games/[^/]+/src/index\\.ts$" },
+    },
+    {
+      name: "controller-reaches-games-through-controller-entry",
+      comment:
+        "apps/controller imports a game only through games/<id>/src/controller/index.ts. It never loads the game's src/index.ts, so rules and physics stay on the TV.",
+      severity: "error",
+      from: { path: "^apps/controller/" },
+      to: { path: "^games/", pathNot: "^games/[^/]+/src/controller/index\\.ts$" },
     },
 
     // Rule 7: inside a game.
@@ -199,15 +209,26 @@ module.exports = {
     {
       name: "game-controller-no-tv-code",
       comment:
-        "games/<id>/src/controller/ never imports the game's host/, phaser, stage, audio or physics.",
+        "games/<id>/src/controller/ never imports the game's host/, phaser, planck, stage, audio or physics.",
       severity: "error",
       from: { path: "^games/([^/]+)/src/controller/" },
-      to: { path: ["^games/$1/src/host/", PHASER, pkg("stage", "audio", "physics")] },
+      to: { path: ["^games/$1/src/host/", PHASER, PLANCK, pkg("stage", "audio", "physics")] },
+    },
+    {
+      // A reachable rule follows every import, also through shared/ and packages. tooling/check-deps
+      // checks reachable rules without type-only imports, because the build erases them: game-sdk's
+      // contract type-imports phaser, and that never ships to a phone.
+      name: "game-controller-never-reaches-physics",
+      comment:
+        "Nothing under games/<id>/src/controller/ may reach planck, @couchcade/physics or phaser, not even through shared/, so Planck.js never ships to phones. Move what the controller needs out of the shared/ module that imports physics.",
+      severity: "error",
+      from: { path: "^games/[^/]+/src/controller/" },
+      to: { path: [PLANCK, pkg("physics"), PHASER], reachable: true },
     },
     {
       name: "game-index-imports-only-shared-and-sdk",
       comment:
-        "games/<id>/src/index.ts statically imports only its shared/ and game-sdk. host/ and controller/ load through import().",
+        "games/<id>/src/index.ts statically imports only its shared/ and game-sdk. host/ loads through import().",
       severity: "error",
       from: { path: "^games/([^/]+)/src/index\\.ts$" },
       to: {
@@ -216,13 +237,14 @@ module.exports = {
       },
     },
     {
-      name: "game-index-lazy-loads-only-host-and-controller",
-      comment: "games/<id>/src/index.ts lazy loads only its own host/ and controller/.",
+      name: "game-index-lazy-loads-only-host",
+      comment:
+        "games/<id>/src/index.ts lazy loads only its own host/. Phones load src/controller/index.ts themselves, so the TV never bundles a Vue controller.",
       severity: "error",
       from: { path: "^games/([^/]+)/src/index\\.ts$" },
       to: {
         dependencyTypes: ["dynamic-import"],
-        pathNot: "^games/$1/src/(host|controller)/",
+        pathNot: "^games/$1/src/host/",
       },
     },
 

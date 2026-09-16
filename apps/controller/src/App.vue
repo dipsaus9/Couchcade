@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount } from "vue";
 import RotateNotice from "./components/RotateNotice.vue";
+import GameController from "./runtime/GameController.vue";
+import { showsGameController } from "./runtime/controller.ts";
 import JoinScreen from "./screens/join/JoinScreen.vue";
 import LobbyScreen from "./screens/lobby/LobbyScreen.vue";
 import { waitingCopy } from "./screens/waiting/copy.ts";
@@ -31,6 +33,11 @@ onBeforeUnmount(() => session.dispose());
       :code="state.session.code"
       :host-connected="state.hostConnected"
       :online="state.online"
+    />
+    <GameController
+      v-else-if="showsGameController(state)"
+      :state="state"
+      :send-message="session.send"
     />
     <WaitingScreen v-else v-bind="waitingCopy(state)" />
   </main>

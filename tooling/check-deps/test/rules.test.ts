@@ -29,7 +29,6 @@ function game(id: string, files: Files = {}): Files {
       "  gamesdk,",
       "  rules,",
       '  hostScene: () => import("./host/scene.ts"),',
-      '  controller: () => import("./controller/Controller.vue"),',
       "};",
       "",
     ].join("\n"),
@@ -40,6 +39,13 @@ function game(id: string, files: Files = {}): Files {
       'import { physics } from "@couchcade/physics";',
       'import * as z from "zod";',
       "export const rules = { utils, gamesdk, physics, z } as unknown as typeof protocol;",
+      "",
+    ].join("\n"),
+    // Shared code the phone needs lives apart from the rules that use physics.
+    [`games/${id}/src/shared/view.ts`]: [
+      'import { utils } from "@couchcade/utils";',
+      'import type { protocol } from "@couchcade/protocol";',
+      "export const view = utils as unknown as typeof protocol;",
       "",
     ].join("\n"),
     [`games/${id}/src/host/scene.ts`]: [
@@ -53,13 +59,22 @@ function game(id: string, files: Files = {}): Files {
     ].join("\n"),
     [`games/${id}/src/controller/Controller.vue`]: [
       '<script setup lang="ts">',
-      'import { rules } from "../shared/rules.ts";',
+      'import { view } from "../shared/view.ts";',
       'import { ui } from "@couchcade/ui";',
       'import { motion } from "@couchcade/motion";',
       'import { ref } from "vue";',
-      "const state = ref({ rules, ui, motion });",
+      "const state = ref({ view, ui, motion });",
       "</script>",
       "<template><p>{{ state }}</p></template>",
+      "",
+    ].join("\n"),
+    // The phone entry. game-sdk type-imports phaser, which the build erases, so that path is fine.
+    [`games/${id}/src/controller/index.ts`]: [
+      'import { gamesdk } from "@couchcade/game-sdk";',
+      "export default {",
+      "  gamesdk,",
+      '  component: () => import("./Controller.vue"),',
+      "};",
       "",
     ].join("\n"),
     [`games/${id}/vitest.config.ts`]: 'import "@couchcade/config";\n',
@@ -82,7 +97,7 @@ function healthyRepo(): Files {
     "apps/host/src/lobby.ts": 'import main from "./main.ts";\nexport default main;\n',
     "apps/host/vite.config.ts": 'import "@couchcade/config";\n',
     "apps/controller/src/main.ts": [
-      'import game from "../../../games/quick-draw/src/index.ts";',
+      'import game from "../../../games/quick-draw/src/controller/index.ts";',
       'import { ui } from "@couchcade/ui";',
       'import { motion } from "@couchcade/motion";',
       'import { createApp } from "vue";',
@@ -107,7 +122,7 @@ function healthyRepo(): Files {
       "",
     ].join("\n"),
     "packages/physics/src/index.ts":
-      'import { utils } from "@couchcade/utils";\nexport const physics = utils;\n',
+      'import { utils } from "@couchcade/utils";\nimport planck from "planck";\nexport const physics = [utils, planck];\n',
     "packages/stage/src/index.ts": [
       'import { gamesdk } from "@couchcade/game-sdk";',
       'import { audio } from "@couchcade/audio";',
@@ -277,7 +292,11 @@ describe("check:deps rules", () => {
         "packages/ui/src/index.ts":
           'import { stage } from "@couchcade/stage";\nexport const ui = stage;\n',
       };
-      expect(await brokenRules(files)).toEqual(["kit-imports-only-core-tier-1-and-utils"]);
+      // stage imports phaser, so the game's controller now reaches phaser through ui as well.
+      expect(await brokenRules(files)).toEqual([
+        "game-controller-never-reaches-physics",
+        "kit-imports-only-core-tier-1-and-utils",
+      ]);
     });
 
     it("fails a package that isn't in the tier map", async () => {
@@ -331,15 +350,32 @@ describe("check:deps rules", () => {
       expect(await brokenRules(files)).toEqual(["controller-app-no-tv-code"]);
     });
 
-    it("fails an app that imports a game's host or controller code directly", async () => {
+    it("fails the host importing a game's controller code", async () => {
       const files = {
         ...healthyRepo(),
-        "apps/host/src/lobby.ts":
-          'import Controller from "../../../games/quick-draw/src/controller/Controller.vue";\nexport default Controller;\n',
-        "apps/controller/src/main.ts":
-          'import scene from "../../../games/quick-draw/src/host/scene.ts";\nexport default scene;\n',
+        "apps/host/src/lobby.ts": [
+          'import entry from "../../../games/quick-draw/src/controller/index.ts";',
+          'import Controller from "../../../games/quick-draw/src/controller/Controller.vue";',
+          "export default [entry, Controller];",
+          "",
+        ].join("\n"),
       };
-      expect(await brokenRules(files)).toEqual(["apps-reach-games-through-index"]);
+      expect(await brokenRules(files)).toEqual(["host-reaches-games-through-index"]);
+    });
+
+    it("fails the controller app loading a game's src/index.ts or host code", async () => {
+      const files = {
+        ...healthyRepo(),
+        "apps/controller/src/main.ts": [
+          'import game from "../../../games/quick-draw/src/index.ts";',
+          'import scene from "../../../games/quick-draw/src/host/scene.ts";',
+          "export default [game, scene];",
+          "",
+        ].join("\n"),
+      };
+      expect(await brokenRules(files)).toEqual([
+        "controller-reaches-games-through-controller-entry",
+      ]);
     });
   });
 
@@ -404,7 +440,70 @@ describe("check:deps rules", () => {
           ].join("\n"),
         }),
       };
-      expect(await brokenRules(files)).toEqual(["game-controller-no-tv-code"]);
+      expect(await brokenRules(files)).toEqual([
+        "game-controller-never-reaches-physics",
+        "game-controller-no-tv-code",
+      ]);
+    });
+
+    it("fails a controller that reaches physics through shared/", async () => {
+      const files = {
+        ...healthyRepo(),
+        ...game("quick-draw", {
+          "games/quick-draw/src/controller/Controller.vue": [
+            '<script setup lang="ts">',
+            'import { rules } from "../shared/rules.ts";',
+            "</script>",
+            "<template><p>{{ rules }}</p></template>",
+            "",
+          ].join("\n"),
+        }),
+      };
+      expect(await brokenRules(files)).toEqual(["game-controller-never-reaches-physics"]);
+    });
+
+    it("fails a controller that reaches planck or phaser through a package", async () => {
+      const files = {
+        ...healthyRepo(),
+        "packages/motion/src/index.ts":
+          'import planck from "planck";\nexport const motion = planck;\n',
+        "packages/ui/src/index.ts": 'import Phaser from "phaser";\nexport const ui = Phaser;\n',
+      };
+      const rootDir = createFixtureRepo(files);
+      fixtures.push(rootDir);
+      const { violations } = await checkDeps({ rootDir, configFile });
+      const reached = violations
+        .filter(({ rule }) => rule.name === "game-controller-never-reaches-physics")
+        .map(({ to }) => to.replace(/^.*node_modules\//, ""));
+      expect([...new Set(reached)].toSorted()).toEqual(["phaser/index.js", "planck/index.js"]);
+    });
+
+    it("fails a controller that imports planck directly", async () => {
+      const files = {
+        ...healthyRepo(),
+        ...game("quick-draw", {
+          "games/quick-draw/src/controller/index.ts":
+            'import planck from "planck";\nexport default { planck };\n',
+        }),
+      };
+      expect(await brokenRules(files)).toEqual([
+        "game-controller-never-reaches-physics",
+        "game-controller-no-tv-code",
+      ]);
+    });
+
+    it("lets a controller reach phaser only through type-only imports", async () => {
+      const files = {
+        ...healthyRepo(),
+        ...game("quick-draw", {
+          "games/quick-draw/src/shared/view.ts": [
+            'import type { rules } from "./rules.ts";',
+            "export const view = 1 as unknown as typeof rules;",
+            "",
+          ].join("\n"),
+        }),
+      };
+      expect(await brokenRules(files)).toEqual([]);
     });
 
     it("checks a Vue component with TypeScript that nothing imports yet", async () => {
@@ -423,7 +522,11 @@ describe("check:deps rules", () => {
           "",
         ].join("\n"),
       };
-      expect(await brokenRules(files)).toEqual(["game-controller-no-tv-code"]);
+      // dependency-cruiser keeps a .vue file's own type-only imports even on the runtime graph.
+      expect(await brokenRules(files)).toEqual([
+        "game-controller-never-reaches-physics",
+        "game-controller-no-tv-code",
+      ]);
     });
 
     it("fails index.ts importing host code statically or lazy loading anything else", async () => {
@@ -444,7 +547,7 @@ describe("check:deps rules", () => {
       };
       expect(await brokenRules(files)).toEqual([
         "game-index-imports-only-shared-and-sdk",
-        "game-index-lazy-loads-only-host-and-controller",
+        "game-index-lazy-loads-only-host",
       ]);
     });
   });
