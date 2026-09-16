@@ -50,5 +50,8 @@ catalog:
   axe-core: ^4.13.0
   size-limit: ^13.1.1
   "@size-limit/preset-app": ^13.1.1
+  playwright: ~1.63.0
+  "@vitest/browser-playwright": ~4.1.11 # Matches vitest
+  "@vue/test-utils": ^2.5.0
   "@lhci/cli": ~0.15.1
   dependency-cruiser: ^18.3.0
