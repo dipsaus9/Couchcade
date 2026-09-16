@@ -150,6 +150,16 @@ describe("join", () => {
     const phone = await connect(freshCode(), playerIdentity());
     expect((await phone.closed).code).toBe(4004);
   });
+
+  it("closes a socket whose identity is invalid with 1008", async () => {
+    const code = await createRoom();
+    const host = await connectHost(code);
+    const badId = await connect(code, { role: "player", playerId: "lowercase", name: "Pat" });
+    const badName = await connect(code, { ...playerIdentity(), name: "x".repeat(13) });
+    expect((await badId.closed).code).toBe(1008);
+    expect((await badName.closed).code).toBe(1008);
+    expect(await host.drain()).toEqual([]);
+  });
 });
 
 describe("forward", () => {

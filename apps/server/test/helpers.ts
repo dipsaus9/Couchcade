@@ -136,7 +136,7 @@ export const hostIdentity: SocketIdentity = { role: "host" };
 
 let playerCounter = 0;
 /** A player identity with a fresh id: 8 letters from the room code alphabet. */
-export function playerIdentity(name = "Pat"): SocketIdentity & { playerId: PlayerId } {
+export function playerIdentity(name = "Pat"): Extract<SocketIdentity, { role: "player" }> {
   playerCounter++;
   const letters = "ABCDEFGHJKLMNPQRSTUVWXYZ";
   let n = playerCounter;
