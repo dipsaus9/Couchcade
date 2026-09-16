@@ -1,10 +1,10 @@
 ---
 id: CC-3.4
 title: Rejoin as the same player after a phone disconnects
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-16 23:02'
+updated_date: '2026-09-16 23:05'
 labels:
   - story
 dependencies:
@@ -47,9 +47,9 @@ Branch: CC-3.4/phone-rejoin
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A reconnect token is stored in sessionStorage and accepted for 2 minutes after disconnect
-- [ ] #2 The host receives player:reconnected and re-sends the current controller state
-- [ ] #3 An E2E test closes and reopens a phone context mid-game and asserts the same player slot
+- [x] #1 A reconnect token is stored in sessionStorage and accepted for 2 minutes after disconnect
+- [x] #2 The host receives player:reconnected and re-sends the current controller state
+- [x] #3 An E2E test closes and reopens a phone context mid-game and asserts the same player slot
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -66,4 +66,14 @@ Branch: CC-3.4/phone-rejoin
 
 <!-- SECTION:NOTES:BEGIN -->
 Verify: pnpm check && pnpm test
+
+Relay: players.released column added (lazy ALTER TABLE for rooms created before it; platform.md Room storage row amended). Seat window lives in apps/server/src/room/reconnect.ts; the single alarm wakes at min(close deadline, earliest seat expiry). A replaced tab now sends player:reconnected instead of player:joined. Host runtime calls runner.leave (onPlayerLeft) for any freed seat (expired/left/kicked), never for disconnected. Phone: online flips false only after 1 s (runtime/reconnect.ts); a visible page with a closed socket opens a fresh socket at once (partysocket's reconnect() can't cut its backoff wait). Not built here: session-flow 'The night' rule 4 (end a game without onPlayerLeft when in-game players drop below min, TV copy 'Not enough players left') — follow-up. Verify: pnpm check, check:style, check:deps, test, build green; e2e platform/rejoin.spec.ts passes on chromium and webkit locally.
+
+Review (story-reviewer, round 1): pass. All 3 criteria met, no scope violations, no findings.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+A phone that drops keeps its seat, colour and score for 2 minutes. The relay marks the player disconnected, keeps the slot out of new joiners' reach and wakes its single Durable Object alarm at the earliest seat expiry, then releases the seat and sends player:left expired; a phone back in time is welcomed into the same slot and the host gets player:reconnected, a late or left player closes with 4011 (hook left for CC-2.5/CC-2.6 kicked and revoked checks). The host runtime forgets a returning phone's last view so the next send window (still 667 ms apart) re-sends it, and calls onPlayerLeft only when a seat is freed. The phone reconnects at once when the page becomes visible with a closed socket and shows Connection lost only after 1 second. e2e/platform/rejoin.spec.ts closes and reopens Ben's phone mid Quick Draw and asserts the same seat, player:reconnected on the TV and a working controller, on Chromium and WebKit.
+<!-- SECTION:FINAL_SUMMARY:END -->
