@@ -35,7 +35,12 @@ onBeforeUnmount(() => window.removeEventListener("resize", fit));
       :origin="origin"
       @end="endRoom"
     />
-    <PasscodeScreen v-else :notice="screen.notice" :open-room="openRoom" />
+    <PasscodeScreen
+      v-else-if="screen.name === 'passcode'"
+      :notice="screen.notice"
+      :open-room="openRoom"
+    />
+    <!-- While a game runs the frame stays empty, so the stage under it shows the game's scene. -->
   </div>
 </template>
 
