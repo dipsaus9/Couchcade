@@ -1,4 +1,10 @@
 {
-  "extends": "@couchcade/config/tsconfig/lib.json",
+  // Browser base: the TV scene in src/host/ needs DOM types for Phaser. src/shared/ stays pure
+  // through dependency-cruiser and the Oxlint overrides, not through the lib setting.
+  "extends": "@couchcade/config/tsconfig/base.json",
+  "compilerOptions": {
+    // import.meta.glob in @couchcade/theme/scenes, and the Vitest browser mode types.
+    "types": ["vite/client", "@vitest/browser-playwright"]
+  },
   "include": ["src", "test", "vitest.config.ts"]
 }
