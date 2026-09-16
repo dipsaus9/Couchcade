@@ -22,7 +22,7 @@ const PACKAGES = [
 ];
 
 /** Stand-ins for npm packages the rules care about. They're never run, only resolved. */
-const NPM_PACKAGES = ["phaser", "vue", "zod"];
+const NPM_PACKAGES = ["phaser", "planck", "vue", "zod"];
 
 export type Files = Record<string, string>;
 

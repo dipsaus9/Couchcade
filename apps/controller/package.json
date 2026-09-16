@@ -2,7 +2,7 @@
   "name": "@couchcade/controller",
   "version": "0.0.0",
   "private": true,
-  "description": "The phone app: join a room by QR code or code, the lobby and the waiting screens. Served at /.",
+  "description": "The phone app: join a room by QR code or code, the lobby, the waiting screens and the running game's controller. Served at /.",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,6 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@couchcade/game-sdk": "workspace:*",
     "@couchcade/protocol": "workspace:*",
     "@couchcade/theme": "workspace:*",
     "@couchcade/utils": "workspace:*",
