@@ -10,10 +10,14 @@ export interface GameStage {
 }
 
 let phaser: Game | null = null;
+let attached: (game: Game) => void = () => {};
+/** Resolves once main.ts has booted Phaser, so a game started early waits for the stage. */
+const booted = new Promise<Game>((resolve) => (attached = resolve));
 
 /** Hands the booted Phaser game to the runtime. main.ts calls it once Phaser's chunk has loaded. */
 export function attachStage(game: Game): void {
   phaser = game;
+  attached(game);
 }
 
 /**
@@ -22,9 +26,8 @@ export function attachStage(game: Game): void {
  */
 export const phaserStage: GameStage = {
   async start(game, data) {
-    const SceneClass = await game.hostScene();
-    if (phaser === null) throw new Error("The stage hasn't booted yet");
-    phaser.scene.add(game.id, SceneClass, true, data as unknown as object);
+    const [SceneClass, stage] = await Promise.all([game.hostScene(), booted]);
+    stage.scene.add(game.id, SceneClass, true, data as unknown as object);
   },
   stop(game) {
     if (phaser?.scene.getScene(game.id)) phaser.scene.remove(game.id);
