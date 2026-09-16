@@ -78,7 +78,6 @@ function submit(): void {
           autocomplete="nickname"
           autocapitalize="words"
           enterkeyhint="go"
-          :maxlength="nameMaxLength"
           placeholder="1 to 12 letters"
           aria-describedby="player-name-hint"
         />
