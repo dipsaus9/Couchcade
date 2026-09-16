@@ -172,6 +172,9 @@ importers:
       vue-tsc:
         specifier: 'catalog:'
         version: 3.3.11(typescript@6.0.3)
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
 
   apps/server:
     dependencies:
