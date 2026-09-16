@@ -8,6 +8,7 @@ import {
 import type { JoinFailure } from "../join/api.ts";
 import type { JoinDraft } from "../join/form.ts";
 import { parseMenuView } from "../screens/menu/menu-view.ts";
+import { parseResultsView } from "../screens/results/results-view.ts";
 import type { StoredSession } from "./storage.ts";
 
 /** Why the phone left a room for good. The phone doesn't reconnect after any of these. */
@@ -53,7 +54,7 @@ export type PhoneEvent =
   | { type: "ended"; reason: EndReason };
 
 /** Which screen the phone shows. `showsGameController` decides about game controllers. */
-export type PhoneScreen = "join" | "connecting" | "lobby" | "menu" | "waiting";
+export type PhoneScreen = "join" | "connecting" | "lobby" | "menu" | "results" | "waiting";
 
 /**
  * The first state after the page loads. A stored session for the same room resumes it: a reload
@@ -143,9 +144,18 @@ export function screenOf(state: PhoneState): PhoneScreen {
   if (view === null) return phase === "lobby" ? "lobby" : "waiting";
   if (gameId !== null) return "waiting";
   if (view.screen === "lobby") return "lobby";
-  // Picking needs the socket and the TV. Until both are back, the waiting screen says why.
+  // Picking and playing again need the socket and the TV. Until both are back, the waiting screen
+  // says why.
   if (view.screen === "menu" && state.online && state.hostConnected && parseMenuView(view.data)) {
     return "menu";
+  }
+  if (
+    view.screen === "results" &&
+    state.online &&
+    state.hostConnected &&
+    parseResultsView(view.data)
+  ) {
+    return "results";
   }
   return "waiting";
 }
