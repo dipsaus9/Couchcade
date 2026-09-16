@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { controllerViewSchema, encode } from "@couchcade/protocol";
 import type { JsonValue } from "@couchcade/protocol";
-import { checkGameDefinition, maxPlayers } from "../src/contract/index.ts";
+import { checkGameDefinition, isGameId, maxPlayers } from "../src/contract/index.ts";
 import type { CouchcadeGame, GameInput, Outcome, Player } from "../src/contract/index.ts";
 import { createFakeRoom } from "./fake-room.ts";
 import { createPlayers } from "./players.ts";
@@ -77,7 +77,7 @@ export function gameContractChecks<TInput extends GameInput, TState, TView exten
           folder,
           "Can't tell the game's folder from the test path. Pass { folder } to testGameContract.",
         ).toBeDefined();
-        expect(game.id).toMatch(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
+        expect(isGameId(game.id), `id ${JSON.stringify(game.id)} is kebab-case`).toBe(true);
         expect(game.id).toBe(folder);
       },
     },

@@ -4,7 +4,7 @@ title: 'Build the game SDK contract, auto-discovery registry and contract test k
 status: In Progress
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-16 16:26'
+updated_date: '2026-09-16 16:28'
 labels:
   - story
 dependencies:
@@ -16,6 +16,7 @@ references:
   - packages/game-sdk/src/contract/
   - packages/game-sdk/src/registry/
   - packages/game-sdk/testing/
+  - packages/game-sdk/
 parent_task_id: CC-1
 priority: high
 type: feature
@@ -59,4 +60,6 @@ Verify: pnpm check && pnpm test
 Owner-approved amendment (2026-09-16, session-flow doc conflict 1), relayed by the orchestrator: phones lazy-load a per-game controller-only entry games/<id>/src/controller/index.ts that default-exports defineController({ id, component }) (interface CouchcadeController { id: string; component: () => Promise<Component> }). The controller loader is removed from CouchcadeGame (hostScene stays). The phone registry is createControllerRegistry over that glob (unique ids, lazy load by id, UnknownGameError for an unknown id); the host keeps createRegistry (eager over src/index.ts). createLazyRegistry over src/index.ts is dropped. platform.md is amended by the orchestrator in its own PR. Also from the session-flow design: titles over 16 characters are rejected (menu cards).
 Scaffolding implied by the package: packages/game-sdk/{tsconfig.json,vitest.config.ts,src/index.ts,test/}. vue and phaser are type-only devDependencies for Component and Scene in the contract; vitest is an optional peer for the testing kit. pnpm-lock.yaml changes are implied bookkeeping.
 Design notes: testGameContract(game, options?) infers the folder from a games/<id>/ test path (fixtures pass { folder }); sample inputs come from inputSchema via zod toJSONSchema, extra ones via { inputs }. Recording gains an optional ticks field so a replay can run past the last input. Game time of tick n is n * 1000 / 60.
+
+Review round 1: block on scope only (package scaffolding tsconfig.json, vitest.config.ts, src/index.ts, test/ and pnpm-lock.yaml). All 5 criteria met. Fix: References amended to add packages/game-sdk/ (existing refs re-passed). pnpm-lock.yaml stays out of References by orchestrator rule (implied bookkeeping, otherwise every package story collides). Advisory taken: the kit's id check now uses isGameId. Advisory left: scene is not checked against registered palettes (theme's registry is Vite-only; the type covers it).
 <!-- SECTION:NOTES:END -->
