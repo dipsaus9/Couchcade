@@ -1,10 +1,10 @@
 ---
 id: CC-1.7
 title: Build packages/utils with room codes and a seeded RNG
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-16 15:53'
+updated_date: '2026-09-16 15:54'
 labels:
   - story
 dependencies:
@@ -50,4 +50,12 @@ Verify: pnpm check && pnpm test
 RNG is mulberry32 (pinned output for seed 42 matches the reference implementation). State is one uint32, so createRng(rng.state) resumes a sequence stored in TState. roomCode() uses crypto.getRandomValues with rejection sampling by default (unpredictable for the Worker) and accepts a seeded Rng for tests. Not done, out of scope: a rude-word filter for room codes (story and platform.md only require no I/O).
 
 Review round 1: block. All 3 criteria met; the only scope violation was pnpm-lock.yaml, which pnpm install regenerates when a workspace package is added (platform.md: lockfiles are committed, never hand-edited). References amended through the CLI to add pnpm-lock.yaml. Advisory: none needing action.
+
+Review round 2: pass. All 3 criteria met, no scope violations, no findings.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added @couchcade/utils (tier 0, no runtime dependencies) with wildcard subpath exports ('.' and './*' -> ./src/*/index.ts, pinned by a test that also imports the subpaths by package name). @couchcade/utils/rng: createRng(seed) on mulberry32 with next/int/pick/shuffle and a uint32 state getter, so games store rng.state in JSON TState and resume with createRng(state); output for seed 42 is pinned against the reference algorithm, and fast-check properties cover same-seed determinism, resume, ranges and shuffle. @couchcade/utils/room-code: ROOM_CODE_ALPHABET (A-Z without I and O), roomCode() from crypto.getRandomValues with rejection sampling (or a seeded Rng for tests) and isRoomCode(). 26 tests.
+<!-- SECTION:FINAL_SUMMARY:END -->
