@@ -1,0 +1,22 @@
+// Throwaway probe for CC-1.4. Delete from the account after the spike: `pnpm run destroy`.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "couchcade-free-tier-probe",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-01",
+  "account_id": "35ee53c3b77e566a5e8e2242f752f668",
+  "workers_dev": true,
+  "durable_objects": {
+    "bindings": [{ "name": "PROBE_ROOM", "class_name": "ProbeRoom" }]
+  },
+  // The Free plan only allows SQLite-backed Durable Objects.
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ProbeRoom"] }],
+  "ratelimits": [
+    {
+      "name": "PROBE_LIMITER",
+      "namespace_id": "1001",
+      "simple": { "limit": 10, "period": 60 }
+    }
+  ],
+  "observability": { "enabled": false }
+}
