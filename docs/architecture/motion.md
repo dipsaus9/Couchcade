@@ -4,7 +4,7 @@ This is the design for using phones as motion controllers: which sensors we read
 
 **For the owner.** Read [Decisions at a glance](#decisions-at-a-glance) and [Open decisions for the owner](#open-decisions-for-the-owner). That takes about 15 minutes. The rest is detail for the stories.
 
-**For agents.** Everything after the owner sections is binding for CC-5.2 to CC-5.10 and for every game controller that uses `@couchcade/motion`. [platform.md](platform.md), [security.md](security.md), [platform-screens.md](../design/platform-screens.md), README.md, [TECH_STACK.md](../TECH_STACK.md) and [HOUSE_STYLE.md](../HOUSE_STYLE.md) still apply, and this doc doesn't repeat them. Where this doc, platform.md and a story disagree, stop and flag it. [Conflicts found while writing this doc](#conflicts-with-stories-and-other-docs) lists the ones already known.
+**For agents.** Everything after the owner sections is binding for CC-5.2 to CC-5.10 and for every game controller that uses `@couchcade/motion`. [platform.md](platform.md), [security.md](security.md), [session-flow.md](session-flow.md), [platform-screens.md](../design/platform-screens.md), README.md, [TECH_STACK.md](../TECH_STACK.md) and [HOUSE_STYLE.md](../HOUSE_STYLE.md) still apply, and this doc doesn't repeat them. Where this doc, platform.md and a story disagree, stop and flag it. [Conflicts found while writing this doc](#conflicts-with-stories-and-other-docs) lists the ones already known.
 
 Status: waiting for owner approval (CC-5.1).
 
@@ -49,13 +49,13 @@ Approving this doc approves these.
 | 11 | Shots use the aim on the phone | When a player shoots or throws, the input carries where the phone pointed at that moment. The TV's crosshair may trail the hand a little, but the hit is judged on the real aim. |
 | 12 | Aim and tilt stream at most 4 messages a second | The phone samples aim 15 times a second and packs up to 4 samples into each message. Tilt is sent only when it changes. |
 | 13 | Tests replay recorded motion | `pnpm trace:record` records real swings on real phones as JSON. Detectors are pure code that unit tests feed with those traces, because Playwright can't fake sensors. |
-| 14 | Screens stay awake during motion games | The phone holds a screen wake lock while a motion game runs. If the screen still locks, "Tap to resume" switches the sensors back on. |
+| 14 | Screens stay awake | The phone holds the screen wake lock that session-flow.md already keeps on during the menu and every game. If the screen still locks, "Tap to resume" switches the sensors back on. |
 
 ---
 
 ## Open decisions for the owner
 
-Each has a recommendation. Everything else in this doc follows from the approved platform and security docs.
+Each has a recommendation. Everything else in this doc follows from the approved platform, security and session flow docs.
 
 1. **Which game tests the gyroscope first?** You asked for a game that really uses the phone's gyroscope. The candidates are Target Range (hold the phone like a bow, aim with the gyroscope, drag to draw, let go to shoot), Duck Season (a fast pointer at moving birds) and Strike Night (swing and twist for spin).
    **Recommendation: Target Range.** Continuous gyroscope aim is the purest test of the sensor, everyone plays at once so every phone at the party gets tested in one round, and slow bow aiming hides the TV crosshair delay from decision 2. Strike Night follows as the first swing game. Until then, the trace recorder page shows live gyroscope readings for any phone (see [Recording](#recording-cc-59)).
@@ -235,8 +235,8 @@ sequenceDiagram
 1. **When.** The host shows the step when the selected game has `needsMotion`. It runs once per game, not once per night. A phone that already granted permission in this page session still shows the screen, but its tap resolves at once without a prompt and goes straight to "Hold your phone still". Calibration runs before every motion game, because players change grip between games.
 2. **Status.** The phone sends one `motion:status` per motion game. "Use touch instead" sends `denied`. `unsupported` covers no sensors, no gyroscope when the game needs one, and a failed secure-context check. That is 1 request per phone per game.
 3. **The choice is per phone.** The game controller reads the local result and mounts either the motion detector or the fallback. The host doesn't treat touch players differently. Games may show a small touch icon next to a player on the TV, nothing more.
-4. **Waiting.** The host starts the game when every seated phone has sent `motion:status`, or 20 seconds after the step began. Phones that haven't answered by then play with touch. See [conflicts](#conflicts-with-stories-and-other-docs): no story owns the host side of this yet.
-5. **Wake lock.** On the enable tap and on every resume tap the phone requests `navigator.wakeLock.request("screen")` if the API exists, and releases it when the game ends. The browser drops the lock when the page is hidden, so resume asks again. Where the API is missing, nothing else is tried. No looping hidden video tricks.
+4. **Waiting.** session-flow.md moves from `motion-check` to `playing` when every phone in the game has answered. This doc adds a limit: after 20 seconds the host starts anyway, and phones that haven't answered play with touch, so one phone left on a table can't hold up the room. See [conflicts](#conflicts-with-stories-and-other-docs): no story owns the host side of this yet.
+5. **Wake lock.** session-flow.md decision 9 keeps the screen wake lock on during the menu and every game (CC-5.10 builds it). The motion step's enable tap and every resume tap request it again with `navigator.wakeLock.request("screen")` if the API exists, because the browser drops the lock whenever the page is hidden. Where the API is missing, nothing else is tried. No looping hidden video tricks.
 6. **Resume.** When the page comes back from `hidden` during a motion game, the controller covers the screen with the approved "Tap to resume" big action. The tap restarts the adapter and the wake lock. Calibration from before the sleep is kept. Aim recentres at the player's next turn or draw.
 7. **Mid-game denial.** If the adapter reports no samples for 2 seconds while the page is visible, the controller switches that player to the fallback for the rest of the game and sends `motion:status { status: "unsupported" }`.
 8. **Orientation.** Motion maths uses the device frame, which ignores page rotation, so gestures work whatever the page does. During a motion game the controller doesn't show the "rotate your phone" error screen, and motion controllers are laid out so a single centred grip or pad works in either orientation. See [open decision 4](#open-decisions-for-the-owner) for locking portrait.
@@ -355,7 +355,7 @@ For Target Range, Double Top and Duck Season.
 **Sending**
 
 - The phone takes one aim sample every 66 ms (15 per second).
-- It sends through the CC-3.6 batching helper, at most 4 messages per second. Each message carries the samples since the last send, as `aim: [[dtMs, yaw, pitch], …]`, at most 4 of them, where `dtMs` is the sample's offset from the input's `at`. Four samples are about 60 bytes.
+- It sends through the CC-3.6 input stream (`set`, see session-flow.md), which allows at most 4 messages per second. The value is the rolling window of the latest samples, as `aim: [[dtMs, yaw, pitch], …]`, at most 4 of them, newest last. `dtMs` is each sample's offset from the input's `at`, so it is 0 for the newest and negative for older ones. The stream's latest-wins rule means each message carries the samples taken since the last one. Four samples are about 60 bytes.
 - A sample that moved less than 0.01 from the last one sent is skipped. A phone held still sends nothing.
 - Only the player whose turn it is streams aim in turn-based games (Double Top). Simultaneous games (Target Range, Duck Season) stream for every player who is aiming.
 - The TV plays the samples back about 250 ms behind, so the crosshair moves smoothly rather than in 4 jumps a second. See [open decision 2](#open-decisions-for-the-owner) and [conflicts](#conflicts-with-stories-and-other-docs).
@@ -417,7 +417,7 @@ For Bumper Sumo, and Paddle Panic's optional tilt.
 5. While the linear acceleration is over 12 m/s² (a shake or a bump), tilt holds its last value for 200 ms, so a dash doesn't jerk the steering.
 6. Paddle Panic uses `x` only.
 
-**Sending.** Through the CC-3.6 batching helper, only on change, at most 4 messages per second.
+**Sending.** Through the CC-3.6 input stream with `set`, so only changes go out, at most 4 messages per second.
 
 **Touch fallback: joystick** (`fallbacks/tilt.ts`)
 
@@ -465,11 +465,12 @@ Platform.md caps each phone at 4 input messages per second, at least 250 ms apar
 
 Rules:
 
-1. **All of a phone's input shares one batching helper.** A game never runs two helpers side by side, so a phone can't exceed 4 per second by combining gestures.
-2. **Events ride with the stream.** When an event fires in a game that also streams, the game sends one input holding both: for example Bumper Sumo's `{ tilt: { x, y }, dash?: at }` or Double Top's `{ aim: [...], throw?: flick }`. Platform.md rule 4 still decides when it leaves: at once if 250 ms have passed, otherwise at the 250 ms mark. The event's `at` keeps the true time, so the wait never costs fairness.
-3. **No raw data.** Samples, filter state and traces never go over the socket. A game input carrying more than 4 aim samples, or any sample array, fails review.
-4. **Worst case is the cap.** An 8-player real-time motion game at 4 per second is exactly what platform.md already budgets for real-time play. Turn-based motion games (Strike Night, Putt Club, Double Top) sit far below it.
-5. **Size.** The largest motion input, 4 aim samples plus a flick, is under 150 bytes, well inside the 1 KB cap.
+1. **All of a phone's input shares one input stream.** A game never runs two CC-3.6 streams side by side, so a phone can't exceed 4 per second by combining gestures.
+2. **Streams use `set`, events use `fire`.** Aim and tilt are continuous values sent with `set` (latest wins per input type). Swing, flick and shake are discrete events sent with `fire`, which session-flow.md sends before any pending `set` value. The event's sample time goes in as `eventTimeStamp`, so the input's `at` is when the player acted, however long it waited for a slot. For Bumper Sumo that means `set({ type: "tilt", payload: { x, y } })` and `fire({ type: "dash", payload: { at } })`.
+3. **Fire payloads carry the aim.** A throw or shot puts the aim sample at the moment of firing in its own payload, as session-flow.md rule 6 asks, for example Double Top's `fire({ type: "throw", payload: { flick, aim: { yaw, pitch } } })`. The TV never looks the aim up from the stream.
+4. **No raw data.** Samples, filter state and traces never go over the socket. A game input carrying more than 4 aim samples, or any sample array, fails review.
+5. **Worst case is the cap.** An 8-player real-time motion game at 4 per second is exactly what platform.md already budgets for real-time play. Turn-based motion games (Strike Night, Putt Club, Double Top) sit far below it.
+6. **Size.** The largest motion input, 4 aim samples, or a flick with its aim, is under 150 bytes, well inside the 1 KB cap.
 
 ---
 
@@ -552,13 +553,12 @@ Found while writing this doc. None changes a decision the owner already approved
 | # | Where | Conflict | Resolution in this doc | Action |
 |---|---|---|---|---|
 | 1 | CC-5.5 criterion 2 | "Aim is sent through the CC-3.6 batching helper at ≤ 15 Hz", but platform.md allows 4 messages per second | 15 Hz is the sampling rate. Samples travel packed, at most 4 messages per second. | Reword the criterion with `backlog-plan` amend mode. |
-| 2 | README network budget and hosting rule 4 | "≤ 15 messages/sec per phone" predates the CC-1.4 measurement | platform.md's 4 per second is binding | README follow-up, together with the other platform.md updates |
-| 3 | CC-5.10 References | The host side of the motion step (show the step, wait for every `motion:status` or 20 seconds, the touch icon) is in `apps/host`, which no CC-5 story lists | Rule 4 of the [flow](#permission-calibration-and-resume-flow) defines it | Add `apps/host/src/motion/` to CC-5.10, or a new CC-5 story |
-| 4 | CC-3.6 | The TV needs a pure helper to play aim samples back 250 ms behind. Host code may not import `@couchcade/motion` (platform.md import rule 7). | The helper belongs in `@couchcade/game-sdk/input`, next to the batching helper | Add a criterion to CC-3.6, or a small new story, before CC-11.4 |
-| 5 | Approved motion-denied screen | The hint "Want motion? Allow it when the next game asks." may be wrong on iPhone, where WebKit returns the saved denial without asking again | CC-5.10 checks it on a real iPhone first | If the next game doesn't ask again, CC-5.10 proposes the recovery that works (for example "close this tab and join again") for a one-line owner OK |
-| 6 | Dinger Derby and Bandeja epics | They name a "tap fallback", while CC-5.4 names a swipe fallback | `fallbacks/swing.ts` offers both, and the game spec picks one | None. Inside CC-5.4's References. |
-| 7 | CC-5.9 References | Starting a dev page from `pnpm trace:record` needs a `trace:record` script in `apps/controller/package.json` and a Vite config for the recorder, both outside the listed folders | The recorder's Vite config and save endpoint live in `apps/controller/src/dev/trace-recorder/`. Only the script line touches `package.json`. | Add `apps/controller/package.json` to CC-5.9's References |
-| 8 | Open decision 4 | Adds a hint line to the approved motion screen | Only if the owner approves decision 4 | None |
+| 2 | CC-5.10 References | The host side of the motion step (show the step, wait for every `motion:status` or 20 seconds, the touch icon) is in `apps/host`, which no CC-5 story lists | Rule 4 of the [flow](#permission-calibration-and-resume-flow) defines it | Add `apps/host/src/motion/` to CC-5.10, or a new CC-5 story |
+| 3 | CC-3.6 | The TV needs a pure helper to play aim samples back 250 ms behind. Host code may not import `@couchcade/motion` (platform.md import rule 7). | The helper belongs in `@couchcade/game-sdk/input`, next to the batching helper | Add a criterion to CC-3.6, or a small new story, before CC-11.4 |
+| 4 | Approved motion-denied screen | The hint "Want motion? Allow it when the next game asks." may be wrong on iPhone, where WebKit returns the saved denial without asking again | CC-5.10 checks it on a real iPhone first | If the next game doesn't ask again, CC-5.10 proposes the recovery that works (for example "close this tab and join again") for a one-line owner OK |
+| 5 | Dinger Derby and Bandeja epics | They name a "tap fallback", while CC-5.4 names a swipe fallback | `fallbacks/swing.ts` offers both, and the game spec picks one | None. Inside CC-5.4's References. |
+| 6 | CC-5.9 References | Starting a dev page from `pnpm trace:record` needs a `trace:record` script in `apps/controller/package.json` and a Vite config for the recorder, both outside the listed folders | The recorder's Vite config and save endpoint live in `apps/controller/src/dev/trace-recorder/`. Only the script line touches `package.json`. | Add `apps/controller/package.json` to CC-5.9's References |
+| 7 | Open decision 4 | Adds a hint line to the approved motion screen | Only if the owner approves decision 4 | None |
 
 ---
 
@@ -570,13 +570,13 @@ Found while writing this doc. None changes a decision the owner already approved
 | Sensor adapter, permission request, visibility, fake adapter | CC-5.2 |
 | Rest calibration, motion frame, pose tracker, sign normalisation | CC-5.3 |
 | Swing detector with swipe and tap fallbacks | CC-5.4 |
-| Aim with recentre, 15 Hz samples through the batching helper, drag fallback | CC-5.5 |
+| Aim with recentre, 15 Hz samples through the input stream, drag fallback | CC-5.5 |
 | Flick detector with swipe fallback | CC-5.6 |
-| Tilt with dead zone, batching helper, joystick adapter | CC-5.7 |
+| Tilt with dead zone, input stream, joystick adapter | CC-5.7 |
 | Shake detector with button fallback | CC-5.8 |
 | Trace recorder page and trace format README | CC-5.9 |
 | Permission step, calibration screen, `motion:status`, wake lock, tap to resume, E2E | CC-5.10 |
-| Batching helper the streams use | CC-3.6 |
+| Input stream that aim, tilt and events go through | CC-3.6 |
 | E2E sensor injection hook | CC-1.17 |
 | Joystick component | CC-4.5 |
 | Game controllers that combine gestures | CC-11.3, CC-12.3, CC-13.3, CC-14.3, CC-15.3, CC-17.3, CC-21.3, CC-22.3, CC-23.3 |
