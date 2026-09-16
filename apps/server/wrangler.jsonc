@@ -1,11 +1,20 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   // The relay: one Worker plus the Room Durable Object. See docs/architecture/platform.md.
-  // Deploys belong to CC-1.18 (GitHub Actions). Don't deploy from a laptop.
+  // .github/workflows/deploy.yml deploys every merge to main. Only the first deploy runs from a
+  // laptop, with `pnpm run deploy`.
   "name": "couchcade",
   "main": "src/worker.ts",
   "account_id": "35ee53c3b77e566a5e8e2242f752f668",
   "compatibility_date": "2026-09-01",
+
+  // Both apps as static files: the controller at /, the host at /host/. `pnpm build` assembles
+  // them into dist/public. Only /api/* and /ws/* run the Worker, so page loads cost nothing.
+  "assets": {
+    "directory": "./dist/public",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/ws/*"],
+  },
 
   // One Durable Object per room code. SQLite-backed, so it runs on the Workers Free plan.
   "durable_objects": {

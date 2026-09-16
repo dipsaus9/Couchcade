@@ -1,0 +1,21 @@
+{
+  "name": "@couchcade/smoke",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Checks a live Couchcade site: both apps load, a room is created with the host passcode and its socket opens.",
+  "type": "module",
+  "scripts": {
+    "smoke": "node src/cli.ts",
+    "typecheck": "tsc",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@couchcade/protocol": "workspace:*"
+  },
+  "devDependencies": {
+    "@couchcade/config": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

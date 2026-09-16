@@ -2,7 +2,8 @@ import { env } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import type { Room } from "../src/room/room.ts";
-import { roomLocationHint, roomStub } from "../src/worker.ts";
+import * as entry from "../src/worker.ts";
+import { roomStub } from "../src/worker.ts";
 import {
   connect,
   connectHost,
@@ -53,9 +54,18 @@ describe("worker routing", () => {
   });
 });
 
+describe("worker entry module", () => {
+  // workerd refuses to start a Worker whose main module exports anything but functions, classes and
+  // handler objects ("Incorrect type for map entry"). Vite dev doesn't check, the deploy does.
+  it("exports only functions and handler objects", () => {
+    for (const [name, value] of Object.entries(entry)) {
+      expect([name, typeof value]).toEqual([name, expect.stringMatching(/^(function|object)$/)]);
+    }
+  });
+});
+
 describe("worker forwarding", () => {
   it("addresses rooms by code with locationHint weur", async () => {
-    expect(roomLocationHint).toBe("weur");
     const calls: unknown[] = [];
     const Room = {
       idFromName: (name: string) => env.Room.idFromName(name),
