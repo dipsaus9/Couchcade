@@ -1,0 +1,5 @@
+{
+  // Browser code: the sensor adapter reads window, document and DeviceMotionEvent.
+  "extends": "@couchcade/config/tsconfig/base.json",
+  "include": ["src", "test", "vitest.config.ts"]
+}
