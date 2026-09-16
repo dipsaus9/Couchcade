@@ -4,7 +4,7 @@ title: Build the controller app shell with QR/code join and lobby screen
 status: Done
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-16 16:57'
+updated_date: '2026-09-16 17:00'
 labels:
   - story
 dependencies:
@@ -53,6 +53,8 @@ Verify: pnpm check && pnpm test
 Local smoke (2026-09-16): server dev server on :5183 plus the controller dev server on :5185 with a throwaway proxy config (CC-1.11 owns the real proxy), a scripted fake host and headless Chrome at 390x844. /?room=ktxw prefilled KTXW; Join disabled for a blank name and enabled for Sam; join returned a ticket, the socket connected and the lobby showed 'Sam | Player 1 | You're in, Sam | You're Cherry, the circle' with a Cherry fill; sessionStorage couchcade:session held code, playerId and rejoinToken; 1 wake lock request; reload rejoined the same seat through /rejoin; a wrong code showed the referee copy inline; landscape with a coarse pointer showed the rotate notice. Phone bundle: 43.8 KB gzip JS (budget 80 KB), 2.0 KB CSS.
 
 Review gate round 1: pass. All 4 criteria met, no scope violations. Advisory: the name input's maxlength counted UTF-16 units and could cut a valid name before validation; fixed by dropping maxlength so checkName and the too-long hint enforce 12 characters.
+
+After CC-1.11 merged: merged origin/main, then ran pnpm dev (server :5173 proxying /host/ to :5174 and everything else to :5175, the controller's dev port). In headless Chrome the host at :5173/host/ created room KJCW with the passcode, the phone at :5173/?room=KJCW had the code filled in, joined as Noor and showed 'Player 1, Cherry, the circle', and the host lobby listed Noor. All dev servers were stopped afterwards.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
