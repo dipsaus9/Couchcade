@@ -91,21 +91,22 @@ Every motion control has a touch fallback. All names, art and sounds are origina
 
 | Concern | Choice |
 |---|---|
-| Package manager | pnpm workspaces with catalogs |
-| Toolchain and task runner | Vite+ (`vp`): Vite, Rolldown, Vitest, Oxlint, Oxfmt |
-| Language | TypeScript (strict) |
-| Host rendering | Phaser (custom build) |
-| Controller UI | Vue 3 |
+| Package manager and task runner | pnpm workspaces with catalogs (`pnpm -r`, `--filter`) |
+| Build | Vite 8 (Rolldown) |
+| Lint and format | Oxlint, Oxfmt |
+| Language | TypeScript 6 (strict), `vue-tsc` |
+| Host rendering | Phaser 4 (custom build) |
+| Controller UI | Vue 3.5 |
 | Relay and API | Cloudflare Workers + Durable Objects (SQLite-backed, WebSocket Hibernation API) |
 | Local Worker runtime | `@cloudflare/vite-plugin` (runs `workerd`) |
-| Validation | Zod (mini build on the phone) |
+| Validation | Zod 4 (`zod/mini` on the phone) |
 | Bot protection | Cloudflare Turnstile + Workers Rate Limiting binding |
-| Testing | Vitest (unit, browser mode, visual), `@cloudflare/vitest-pool-workers`, Playwright, fast-check, axe-core |
+| Testing | Vitest 4.1 (unit, browser mode, visual), `@cloudflare/vitest-plugin`, Playwright, fast-check, axe-core |
 | Budgets | size-limit, Lighthouse CI |
 | Import boundaries | dependency-cruiser |
 | CI/CD | GitHub Actions + Wrangler |
 
-> Vite+ is pre-1.0. Versions are pinned in the catalog. If a release breaks the workflow, the fallback is Turborepo with Vitest, Oxlint and Oxfmt called directly; the repository structure stays the same.
+> Every choice is free. See [`docs/TECH_STACK.md`](docs/TECH_STACK.md) for the research behind it, the alternatives that were rejected, and the open questions for Phase 0. Vite+ is postponed until 1.0; the configs stay plain Vite, Vitest and Oxc so a later move is cheap.
 
 ---
 
@@ -143,10 +144,12 @@ couchcade/
 ├── e2e/                       # Playwright multi-device tests
 ├── tooling/                   # check-style, budgets, sensor trace recorder
 ├── docs/
-│   └── HOUSE_STYLE.md         # Visual and interaction guidelines
+│   ├── HOUSE_STYLE.md         # Visual and interaction guidelines
+│   └── TECH_STACK.md          # Stack, hosting and free-tier research
 ├── pnpm-workspace.yaml        # Workspace globs + dependency catalog
-├── vite.config.ts             # Root lint, format, test and task config
-└── package.json
+├── .oxlintrc.json             # Root lint rules
+├── .oxfmtrc.json              # Root format rules
+└── package.json               # Root scripts
 ```
 
 ---
@@ -156,18 +159,17 @@ couchcade/
 ### Requirements
 
 - Node.js (current LTS)
-- pnpm
-- Vite+ CLI (`vp`), see [viteplus.dev](https://viteplus.dev)
-- A free Cloudflare account (only needed to deploy)
+- pnpm (the version pinned in `packageManager`)
+- A free Cloudflare account (only needed to deploy; no credit card)
 
 ### Install and run
 
 ```bash
-git clone https://github.com/<you>/couchcade.git
-cd couchcade
+git clone https://github.com/dipsaus9/Couchcade.git
+cd Couchcade
 pnpm install
 cp apps/server/.dev.vars.example apps/server/.dev.vars
-vp run dev
+pnpm dev
 ```
 
 This starts the Worker (API, relay and static assets) in the local `workerd` runtime, plus the host and controller dev servers.
@@ -202,19 +204,19 @@ Open the generated `https://…trycloudflare.com` URL on your phone.
 
 ## Scripts
 
-Every package exposes the same script names, so root commands run across the whole repository with caching.
+Every package exposes the same script names, so root commands run across the whole repository with `pnpm -r`.
 
 | Command | What it does |
 |---|---|
-| `vp run dev` | Starts server, host and controller |
-| `vp check` | Formats, lints and type-checks |
-| `vp run test` | Runs unit and integration tests with coverage thresholds |
+| `pnpm dev` | Starts server, host and controller |
+| `pnpm check` | Checks formatting, lints and type-checks |
+| `pnpm test` | Runs unit and integration tests with coverage thresholds |
 | `pnpm e2e` | Runs Playwright E2E, game scene and visual tests |
-| `pnpm check:style` | Fails on colours or fonts outside `@couchcade/theme` and off-palette sprites |
+| `pnpm check:style` | Fails on colours or fonts outside `@couchcade/theme`, off-palette sprites, `v-html` and `new Date()` in `shared/` |
 | `pnpm check:deps` | Enforces import boundaries |
 | `pnpm budgets` | Runs size-limit and Lighthouse CI |
-| `vp run build` | Builds everything |
-| `pnpm deploy` | Builds and deploys the Worker with Wrangler |
+| `pnpm build` | Builds everything |
+| `pnpm run deploy` | Builds and deploys the Worker with Wrangler (`pnpm deploy` is a built-in pnpm command, so use `run`) |
 
 ---
 
@@ -234,7 +236,7 @@ apps  ──►  games  ──►  stage / ui / game-sdk / motion  ──►  th
 
 - TypeScript: every package extends a base from `packages/config/tsconfig/` (`base`, `vue`, `worker`, `lib`).
 - Vite and Vitest: every package uses a preset from `packages/config/vite/` (`defineAppConfig`, `defineLibConfig`, `defineWorkerConfig`, `defineTestConfig`).
-- Lint and format rules live only in the root `vite.config.ts`.
+- Lint and format rules live only in the root `.oxlintrc.json` and `.oxfmtrc.json`.
 - Dependency versions live only in the `pnpm-workspace.yaml` catalog. Packages reference them with `"catalog:"`.
 
 ### Internal packages
@@ -247,7 +249,7 @@ apps  ──►  games  ──►  stage / ui / game-sdk / motion  ──►  th
 - Game rules in `src/shared/` are pure functions.
 - Randomness comes from the seeded RNG in `@couchcade/utils`.
 - Time comes in as `dtMs` on a fixed timestep.
-- `Math.random()` and `Date.now()` are banned by lint inside `shared/`.
+- `Math.random()` and `Date.now()` are banned by lint inside `shared/`, and `new Date()` by `check:style`.
 
 ---
 
@@ -297,7 +299,7 @@ Every package and game has tests, and coverage thresholds are enforced per packa
 | `motion` | Recorded sensor traces from real phones replayed through gesture detection | Vitest | 90% |
 | `ui` | Component interaction, accessibility, visual regression | Vitest browser mode, axe-core | 85% |
 | `stage` | Visual snapshots at fixed seed | Playwright | All components |
-| `apps/server` | Room lifecycle, hibernation, reconnects, cleanup, security rules | `@cloudflare/vitest-pool-workers` | 90% |
+| `apps/server` | Room lifecycle, hibernation, reconnects, cleanup, security rules | `@cloudflare/vitest-plugin` | 90% |
 | Game rules | Unit and property tests | Vitest, fast-check | 90% |
 | Game contract | `testGameContract(game)` | game-sdk/testing | Required |
 | Game replays | Input logs replayed to an exact final state | game-sdk/testing | 3+ per game |
@@ -312,19 +314,25 @@ pnpm trace:record
 
 Opens a recorder page on your phone. Perform a gesture, label it, and the trace is saved as a JSON fixture in `packages/motion/test/traces/`.
 
+Playwright can't emulate motion sensors, so `@couchcade/motion` reads sensors through an adapter that tests replace with recorded traces.
+
 ### CI pipeline
 
 ```
 Pull request
- ├─ vp check                      lint, format, types
+ ├─ check                         lint, format, types
  ├─ check:style + check:deps      house style and import boundaries
- ├─ vp run test                   unit + integration + coverage thresholds
- ├─ e2e                           E2E + game scenes + visual regression
- ├─ budgets                       size-limit + Lighthouse CI
+ ├─ test                          unit + integration + coverage thresholds
+ ├─ e2e                           E2E + game scenes + visual regression, against the local Worker
+ ├─ budgets                       size-limit + Lighthouse CI (assert only)
  └─ security                      pnpm audit + CodeQL
 Merge to main
  └─ deploy                        wrangler deploy → smoke test on the live URL
 ```
+
+- There are no preview deploys: Cloudflare doesn't create preview URLs for Workers with Durable Objects.
+- Visual baselines are generated in the pinned Playwright Docker image, never on a Mac.
+- Traces and reports are uploaded only when a job fails, and kept for 7 days.
 
 ---
 
@@ -340,7 +348,7 @@ Couchcade has no accounts, no chat, no email forms and no stored user content, s
 | Message flooding | Per-socket token bucket (20/s, burst 40); violators are disconnected and their reconnect token is revoked |
 | Malformed or oversized messages | 1 KB cap and schema validation; invalid messages are dropped |
 | Offensive or malicious names | 1–12 characters, NFKC normalisation, character allowlist, NL + EN blocklist, host can kick |
-| XSS | All user text rendered as text, `v-html` banned by lint, strict CSP |
+| XSS | All user text rendered as text, `v-html` banned by `check:style`, strict CSP |
 | Supply chain | pnpm `minimumReleaseAge`, frozen lockfile, Renovate, `pnpm audit`, CodeQL, Actions pinned to SHAs |
 | Leaked deploy credentials | Scoped Cloudflare API token stored as a GitHub secret, branch protection on `main` |
 
@@ -411,41 +419,54 @@ A pull request that breaks a budget fails CI.
 |---|---|
 | Message size | ≤ 1 KB (typically < 100 bytes) |
 | Median RTT in the EU | < 120ms |
-| Real-time input rate | ≤ 15 messages/sec per phone |
+| Real-time input rate | ≤ 15 messages/sec per phone, sent only when input changes |
 
 ---
 
 ## Hosting and free-tier limits
 
-Couchcade runs entirely on the Cloudflare Workers Free plan and costs €0. When a free limit is reached, requests fail until the daily reset at 00:00 UTC; there are no charges.
+Couchcade runs entirely on the Cloudflare Workers Free plan and costs €0. No credit card is needed. When a free limit is reached, requests fail until the daily reset at 00:00 UTC; there are no charges.
 
 | Resource | Free limit | Notes |
 |---|---|---|
-| Durable Object requests | 100,000 / day | Incoming WebSocket messages count at a 20:1 ratio |
+| Durable Object requests | 100,000 / day | **The limit we hit first.** Every connection and incoming WebSocket message counts. Paid plans count messages 20:1; whether Free does is undocumented |
 | Durable Object duration | 13,000 GB-s / day | Hibernation keeps idle rooms free |
-| Worker requests | 100,000 / day | WebSocket messages don't count, only the upgrade |
 | DO SQLite rows written | 100,000 / day | One snapshot per round |
-| Static assets | Unlimited | Host and controller apps |
+| Worker requests | 100,000 / day | WebSocket messages don't count, only the upgrade |
+| Worker CPU time | 10 ms per request | Keep ticket, Turnstile and schema checks cheap |
+| Outgoing WebSocket messages | Free | Relay → phones costs nothing |
+| Workers Logs | 200,000 events / day | Sample logs so they last the day |
+| Static assets | Unlimited requests | Host and controller apps |
 | Turnstile | Unlimited challenges | |
 
 Rules to stay inside the limits:
 
-1. Use the WebSocket Hibernation API and store player data with `ws.serializeAttachment()`.
-2. Reject invalid requests in the Worker, before they reach a Durable Object.
-3. Throttle real-time input to 15 messages per second.
-4. Snapshot per round, never per frame.
-5. Delete rooms after 30 minutes idle or 4 hours total.
+1. Use the WebSocket Hibernation API (`ctx.acceptWebSocket()`) and store player data with `ws.serializeAttachment()`.
+2. Never use `setTimeout` or `setInterval` in a Durable Object; they block hibernation. Use alarms.
+3. Reject invalid requests in the Worker, before they reach a Durable Object.
+4. Phones send input only when it changes, at most 15 messages per second.
+5. The host sends one batched `controller:state` per tick, not one message per phone.
+6. Answer keep-alive pings with `setWebSocketAutoResponse()`; the RTT `ping`/`pong` only runs with the dev overlay open.
+7. Snapshot per round, never per frame.
+8. Delete rooms after 30 minutes idle or 4 hours total.
+9. Create rooms with `locationHint: "weur"`.
 
-Limits last verified September 2026. Check the Cloudflare pricing docs before relying on them.
+A 2-hour game night uses roughly 15,000 Durable Object requests if the 20:1 ratio applies on Free, and more than the daily limit if it doesn't. Phase 0 measures this before any game is built. See [`docs/TECH_STACK.md`](docs/TECH_STACK.md#the-request-budget) for the numbers and the fallback.
+
+Limits last verified 16 September 2026. Check the Cloudflare pricing docs before relying on them.
 
 ### Deploying
 
+The first deploy is done by hand:
+
 ```bash
 npx wrangler login
-pnpm deploy
+pnpm run deploy
 ```
 
-The site is served from `couchcade.<account>.workers.dev`. A custom domain is optional.
+After that, merges to `main` deploy through GitHub Actions with a Cloudflare API token that only has the Workers `Editor` role on this Worker. Every deploy disconnects open WebSockets, so the host and phones reconnect automatically.
+
+The site is served from `couchcade.<account>.workers.dev`. A custom domain is optional and would cost a domain registration.
 
 ---
 
@@ -461,7 +482,7 @@ See [`docs/HOUSE_STYLE.md`](docs/HOUSE_STYLE.md) for the full guidelines.
 
 ## Roadmap
 
-- [ ] **Phase 0: Foundations.** Monorepo, CI, relay with hibernation, security baseline (Turnstile, tickets, rate limits, headers), first deploy
+- [ ] **Phase 0: Foundations.** Walking skeleton (host + phone over the local dev server), free-tier measurement on a real deploy, monorepo, CI, relay with hibernation, security baseline (Turnstile, tickets, rate limits, headers), first deploy
 - [ ] **Phase 1: Platform core + house style.** `theme`, `ui`, `stage`, `protocol`, `game-sdk`, `utils`; lobby with Pips, VIP, kick and lock; reconnects; budgets and visual regression
 - [ ] **Phase 2: Quick Draw + Pixel Derby.** Rounds, reaction timing, throttled real-time input, first playtest
 - [ ] **Phase 3: Strike Night.** Motion package, sensor traces, physics
@@ -475,7 +496,7 @@ See [`docs/HOUSE_STYLE.md`](docs/HOUSE_STYLE.md) for the full guidelines.
 1. Create a branch from `main`.
 2. Keep changes inside the right package and follow the dependency direction.
 3. Add or update tests; coverage thresholds must pass.
-4. Run `vp check`, `vp run test` and `pnpm check:style` locally.
+4. Run `pnpm check`, `pnpm test` and `pnpm check:style` locally.
 5. Open a pull request. All CI checks must be green before merging.
 
 All names, art and sounds must be original. Don't use assets, names or characters from existing games.
