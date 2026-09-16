@@ -92,6 +92,9 @@ importers:
 
   apps/controller:
     dependencies:
+      '@couchcade/game-sdk':
+        specifier: workspace:*
+        version: link:../../packages/game-sdk
       '@couchcade/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol

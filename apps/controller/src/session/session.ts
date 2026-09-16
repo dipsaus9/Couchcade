@@ -1,3 +1,5 @@
+import { roomClock, type RoomClock } from "@couchcade/game-sdk/clock";
+import type { PhoneToRelayMessage } from "@couchcade/protocol";
 import { shallowRef, type ShallowRef } from "vue";
 import { requestJoin, type FetchFn } from "../join/api.ts";
 import { normaliseName, roomCodeFromSearch, type JoinDraft } from "../join/form.ts";
@@ -19,11 +21,15 @@ export interface PhoneSessionOptions {
   storage?: SessionStorageLike | null;
   fetchFn?: FetchFn;
   turnstile?: TurnstileProvider;
+  /** The room clock inputs are stamped with. Defaults to the shared `roomClock`. */
+  clock?: Pick<RoomClock, "connect" | "disconnect" | "receive">;
 }
 
 export interface PhoneSession {
   state: Readonly<ShallowRef<PhoneState>>;
   join(draft: JoinDraft): Promise<void>;
+  /** Sends a message to the room. Dropped while the phone has no socket. */
+  send(message: PhoneToRelayMessage): void;
   dispose(): void;
 }
 
@@ -36,6 +42,7 @@ export function createPhoneSession({
   storage = browserSessionStorage(),
   fetchFn,
   turnstile = noTurnstile,
+  clock = roomClock,
 }: PhoneSessionOptions = {}): PhoneSession {
   const state = shallowRef(initialState(roomCodeFromSearch(search), loadSession(storage)));
   let socket: RoomSocket | null = null;
@@ -52,9 +59,17 @@ export function createPhoneSession({
       session,
       ticket,
       fetchFn,
-      onMessage: (message) => dispatch({ type: "message", message }),
+      onMessage: (message) => {
+        if (message.t === "clock:pong") return clock.receive(message.d);
+        dispatch({ type: "message", message });
+        // Every (re)connect syncs the room clock again: 5 samples, then 1 every 30 s (CC-1.14).
+        if (message.t === "room:welcome") clock.connect((d) => send({ t: "clock:ping", d }));
+      },
       onOpen: () => dispatch({ type: "socket-open" }),
-      onLost: () => dispatch({ type: "socket-lost" }),
+      onLost: () => {
+        clock.disconnect();
+        dispatch({ type: "socket-lost" });
+      },
       onEnded: (reason) => {
         socket = null;
         leaveRoom();
@@ -63,7 +78,12 @@ export function createPhoneSession({
     });
   }
 
+  function send(message: PhoneToRelayMessage): void {
+    socket?.send(message);
+  }
+
   function leaveRoom(): void {
+    clock.disconnect();
     socket?.close();
     socket = null;
     releaseWakeLock?.();
@@ -108,7 +128,9 @@ export function createPhoneSession({
   return {
     state,
     join,
+    send,
     dispose: () => {
+      clock.disconnect();
       socket?.close();
       socket = null;
       releaseWakeLock?.();
