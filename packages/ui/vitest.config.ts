@@ -18,6 +18,8 @@ export default defineLibConfig({
     browser: {
       enabled: true,
       headless: true,
+      // Failures print the axe-core findings; screenshots would only litter the package folder.
+      screenshotFailures: false,
       provider: playwright(),
       instances: [{ browser: "chromium" }],
       commands: { emulateReducedMotion },
