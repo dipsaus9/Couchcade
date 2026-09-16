@@ -45,6 +45,9 @@ catalogs:
     partyserver:
       specifier: ~0.5.10
       version: 0.5.10
+    partysocket:
+      specifier: ^1.3.0
+      version: 1.3.0
     phaser:
       specifier: ^4.2.1
       version: 4.2.1
@@ -54,6 +57,9 @@ catalogs:
     typescript:
       specifier: ^6.0.3
       version: 6.0.3
+    uqr:
+      specifier: ^0.1.3
+      version: 0.1.3
     vite:
       specifier: ^8.3.0
       version: 8.3.0
@@ -83,6 +89,52 @@ importers:
       oxlint:
         specifier: 'catalog:'
         version: 1.83.0
+
+  apps/host:
+    dependencies:
+      '@couchcade/game-sdk':
+        specifier: workspace:*
+        version: link:../../packages/game-sdk
+      '@couchcade/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      '@couchcade/theme':
+        specifier: workspace:*
+        version: link:../../packages/theme
+      '@couchcade/utils':
+        specifier: workspace:*
+        version: link:../../packages/utils
+      partysocket:
+        specifier: 'catalog:'
+        version: 1.3.0
+      phaser:
+        specifier: 'catalog:'
+        version: 4.2.1
+      uqr:
+        specifier: 'catalog:'
+        version: 0.1.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.42(typescript@6.0.3)
+    devDependencies:
+      '@couchcade/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@vitejs/plugin-vue':
+        specifier: 'catalog:'
+        version: 6.0.9(vite@8.3.0(@types/node@24.13.4)(esbuild@0.28.1))(vue@3.5.42(typescript@6.0.3))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vite:
+        specifier: 'catalog:'
+        version: 8.3.0(@types/node@24.13.4)(esbuild@0.28.1)
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.11(@types/node@24.13.4)(@vitest/browser-playwright@4.1.11)(vite@8.3.0(@types/node@24.13.4)(esbuild@0.28.1))
+      vue-tsc:
+        specifier: 'catalog:'
+        version: 3.3.11(typescript@6.0.3)
 
   apps/server:
     dependencies:
@@ -1317,6 +1369,9 @@ packages:
   estree-walker@3.0.3:
     resolution: {integrity: sha512-7RUKfXgSMMkzt6ZuXmqapOurLGPPfgj6l9uRZ7lRGolvk0y2yocc35LdcxKC5PQZdn2DMqioAQ2NoWcrTKmm6g==}
 
+  event-target-polyfill@0.0.4:
+    resolution: {integrity: sha512-Gs6RLjzlLRdT8X9ZipJdIZI/Y6/HhRLyq9RdDlCsnpxr/+Nn6bU2EFGuC94GjxqhM+Nmij2Vcq98yoHrU8uNFQ==}
+
   eventemitter3@5.0.4:
     resolution: {integrity: sha512-mlsTRyGaPBjPedk6Bvw+aqbsXDtoAyAzm5MO7JgU+yVRyMQ5O8bD4Kcci7BS85f93veegeCPkL8R4GLClnjLFw==}
 
@@ -1565,6 +1620,14 @@ packages:
     peerDependencies:
       '@cloudflare/workers-types': ^4.20260424.1 || ^5.20260703.1
 
+  partysocket@1.3.0:
+    resolution: {integrity: sha512-1zToNyolZFK/7nuAw/K2bZrNzFqaZyRoCEkS+9vG6WSC5ikrN6qWRe96q6ImU51uptz2r+dAwSkwhJVdQi4LiA==}
+    peerDependencies:
+      react: '>=17'
+    peerDependenciesMeta:
+      react:
+        optional: true
+
   path-browserify@1.0.1:
     resolution: {integrity: sha512-b7uo2UCUOYZcnF/3ID0lulOJi/bafxa1xPe7ZPsammBSpjSWQkjNxlt635YGS2MiR9GjvuXCtz2emr3jbsz98g==}
 
@@ -1742,6 +1805,9 @@ packages:
 
   unenv@2.0.0-rc.24:
     resolution: {integrity: sha512-i7qRCmY42zmCwnYlh9H2SvLEypEFGye5iRmEMKjcGi7zk9UquigRjFtTLz0TYqr0ZGLZhaMHl/foy1bZR+Cwlw==}
+
+  uqr@0.1.3:
+    resolution: {integrity: sha512-0rjE8iEJe4YmT9TOhwsZtqCMRLc5DXZUI2UEYUUg63ikBkqqE5EYWaI0etFe/5KUcmcYwLih2RND1kq+hrUJXA==}
 
   vite@8.3.0:
     resolution: {integrity: sha512-lhZBVvEHefgE+HQZC9O7EBJgCU/nVzFNl7vkS4RE0APtWLP02/8QVIkQtzBxPquh7lq5/78NHipTj7ODQ6XuyQ==}
@@ -2676,6 +2742,8 @@ snapshots:
     dependencies:
       '@types/estree': 1.0.9
 
+  event-target-polyfill@0.0.4: {}
+
   eventemitter3@5.0.4: {}
 
   expect-type@1.4.0: {}
@@ -2887,6 +2955,10 @@ snapshots:
       '@cloudflare/workers-types': 5.20260914.1
       nanoid: 5.1.16
 
+  partysocket@1.3.0:
+    dependencies:
+      event-target-polyfill: 0.0.4
+
   path-browserify@1.0.1: {}
 
   path-parse@1.0.7: {}
@@ -3072,6 +3144,8 @@ snapshots:
   unenv@2.0.0-rc.24:
     dependencies:
       pathe: 2.0.3
+
+  uqr@0.1.3: {}
 
   vite@8.3.0(@types/node@24.13.4)(esbuild@0.28.1):
     dependencies:
