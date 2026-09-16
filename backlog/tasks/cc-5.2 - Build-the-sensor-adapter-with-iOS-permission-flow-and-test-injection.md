@@ -1,10 +1,10 @@
 ---
 id: CC-5.2
 title: Build the sensor adapter with iOS permission flow and test injection
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-16 22:33'
+updated_date: '2026-09-16 22:35'
 labels:
   - story
 dependencies:
@@ -60,4 +60,12 @@ AC2 follows motion.md adapter rule 5: on hidden the adapter removes its devicemo
 AC1: request() calls DeviceMotionEvent.requestPermission() synchronously (no await first), nothing else calls it, and where navigator.userActivation exists and isn't active it isn't called at all (reports unsupported, same as the browser's NotAllowedError would).
 E2E hook: createFakeAdapter() fits the window.__couchcadeMotion adapter shape from e2e/src/motion.ts (setPermission, push, play(trace, { speed })); fake.test.ts assigns it to that shape without a cast. No change to the e2e contract was needed.
 Also shipped per motion.md: waitForCapability (1 s real-data check), trace v1 reader traceSamples, synthetic.still and synthetic.swing (motion.md test layer 1 names CC-5.2 for these).
+
+Review round 1: pass. All 5 criteria met, no scope violations. Advisory: a second start() of the same listener returned a separate stop() that aliased the first; fixed so start() returns the same stop() for a listener already started (test added).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added @couchcade/motion (kit tier, no npm dependencies) with the sensors module from motion.md. createBrowserAdapter reads one devicemotion listener and fans samples out. request() calls DeviceMotionEvent.requestPermission() synchronously inside the tap, never outside a user gesture, and reports granted, denied or unsupported (no DeviceMotionEvent, insecure page, a throw or rejection). When the page is hidden it pauses, and once visible the Tap to resume start() resumes it (rule 5). Samples expose t, interval (for diagnostics), acceleration, gravityAcceleration and rotationRate as delivered, with NaN as null, and capability() reports full, accelerometer or none. waitForCapability does the 1 s real-data check. createFakeAdapter (setPermission, push, play) replaces the adapter in tests and fits the e2e window.__couchcadeMotion hook without changes. The version 1 trace reader and synthetic.still/swing builders are included. Package exports use the wildcard subpath pattern. 48 unit tests use a fake window, fake document visibility and fake timers.
+<!-- SECTION:FINAL_SUMMARY:END -->
