@@ -1,0 +1,4 @@
+{
+  "extends": "@couchcade/config/tsconfig/vue.json",
+  "include": ["src", "test", "vite.config.ts"]
+}

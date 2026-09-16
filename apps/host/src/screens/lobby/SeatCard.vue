@@ -1,0 +1,85 @@
+<script setup lang="ts">
+import { computed } from "vue";
+import type { Seat } from "./lobby-state.ts";
+import PlayerShape from "./PlayerShape.vue";
+
+// One of the 8 lobby cards. An empty seat previews the shape the next player gets.
+const props = defineProps<{ seat: Seat; isVip: boolean }>();
+
+const colour = computed(() => `var(--cc-player-${props.seat.style.id})`);
+const status = computed(() => {
+  const { player, slot } = props.seat;
+  if (!player) return "Scan to join";
+  if (!player.connected) return "Away";
+  return props.isVip ? "VIP" : `Player ${slot + 1}`;
+});
+</script>
+
+<template>
+  <article
+    class="seat"
+    :class="{ empty: !seat.player, away: seat.player && !seat.player.connected }"
+  >
+    <PlayerShape
+      class="shape"
+      :shape="seat.style.shape"
+      :size="seat.player ? 96 : 72"
+      :style="{ fill: seat.player ? colour : 'var(--cc-sky)' }"
+    />
+    <p v-if="seat.player" class="name">{{ seat.player.name }}</p>
+    <p v-else class="name small">Slot {{ seat.slot + 1 }}</p>
+    <p class="status" :class="{ tag: isVip && seat.player?.connected }">{{ status }}</p>
+  </article>
+</template>
+
+<style scoped>
+.seat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--cc-space-2);
+  padding: var(--cc-space-4);
+  background: var(--cc-chalk);
+  border: var(--cc-outline-tv) solid var(--cc-ink);
+  border-radius: var(--cc-radius-panel);
+  box-shadow: var(--cc-depth-panel);
+  min-width: 0;
+}
+.seat.empty {
+  background: var(--cc-sky);
+  border-color: var(--cc-ink-20-on-sky);
+  box-shadow: none;
+}
+.shape {
+  stroke: var(--cc-ink);
+}
+.empty .shape {
+  stroke: var(--cc-ink-20-on-sky);
+}
+.name,
+.status {
+  margin: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.name {
+  font: 700 var(--cc-text-body-tv) var(--cc-text-body-font);
+}
+.name.small,
+.status {
+  font: var(--cc-text-small-weight) var(--cc-text-small-tv) var(--cc-text-small-font);
+}
+.away .status {
+  color: var(--cc-ink-70);
+}
+.tag {
+  padding: 0 var(--cc-space-3);
+  font-weight: 700;
+  background: var(--cc-sky);
+  border: var(--cc-outline-tv) solid var(--cc-ink);
+  border-radius: var(--cc-radius-tag);
+}
+</style>
