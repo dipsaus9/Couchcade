@@ -1,12 +1,11 @@
-import { toCssVars } from "@couchcade/theme";
+// The theme tokens as CSS variables, generated at build time (vite.config.ts), the only source of
+// colours, fonts and sizes. A stylesheet, never an inline <style>, so the CSP (style-src 'self')
+// needs no relaxation.
+// oxlint-disable-next-line import/no-unassigned-import
+import "virtual:couchcade-theme.css";
 import { createApp } from "vue";
 import App from "./App.vue";
 import { attachStage } from "./runtime/stage.ts";
-
-// The theme's tokens as CSS variables, the only source of colours, fonts and sizes.
-const tokens = document.createElement("style");
-tokens.textContent = toCssVars();
-document.head.append(tokens);
 
 createApp(App).mount("#app");
 
