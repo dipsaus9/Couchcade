@@ -4,7 +4,7 @@ title: Write the security design doc in docs/architecture/security.md
 status: In Progress
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-16 15:46'
+updated_date: '2026-09-16 15:54'
 labels:
   - story
   - owner-gate
@@ -50,4 +50,6 @@ Owner gate: open the docs PR, send the owner a short summary plus the PR link in
 Review gate (dipsaus-ai:story-reviewer, round 1): pass. AC1 and AC2 met; AC3 is the owner gate, pending. 5 advisories, all fixed in a follow-up commit: RL_PASSCODE source marked as amended (counts every attempt), missing passcode still reaches 401, rate-limit order rule reworded, malformed rejoin returns 401 to match platform.md, decision 3 names the 16-character option.
 Open decisions for the owner (recommendations in the doc): 1 phone flood bucket 5/s burst 15 instead of 20/40; 2 join limit 20/min per IP instead of 10 for shared Wi-Fi; 3 drop the README's interactive challenge after 3 wrong codes; 4 cap rooms at 16 phones (8 players + 8 audience, 409 room-full).
 Follow-ups: new CC-2 story for repo security setup (CodeQL default setup, Dependabot alerts, private vulnerability reporting, branch protection, pnpm audit in CI); amend CC-2.3, CC-2.5, CC-3.10, platform.md and README after the owner decides.
+
+Owner decisions, 2026-09-16 (relayed by the orchestrator; not the doc approval): 1 phones keep the 20/s flood bucket with burst 40, same as the host; 2 join limit raised to 20 per IP per minute; 3 the README's interactive challenge after 3 wrong codes is dropped (README edit done separately); 4 at most 16 phones per room (8 players + 8 audience), 409 room-full. The open-decisions section is removed from security.md and the decisions are rows 15-18. AC3 (owner approval) is still open.
 <!-- SECTION:NOTES:END -->
