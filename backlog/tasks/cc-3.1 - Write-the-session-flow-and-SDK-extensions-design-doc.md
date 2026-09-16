@@ -4,7 +4,7 @@ title: Write the session flow and SDK extensions design doc
 status: In Progress
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-16 16:12'
+updated_date: '2026-09-16 16:19'
 labels:
   - story
   - owner-gate
@@ -45,4 +45,6 @@ Write docs/architecture/session-flow.md: decisions table and owner forks first, 
 Owner gate: open the docs PR, send the owner a short summary plus the PR link in chat, and wait for explicit approval. Merge only after approval; record it with --append-notes.
 
 Review gate (dipsaus-ai:story-reviewer, round 1): pass. AC1 and AC2 met, no scope violations, no findings. AC3 is the owner gate and stays open until the owner approves the PR.
+
+Owner decisions 2026-09-16 recorded in session-flow.md: (1) TV lag check taps along to a steady flashing beat, measuring display lag without reaction time; network lag is handled by room-clock timestamps. (2) VIP pick starts a 3-second countdown the VIP can change or cancel. (3) Every turn-based game spec sets a turn timer, no platform pause. Still open: decision 4, a controller-only entry for phones so Planck.js never reaches the phone bundle. The doc is not approved yet.
 <!-- SECTION:NOTES:END -->

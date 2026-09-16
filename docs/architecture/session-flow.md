@@ -2,18 +2,19 @@
 
 This is the design for everything around a game: the menu, results, late joiners and audience, phones that drop, a TV that refreshes, and the SDK helpers that real-time games share (input batching, rewind, TV lag calibration, physics and the create-game template). The CC-3 stories build it, and CC-8 party mode plugs into it.
 
-**For the owner.** Read [Decisions at a glance](#decisions-at-a-glance) and [Open decisions for the owner](#open-decisions-for-the-owner). That takes about 15 minutes. The rest is detail for the stories.
+**For the owner.** Read [Decisions at a glance](#decisions-at-a-glance), [Owner decisions](#owner-decisions-2026-09-16) and [Open decision for the owner](#open-decision-for-the-owner). That takes about 15 minutes. The rest is detail for the stories.
 
 **For agents.** Everything after the owner sections is binding for CC-3.2 to CC-3.11, like [platform.md](platform.md) and [security.md](security.md). This doc doesn't repeat them. It adds what they leave open. Where this doc, platform.md, security.md and a story disagree, stop and flag it. [Conflicts found while writing this doc](#conflicts-found-while-writing-this-doc) lists the ones already known.
 
-Status: draft, waiting for owner approval (CC-3.1). The doc is written as if every open decision goes the recommended way.
+Status: draft, waiting for owner approval (CC-3.1). The owner decided rows 2, 8 and 13 on 16 September 2026. Row 16 is still open, and the doc assumes the recommended answer.
 
 ---
 
 ## Contents
 
 - [Decisions at a glance](#decisions-at-a-glance)
-- [Open decisions for the owner](#open-decisions-for-the-owner)
+- [Owner decisions (2026-09-16)](#owner-decisions-2026-09-16)
+- [Open decision for the owner](#open-decision-for-the-owner)
 - [Words used in this doc](#words-used-in-this-doc)
 - [The night, phase by phase](#the-night-phase-by-phase)
 - [Game menu](#game-menu)
@@ -35,59 +36,50 @@ Status: draft, waiting for owner approval (CC-3.1). The doc is written as if eve
 
 ## Decisions at a glance
 
-Approving this doc approves these. Rows 2, 8 and 13 depend on the [open decisions](#open-decisions-for-the-owner) and show the recommended answer.
+Approving this doc approves these. Rows 2, 8 and 13 are [owner decisions](#owner-decisions-2026-09-16). Row 16 is the one [open decision](#open-decision-for-the-owner) and shows the recommended answer.
 
 | # | Decision | In plain words |
 |---|---|---|
 | 1 | Lobby, menu, game, results, menu | The lobby only comes before the first game. After results the VIP picks "Play again" or "Back to menu". Nothing moves on by itself. |
-| 2 | The VIP picks on their phone, then a 3-second countdown | Tapping a game puts the Sunny focus ring on its TV card and starts a countdown. The VIP can tap another game or cancel before it runs out. (Open decision 2) |
+| 2 | The VIP picks on their phone, then a 3-second countdown | Tapping a game puts the Sunny focus ring on its TV card and starts a countdown. The VIP can tap another game or cancel before it runs out. (owner, 2026-09-16) |
 | 3 | Games that don't fit are greyed out | A game whose player count doesn't fit the seated players is grey on the TV and on the VIP's phone and can't be picked. A seat kept for a dropped phone still counts. |
 | 4 | "Surprise me" picks a fitting game | A random game that fits the player count, never the game just played if another one fits. |
 | 5 | Results show one game only | The TV shows that game's placements. Running totals across games belong to party mode (CC-8). |
 | 6 | Audience fills free seats between games | The longest-waiting audience member gets the next free seat, automatically, but never while a game runs. Late joiners and promoted audience play from the next game, as the owner decided. |
 | 7 | Dropped phones come back on their own | The phone shows "Connection lost" and reconnects as the same player within the 2-minute window from platform.md. Its current view comes back from the TV. |
-| 8 | Games aren't told about short drops | A game only hears about a player when their seat expires. Turn-based games use a turn timer so nobody waits for a locked phone. (Open decision 3) |
+| 8 | Games aren't told about short drops | A game only hears about a player when their seat expires. Turn-based games use a turn timer so nobody waits for a locked phone. (owner, 2026-09-16) |
 | 9 | Phones stay awake during games | The screen wake lock from CC-5.10 is held on the menu and during every game, not only motion games. Fewer locked screens means fewer drops. |
 | 10 | A refreshed TV resumes at the next round | Games with `snapshot` and `restore` continue at the start of the next round with scores kept. Games without them end and the room goes back to the menu. Phones show "Waiting for the TV" and send nothing meanwhile. |
 | 11 | Phones send at most 4 inputs per second | The CC-1.4 measurement set this, so the 15 per second fallback doesn't apply. Only changes are sent, presses go out before stream updates, and button mashing is sent as a count. |
 | 12 | Rewind up to 150 ms, as a pure wrapper | Real-time games wrap their rules with `withRewind`. It needs no change to the game contract or the host runtime. |
-| 13 | TV lag is measured by tapping along to a steady flash | That measures the TV's delay without anyone's reaction time, so games can subtract it. Measured on demand from the lobby and remembered per laptop. (Open decision 1) |
+| 13 | TV lag is measured by tapping along to a steady flash | That measures the TV's delay without anyone's reaction time, so games can subtract it. Measured on demand from the lobby and remembered per laptop. (owner, 2026-09-16) |
 | 14 | Physics is a pure step over plain numbers | The Planck.js world is rebuilt from game state on every step. The same inputs give the same positions in the same browser engine. |
 | 15 | `pnpm create-game` makes a small working game | It fills `games/<id>` only and prints a checklist for the spec, the scene palette and the E2E test. |
-| 16 | Planck must never reach phones | Found while writing this doc: the phone loads a game's `index.ts`, which pulls in physics through the rules. Phones get a controller-only entry instead. See [Conflicts](#conflicts-found-while-writing-this-doc). |
+| 16 | Planck must never reach phones | Found while writing this doc: the phone loads a game's `index.ts`, which pulls in physics through the rules. Phones get a controller-only entry instead. (Open decision 4) |
 
 ---
 
-## Open decisions for the owner
+## Owner decisions (2026-09-16)
 
-These are the product choices this doc can't settle alone. Each has a recommendation, and the rest of the doc assumes it.
+The owner settled the three product choices in the first draft on 16 September 2026. The rest of the doc follows them.
 
-### 1. How the TV lag check measures lag
+1. **TV lag check: tap along to a steady flashing beat.** Players tap in time with a flash that repeats on a steady beat, not after it. That measures the TV's display lag without reaction time, so games that judge reactions to the screen subtract it. Reacting to a random flash, as CC-3.8 first read, was rejected because the value would be mostly reaction time. CC-3.8 criterion 1 is reworded to "Players tap along to 5 flashes on a steady beat" through `backlog-plan`.
+2. **VIP taps a game: a 3-second countdown the VIP can change or cancel.** The TV moves the Sunny focus ring to the card and counts down. Tapping another game restarts the count, and "Back" cancels. It uses the existing `pick-game` and `back-to-menu` actions, so the protocol doesn't change. Starting on the tap and a separate "Start game" button were rejected.
+3. **A phone drops during its turn: every turn-based game spec sets a turn timer.** The spec also says what happens when it runs out, for example a skipped turn or a weak automatic throw. The platform never pauses a game for a dropped phone and gets no new contract hook for short drops.
 
-CC-3.8 says "players tap when a flash appears". That measures reaction time plus TV lag, about 250 ms plus the lag, and the Quick Draw spec already found that games can't subtract such a number without turning real reactions into fouls.
+## Open decision for the owner
 
-| Option | What players do | Result |
+### 4. Give phones a controller-only entry per game
+
+Found while writing this doc. platform.md lets a game's `src/shared/` import `@couchcade/physics`, and the phone lazy-loads the game's `src/index.ts`, which imports `shared/`. The first physics game would ship Planck.js (tens of KB gzipped) to every phone and break the README's 25 KB per-game controller budget.
+
+| Option | What changes | Cost |
 |---|---|---|
-| **A. Tap along to a steady flash (recommended)** | The flash repeats on a steady beat. Players tap in time with it, not after it. 3 practice flashes, then 5 that count. About 6 seconds. | Measures the TV's delay without reaction time, the way rhythm games calibrate by hand. Games can subtract it. Tapping along has a small bias of its own, in the tens of milliseconds. The approved calibration screen stays as drawn. |
-| B. React to a random flash, as CC-3.8 reads now | Tap as soon as the flash appears, 5 times | The value is mostly reaction time. No game can use it. Only worth building if we never subtract lag. |
-| C. React on the phone, then on the TV, and subtract | 5 flashes on the phone, then 5 on the TV | Removes reaction time too, but takes twice as long and needs a phone screen that isn't in the approved canvas. |
+| **A. Controller-only entry for phones (recommended)** | Phones glob `games/*/src/controller/index.ts`, which exports `{ id, component: () => import("./Controller.vue") }`. dependency-cruiser forbids anything under `src/controller/` from reaching `planck`, `@couchcade/physics` or `phaser`, including through `shared/`. The host keeps loading `src/index.ts`. | A platform.md amendment, best made before CC-1.16 builds the phone registry. One more small file per game, which the create-game template generates. |
+| B. Keep the phone on `src/index.ts` and keep physics out of `shared/` | Physics games step Planck from `src/host/` instead of pure rules | Breaks pure, replayable rules for physics games. Rewind, restore and recorded replays stop working for them. |
+| C. Accept Planck on phones for physics games | Nothing changes | Physics games miss the 25 KB budget and load slower on 4G. |
 
-If A is approved, CC-3.8 criterion 1 is reworded to "Players tap along to 5 flashes on a steady beat" through `backlog-plan`.
-
-### 2. What happens when the VIP taps a game
-
-| Option | Flow | Cost |
-|---|---|---|
-| **A. 3-second countdown the VIP can change (recommended)** | The TV moves the Sunny focus ring to the card and counts down "Starting in 3". Tapping another game moves the ring and restarts the count. "Back" cancels. | 1 request per tap. Uses the existing `pick-game` and `back-to-menu` actions. |
-| B. Start on tap | The game starts at once | Cheapest, but a mis-tap starts the wrong game and the ring on the TV is never seen. |
-| C. Highlight, then "Start game" | Every tap moves the ring on the TV. A second button starts. | Needs a new `ui:action` value, so a protocol change, and two taps every time. |
-
-### 3. A player's phone drops during their turn
-
-| Option | What happens | Cost |
-|---|---|---|
-| **A. Turn timer in the game (recommended)** | Every turn-based game spec sets a turn timer and what happens when it runs out, for example a skipped turn or a weak automatic throw. A player who unlocks their phone in time just carries on. | No platform change. Every turn-based spec has to define the timer. |
-| B. The platform pauses the game | The TV shows "Waiting for Sam" until the phone returns or the seat expires, up to 2 minutes | Needs a new optional contract hook for short drops. Everyone waits for the player who went to the kitchen. |
+Until the owner decides, CC-1.16 can ship as specified, because Quick Draw has no physics.
 
 ---
 
@@ -275,7 +267,7 @@ sequenceDiagram
 1. On `player:left { reason: "disconnected" }`, the scoreboard chip and lobby card show the player as away. The game isn't told.
 2. On `player:reconnected`, the host forgets the last view it sent that phone, so the next send window includes it. It costs no extra message when other views change in the same window.
 3. On `player:left { reason: "expired" }`, the host calls `onPlayerLeft` if that player is in-game, and removes them from the lobby and menu counts.
-4. Turn-based games don't wait for a dropped player. Their spec sets a turn timer (open decision 3).
+4. Turn-based games don't wait for a dropped player. Their spec sets a turn timer (owner decision 3).
 
 ---
 
@@ -459,6 +451,8 @@ A game's `view`, `outcome` and `snapshot` call `unwrap(state)` first. `snapshot`
 
 Built by CC-3.8 in `apps/host/src/screens/calibration/` and `packages/game-sdk/src/clock/display-lag.ts`, from the approved TV lag calibration artboard.
 
+This check is only about display lag, the time the TV takes to show a frame the host drew. Network lag is already handled by the room clock, because every input carries `at`, the room time when the player acted, not when the message arrived.
+
 ### Flow
 
 1. The host clicks "Check TV lag" on the TV lobby. The host moves to `calibration`. Every player's phone shows `calibration`: a big action "Tap with the flash" and the hint "Tap in time, not after".
@@ -546,6 +540,7 @@ games/<id>/
 ├── src/shared/rules.ts     # init, onPlayerInput, view, outcome, snapshot, restore
 ├── src/host/scene.ts       # a scene that draws the scores
 ├── src/controller/Controller.vue  # one big action that sends "tap"
+├── src/controller/index.ts  # phone entry: { id, component } (open decision 4)
 ├── assets/.gitkeep
 ├── test/contract.test.ts   # testGameContract(game)
 ├── test/rules.test.ts      # first to 5 taps wins
@@ -602,11 +597,11 @@ A night of 15 games adds about 200 requests of session flow. A full audience of 
 
 ## Conflicts found while writing this doc
 
-These need a change outside this doc. Approving the doc approves the proposed fix, and the named story makes it.
+These need a change outside this doc. Approving the doc approves the proposed fixes, except item 1, which waits for open decision 4. The named story makes each fix.
 
-1. **Planck would reach phones.** platform.md lets `src/shared/` import `physics`, and the phone lazy-loads a game's `src/index.ts`, which imports `shared/`. A physics game would ship Planck.js (tens of KB gzipped) to phones and break the 25 KB per-game controller budget. Fix: phones glob `games/*/src/controller/index.ts`, which exports `{ id, component: () => import("./Controller.vue") }`. dependency-cruiser forbids anything under `src/controller/` from reaching `planck`, `@couchcade/physics` or `phaser`, including through `shared/`. Quick Draw has no physics, so CC-1.16 can ship as specified. The platform.md amendment is best made before CC-1.16 builds the phone registry, and at the latest in CC-3.9's PR.
+1. **Planck would reach phones.** See [open decision 4](#open-decision-for-the-owner). If the owner picks the recommended answer, the platform.md amendment is best made before CC-1.16 builds the phone registry, and at the latest in CC-3.9's PR.
 2. **CC-3.6 criterion 2** says release and fire events "flush immediately". platform.md budget rule 4 says at once only if 250 ms have passed, otherwise at the 250 ms mark. platform.md wins, and CC-3.6 builds rule 2 of [Real-time input batching](#real-time-input-batching).
-3. **CC-3.8 criterion 1** ("tap when a flash appears") changes to tapping along to a steady beat if open decision 1 goes to A.
+3. **CC-3.8 criterion 1** ("tap when a flash appears") changes to tapping along to a steady beat (owner decision 1).
 4. **Snapshot size.** platform.md says a game snapshot is "1 KB max". The whole frame is 1 KB, so a game's part is 600 bytes. CC-3.5 enforces it in the host runtime. CC-1.13's `testGameContract` should check it once CC-3.5 lands.
 5. **Title length.** `createRegistry` (CC-1.13) should reject titles over 16 characters, so the menu view fits.
 6. **README.** "Creating a game" still says to copy `games/quick-draw`, and the network budget still says 15 messages per second. CC-3.11 updates the first and a README pass updates the second to 4 per second.
@@ -629,4 +624,4 @@ These need a change outside this doc. Approving the doc approves the proposed fi
 | `pnpm create-game` | CC-3.11 |
 | Wake lock | CC-5.10 |
 | Party mode rules | CC-8.1 |
-| Phone controller entry (conflict 1) | CC-1.16 or CC-3.9 |
+| Phone controller entry (open decision 4) | CC-1.16 or CC-3.9 |
