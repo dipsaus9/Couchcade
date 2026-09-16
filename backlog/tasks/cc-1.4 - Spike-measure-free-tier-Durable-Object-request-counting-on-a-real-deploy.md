@@ -4,7 +4,7 @@ title: 'Spike: measure free-tier Durable Object request counting on a real deplo
 status: In Progress
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-16 15:27'
+updated_date: '2026-09-16 15:30'
 labels:
   - story
 dependencies: []
@@ -28,9 +28,9 @@ Branch: CC-1.4/free-tier-probe
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A probe Worker in spikes/free-tier-probe/ sends a known number of incoming messages (at least 1,000) and the Durable Object request count from the dashboard is recorded
-- [ ] #2 Whether the Rate Limiting binding enforces limits on the Free plan is recorded
-- [ ] #3 A recommended maximum input rate per phone is recorded for CC-3.6
+- [x] #1 A probe Worker in spikes/free-tier-probe/ sends a known number of incoming messages (at least 1,000) and the Durable Object request count from the dashboard is recorded
+- [x] #2 Whether the Rate Limiting binding enforces limits on the Free plan is recorded
+- [x] #3 A recommended maximum input rate per phone is recorded for CC-3.6
 - [ ] #4 The probe Worker is deleted from the Cloudflare account afterwards
 <!-- AC:END -->
 
@@ -83,4 +83,9 @@ Arithmetic, on the safe assumption that every incoming message is a full Durable
 Implication outside CC-3.6: host-to-relay messages also count 1:1. A per-tick controller:state from the host at 10 per second would be 72,000 per 2 hours by itself, so the host send rate needs its own cap (follow-up).
 
 Correction to the rate-limit note: the exact total is 151 allowed out of 271 hits between 15:02:28Z and 15:04:45Z (22 + 22 + 4 x 22 + 0 + 19), against a configured limit of 10 per 60 s.
+
+2026-09-16 dashboard check: the owner opened Billing > Billable usage and it showed 'No data.' (the page refreshes daily and only lists billable activity). So whether the Free daily limit counts incoming WebSocket messages 20:1 is still unknown. Decision (orchestrator sign-off, delegated by the owner): assume 1:1, so every incoming message is a full Durable Object request.
+- CC-3.6: cap phone input at 4 messages per second per phone.
+- Host-to-relay messages also count 1:1, so host broadcasts such as controller:state need their own send cap.
+- Follow-up: on 2026-09-17 or 2026-09-18, re-check Billing > Billable usage for 16 Sep. About 1,024 Durable Object requests means 1:1; about 50-60 means 20:1, and then the phone cap can go back up to 15 per second.
 <!-- SECTION:NOTES:END -->
