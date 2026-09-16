@@ -8,7 +8,7 @@
     "dev": "vite",
     "typecheck": "tsc",
     "test": "vitest run",
-    "build": "rm -rf dist/public && mkdir -p dist/public && cp -R ../controller/dist/. dist/public/ && cp -R ../host/dist dist/public/host",
+    "build": "rm -rf dist/public && mkdir -p dist/public && cp -R ../controller/dist/. dist/public/ && cp -R ../host/dist dist/public/host && node scripts/write-headers-file.ts",
     "deploy": "wrangler deploy"
   },
   "dependencies": {

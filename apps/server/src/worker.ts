@@ -3,6 +3,7 @@ import { isRoomCode, roomCode } from "@couchcade/utils";
 import { errorResponse, handleApi } from "./api/index.ts";
 import { forwardHeaders, type SocketIdentity } from "./room/identity.ts";
 import type { Room } from "./room/room.ts";
+import { withSecurityHeaders } from "./security/headers.ts";
 import { verifyTicket as verifyHmacTicket } from "./security/tickets.ts";
 
 export { Room } from "./room/room.ts";
@@ -69,15 +70,28 @@ const socketRoute = /^\/ws\/([^/]+)$/;
 export function createWorker({ verifyTicket, newRoomCode = roomCode }: WorkerOptions) {
   return {
     async fetch(request: Request, env: Cloudflare.Env): Promise<Response> {
-      const url = new URL(request.url);
-      const socket = socketRoute.exec(url.pathname);
-      if (socket) return connectSocket(request, url, socket[1] ?? "", env, verifyTicket);
-      if (url.pathname.startsWith("/api/")) {
-        return handleApi(request, url, { env, newRoomCode, room: (code) => roomStub(env, code) });
-      }
-      return errorResponse("not-found");
+      const response = await route(request, env, verifyTicket, newRoomCode);
+      // docs/architecture/security.md, "Headers", point 2: every Worker response gets the README's
+      // headers, except a successful WebSocket upgrade (status 101) — rebuilding a Response from one
+      // drops its `webSocket` pair, and the upgrade itself carries no page content to protect.
+      return response.status === 101 ? response : withSecurityHeaders(response);
     },
   } satisfies ExportedHandler<Cloudflare.Env>;
+}
+
+async function route(
+  request: Request,
+  env: Cloudflare.Env,
+  verifyTicket: TicketVerifier,
+  newRoomCode: () => string,
+): Promise<Response> {
+  const url = new URL(request.url);
+  const socket = socketRoute.exec(url.pathname);
+  if (socket) return connectSocket(request, url, socket[1] ?? "", env, verifyTicket);
+  if (url.pathname.startsWith("/api/")) {
+    return handleApi(request, url, { env, newRoomCode, room: (code) => roomStub(env, code) });
+  }
+  return errorResponse("not-found");
 }
 
 async function connectSocket(
