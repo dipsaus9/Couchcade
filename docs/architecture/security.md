@@ -41,7 +41,7 @@ Approving this doc approves these. The row marked "open" and some numbers in the
 |---|---|---|
 | 1 | The worst case is a day offline, never a bill | On the Free plan a used-up limit just stops requests until 02:00 Dutch summer time. Every defence here is free. An attacker can at most take the site down for the rest of the day. |
 | 2 | We defend against bots and a mischievous guest | The URL and the code are public. We plan for scanners, bots, and someone at the party or in a group chat who knows the room code. We don't plan for paid attackers, a malicious host or friends cheating with a modified phone app. |
-| 3 | One host passcode of 4 random words | Only the passcode creates rooms. It's a Worker secret, checked in constant time, typed into a masked field and never saved by the app. Four random words can't be guessed through the API. |
+| 3 | One host passcode of 4 random words | Only the passcode creates rooms. Four random words or 16 random characters. It's a Worker secret, checked in constant time, typed into a masked field and never saved by the app. Either can.t be guessed through the API. |
 | 4 | Turnstile on create and join, nowhere else | The invisible check runs when the host submits the passcode and when a phone taps Join. It doesn't run on rejoin, sockets or page loads. The host still needs it because the rate limits are loose. |
 | 5 | The Worker checks everything before a room is called | Rate limit, Turnstile, passcode, name and ticket are all checked in the Worker, cheapest first. A rejected request never costs a Durable Object request. |
 | 6 | Rate limits are speed bumps, not quotas | CC-1.4 showed the binding lets several times the limit through on Free. We use it only to slow abuse. Limits are per IP address (per /64 block for IPv6) and never stored. |
@@ -186,7 +186,7 @@ Cheap checks run first, and nothing reaches a room until every check has passed.
 **`POST /api/rooms`**
 
 1. Passcode-attempt limit, 5 per IP per minute, counted on every attempt. Else 429.
-2. Body is JSON under 1 KB and matches the schema. Else 400.
+2. Body is JSON under 1 KB and matches the schema. Else 400. A missing or empty `passcode` passes this step, so it still gets 401 at step 4.
 3. Turnstile, action `create`. Else 403.
 4. Passcode, constant-time. Else 401.
 5. Room-creation limit, 3 per IP per minute. Else 429.
@@ -206,9 +206,8 @@ The passcode limit counts every attempt, not only wrong ones. The binding can on
 **`POST /api/rooms/:code/rejoin`**
 
 1. Rejoin limit, 30 per IP per minute. Else 429.
-2. Code format and body schema. Else 400.
-3. Signature valid, `k` is `rejoin`, `r` matches the path. Else 401.
-4. Sign a fresh ticket. No room call. The room checks kicked, revoked and the seat window when the socket connects.
+2. Code format, body schema, valid signature, `k` is `rejoin`, `r` matches the path. Else 401, the only error platform.md lists for rejoin besides 429.
+3. Sign a fresh ticket. No room call. The room checks kicked, revoked and the seat window when the socket connects.
 
 **`GET /ws/:code`**
 
@@ -222,7 +221,7 @@ All limits use the Workers Rate Limiting binding with a 60-second period, declar
 
 | Binding | Counts | Limit per IP per minute | Source |
 |---|---|---|---|
-| `RL_PASSCODE` | Every `POST /api/rooms` | 5 | CC-2.3 criterion 3 |
+| `RL_PASSCODE` | Every `POST /api/rooms` | 5 | CC-2.3 criterion 3, amended to count every attempt |
 | `RL_CREATE` | Room creations that passed the passcode | 3 | CC-2.3 criterion 1 |
 | `RL_JOIN` | Every join attempt | 10, or 20 (open decision 2) | CC-2.3 criterion 2 |
 | `RL_REJOIN` | Every rejoin | 30 | This doc |
@@ -233,7 +232,7 @@ Rules:
 1. **Key.** The `CF-Connecting-IP` header. For IPv6, the first 64 bits, because one home or phone gets a whole /64 block. Prefix the key with the binding's purpose so tests read clearly. In local tests, pass the header explicitly.
 2. **Speed bumps only.** CC-1.4 measured 151 of 271 requests passing a limit of 10 per 60 seconds. Counts are per Cloudflare location and eventually consistent. Never build a feature that depends on an exact count.
 3. **Why 30 for rejoin and upgrade.** A deploy disconnects every socket at once. A TV and 8 phones on one Wi-Fi reconnect together, each with a rejoin and an upgrade, and partysocket retries on failure.
-4. **Order.** A limit is always checked before Turnstile and before any room call. A 429 costs one Worker request and no Durable Object request (CC-2.3 criterion 4).
+4. **Order.** Every limit is checked before any room call. The attempt limits (passcode, join, rejoin, upgrade) are also checked before Turnstile. A 429 costs one Worker request and no Durable Object request (CC-2.3 criterion 4).
 5. **Never stored.** The binding holds the key in Cloudflare's memory. We don't write IPs anywhere.
 6. **What 429 looks like.** Body `{ error: "rate-limited" }`. The apps show a referee-voice "Too many tries. Wait a minute and try again." and don't retry on their own.
 
@@ -438,4 +437,4 @@ The README's privacy promises hold: no cookies, no analytics, IPs only in memory
 These defences have no story yet. They need a new CC-2 story, planned with `backlog-plan`:
 
 1. **Repository security setup.** Turn on CodeQL default setup, Dependabot alerts and private vulnerability reporting. Add branch protection on `main`. Add `pnpm audit --prod --audit-level high` to CI. Confirm the settings with `gh api` and record the output in the story notes.
-2. **Decision updates.** Once the owner answers the open decisions, amend CC-2.3, CC-2.5, CC-3.10, platform.md and the README to match.
+2. **Decision updates.** Once the owner answers the open decisions, amend CC-2.3, CC-2.5, CC-3.10, platform.md and the README to match. Also reword CC-2.3 criterion 3 to "more than 5 passcode attempts per IP per minute return 429", because the limit counts every attempt (see [Check order](#check-order-per-endpoint)).
