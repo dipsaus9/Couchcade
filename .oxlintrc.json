@@ -1,0 +1,49 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "import", "vue", "vitest"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn"
+  },
+  "env": {
+    "builtin": true,
+    "es2024": true
+  },
+  "ignorePatterns": [
+    "spikes/**",
+    "backlog/**",
+    "**/dist/**",
+    "**/.wrangler/**",
+    "**/node_modules/**"
+  ],
+  "rules": {
+    "typescript/consistent-type-imports": "error",
+    "typescript/no-explicit-any": "error",
+    "import/no-cycle": "error"
+  },
+  "overrides": [
+    {
+      "files": ["games/*/src/shared/**"],
+      "rules": {
+        "no-restricted-properties": [
+          "error",
+          {
+            "object": "Math",
+            "property": "random",
+            "message": "Game rules must be deterministic. Use createRng(seed) from @couchcade/utils."
+          },
+          {
+            "object": "Date",
+            "property": "now",
+            "message": "Game rules only see game time. Take dtMs or InputContext instead."
+          },
+          {
+            "object": "performance",
+            "property": "now",
+            "message": "Game rules only see game time. Take dtMs or InputContext instead."
+          }
+        ]
+      }
+    }
+  ]
+}
