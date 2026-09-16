@@ -6,7 +6,7 @@ This is the threat model for Couchcade and the defences the CC-2 stories build. 
 
 **For agents.** Everything after the owner sections is binding, like [platform.md](platform.md). This doc adds security detail to platform.md and doesn't repeat it. Where a rule here isn't named in a story's acceptance criteria, the story that owns the file builds it and adds the test anyway. The [threat table](#threats-defences-and-tests) marks those rules with "added by this doc". Where this doc, platform.md and a story disagree, stop and flag it.
 
-Status: draft, waiting for owner approval (CC-2.1).
+Status: approved by the owner on 16 September 2026 (CC-2.1), with the decisions in rows 15 to 18.
 
 ---
 
