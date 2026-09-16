@@ -84,7 +84,7 @@ With 5 players, games for up to 4 players are disabled but stay visible.
 
 | | |
 |---|---|
-| Colours | Sky background; Turf flash panel (the "tap now" state); Sunny `callout` with Ink stroke and shadow; Turf dots for finished flashes, Sunny ring for the current one; Ink 45% for players still waiting |
+| Colours | Sky background; Turf flash panel (the "tap now" state); Sunny `callout` with Ink stroke and shadow; Turf dots for finished flashes, Sunny ring for the current one; Ink 70% for players still waiting |
 | Type | `title` "Check the TV lag"; `body` explanation; `callout` "TAP!"; `score` "4/5" and tap times; `small` "ms" |
 | Shape | Panel with Sky `tab` "Last tap"; `radius-pill` chips without depth (not tappable); quiet "Skip" button |
 | Components | Callout, player chip with score, quiet button, room code panel |
@@ -193,7 +193,8 @@ The canvas needed a few values the house style doesn't define yet. If the owner 
 |---|---|---|
 | `ink-20` tint on Chalk | `#CED2DB` | Disabled outlines, progress ring track |
 | `ink-20` tint on Sky | `#78B1D2` | Empty lobby slot outline |
-| `ink-45` tint on Chalk | `#979EAE` | Disabled labels, placeholders, waiting values |
+| `ink-45` tint on Chalk | `#979EAE` | Disabled labels only (disabled controls are exempt from WCAG AA) |
+| `ink-70` tint on Chalk | `#60697F` | Placeholders, waiting values, secondary hints (about 5.3:1 on Chalk, passes AA) |
 | Jersey emblem | Player shape in Chalk on the chest | Pips without relying on colour |
 | Small TV button | 64px high, `action` label | Kick on a lobby card |
 
