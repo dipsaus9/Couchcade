@@ -4,8 +4,10 @@
  *
  * - `rates.ts`: the phone and host send caps
  * - `stream.ts`: `createInputStream`, the phone's batching helper around the send helper
+ * - `aim-playback.ts`: `addAimSamples` and `aimAt`, the host's aim playback 250 ms behind
  *
  * Each concern is its own file in this folder and is re-exported here.
  */
+export * from "./aim-playback.ts";
 export * from "./rates.ts";
 export * from "./stream.ts";
