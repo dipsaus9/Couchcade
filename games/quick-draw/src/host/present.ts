@@ -17,8 +17,6 @@ export const frameMs = 100;
 export const crowShowMs = 900;
 /** The dust puff blows past at the start of `result`. */
 export const dustShowMs = motion.celebrate.ms;
-/** How far the round chip lifts during `intro`: 8 px at 1080p. */
-export const roundChipLiftPx = 2;
 
 /** Due times sit on the tick grid. Half a tick of slack absorbs float rounding, as in the rules. */
 const slackMs = tickMs / 2;
@@ -58,7 +56,6 @@ export interface CalloutPresentation {
 export interface Presentation {
   phase: Phase;
   round: number;
-  roundChipLift: number;
   /** DRAW! or a fake word. There is only ever one on screen. */
   callout: CalloutPresentation | null;
   /** The crow fake: animation frame 0 to 2, null when there's no crow. */
@@ -210,7 +207,6 @@ export function present(state: QuickDrawState, options: PresentOptions): Present
   return {
     phase: state.phase,
     round: state.round,
-    roundChipLift: state.phase === "intro" ? roundChipLiftPx : 0,
     callout: currentCallout(state),
     crow: crowFake
       ? {
