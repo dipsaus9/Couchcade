@@ -4,7 +4,7 @@ title: 'Build the game SDK contract, auto-discovery registry and contract test k
 status: In Progress
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-16 16:28'
+updated_date: '2026-09-16 16:29'
 labels:
   - story
 dependencies:
@@ -16,7 +16,10 @@ references:
   - packages/game-sdk/src/contract/
   - packages/game-sdk/src/registry/
   - packages/game-sdk/testing/
-  - packages/game-sdk/
+  - packages/game-sdk/tsconfig.json
+  - packages/game-sdk/vitest.config.ts
+  - packages/game-sdk/src/index.ts
+  - packages/game-sdk/test/
 parent_task_id: CC-1
 priority: high
 type: feature
@@ -62,4 +65,6 @@ Scaffolding implied by the package: packages/game-sdk/{tsconfig.json,vitest.conf
 Design notes: testGameContract(game, options?) infers the folder from a games/<id>/ test path (fixtures pass { folder }); sample inputs come from inputSchema via zod toJSONSchema, extra ones via { inputs }. Recording gains an optional ticks field so a replay can run past the last input. Game time of tick n is n * 1000 / 60.
 
 Review round 1: block on scope only (package scaffolding tsconfig.json, vitest.config.ts, src/index.ts, test/ and pnpm-lock.yaml). All 5 criteria met. Fix: References amended to add packages/game-sdk/ (existing refs re-passed). pnpm-lock.yaml stays out of References by orchestrator rule (implied bookkeeping, otherwise every package story collides). Advisory taken: the kit's id check now uses isGameId. Advisory left: scene is not checked against registered palettes (theme's registry is Vite-only; the type covers it).
+
+References narrowed from packages/game-sdk/ to the exact scaffolding paths (tsconfig.json, vitest.config.ts, src/index.ts, test/), because packages/game-sdk/ prefix-collided with To Do stories CC-1.14, CC-3.6, CC-3.7, CC-3.8 and CC-8.2.
 <!-- SECTION:NOTES:END -->
