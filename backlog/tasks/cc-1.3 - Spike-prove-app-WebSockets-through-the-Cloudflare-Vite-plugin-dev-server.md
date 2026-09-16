@@ -54,6 +54,8 @@ Vite plugin dev server (:5173), node relay-test (strict ping-pong, order checked
 Edge cases on the Vite plugin dev server: (1) Vite HMR socket (vite-hmr) open next to app sockets, both work. (2) App socket requesting subprotocol couchcade.v1 fails (1006; curl got 400 once, then no response) because partyserver does not echo Sec-WebSocket-Protocol. Same 1006 on plain wrangler dev (:8787) and through the proxy, so it is Workers/WebSocket behaviour, not the plugin. (3) Upgrade on a path the Worker does not route: destroyed, 1006 (the #15654 path; harmless for us). (4) 15s idle then relay: still open, relayed. (5) Editing src/worker.ts: 'hmr update virtual:cloudflare/worker-entry', open sockets NOT closed, old sockets still relay, new requests get the new code. (6) Reconnect after edit works.
 
 Fallback, wrangler dev :8787 + Vite proxy :5174 (server.proxy '/parties' ws:true): 100/side 200 msgs 89ms, 1000/side 2000 msgs 446ms, direct :8787 100/side 76ms. All exit 0. It works too, about 3x faster per message than the plugin path (extra Node ws coupling hop), irrelevant at <=15 msg/s per phone. All dev servers and Chrome killed after the runs (lsof on 5173/5174/8787/9333 empty).
+
+Review gate (dipsaus-ai:story-reviewer, round 1): verdict pass. AC1 met, AC2 met, no scope violations, no findings.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
