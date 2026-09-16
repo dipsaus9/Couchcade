@@ -4,7 +4,7 @@ title: Write the motion controls design doc
 status: In Progress
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-16 16:33'
+updated_date: '2026-09-16 16:36'
 labels:
   - story
   - owner-gate
@@ -57,4 +57,6 @@ Research findings (2026-09-16), sources in docs/architecture/motion.md:
 - Conflicts flagged in the doc: CC-5.5 AC2 '15 Hz' read as sampling rate at <=4 msgs/s; README 15 msg/s stale; host side of motion step unowned; aim playback helper for game-sdk; approved denied-screen hint may be wrong on iPhone; CC-5.9 needs apps/controller/package.json in References.
 
 Review (dipsaus-ai:story-reviewer, round 1): criteria 1 and 2 met, no scope violations, no findings. Criterion 3 is the owner gate and stays pending; the mechanical block is only that gate. Status stays In Progress until the owner approves.
+
+Review round 2 (after merging origin/main with session-flow.md and aligning to its CC-3.6 set/fire input stream, wake lock scope and motion-check transition): criteria 1 and 2 met, no scope violations, no findings. Criterion 3 is the owner gate.
 <!-- SECTION:NOTES:END -->
