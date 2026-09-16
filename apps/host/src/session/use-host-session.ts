@@ -11,6 +11,7 @@ import {
   createHostRuntime,
   type HostRuntime,
   type MenuScreenState,
+  type ResultsScreenState,
 } from "../runtime/host-runtime.ts";
 import { phaserStage } from "../runtime/stage.ts";
 import { applyRelayMessage, initialLobby, type LobbyState } from "../screens/lobby/lobby-state.ts";
@@ -22,7 +23,14 @@ export type HostScreen =
   /** The VIP picks a game on their phone. */
   | { name: "menu"; lobby: LobbyState; connection: ConnectionStatus; menu: MenuScreenState }
   /** A game runs. The TV shows the stage with the game's scene. */
-  | { name: "playing"; lobby: LobbyState; connection: ConnectionStatus };
+  | { name: "playing"; lobby: LobbyState; connection: ConnectionStatus }
+  /** A game ended. The VIP's phone picks "Play again" or "Back to menu". */
+  | {
+      name: "results";
+      lobby: LobbyState;
+      connection: ConnectionStatus;
+      results: ResultsScreenState;
+    };
 
 /**
  * The TV's session: passcode, room creation, the relay socket, the lobby state and the game
@@ -49,7 +57,9 @@ export function useHostSession() {
     runtime = roomRuntime;
     const show = () => {
       const menu = roomRuntime.menu;
+      const results = roomRuntime.results;
       if (menu) screen.value = { name: "menu", lobby, connection, menu };
+      else if (results) screen.value = { name: "results", lobby, connection, results };
       else screen.value = { name: roomRuntime.running ? "playing" : "lobby", lobby, connection };
     };
     show();

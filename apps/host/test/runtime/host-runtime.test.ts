@@ -13,6 +13,7 @@ import {
   inputMessage,
   lobbyWith,
   pickAction,
+  playAgainAction,
   startAction,
   type EchoState,
 } from "./fixtures.ts";
@@ -268,8 +269,9 @@ describe("createHostRuntime", () => {
     );
   });
 
-  it("returns host and phones to the lobby when the game has an outcome", async () => {
-    const { runtime, handle, play, vip, second, time, ofType, stageLog, changes, lobby } = setup();
+  it("shows the results screen to every seated phone when the game has an outcome", async () => {
+    const { runtime, handle, play, vip, second, lobby, time, ofType, stageLog, changes } = setup();
+    const third = lobby.players[2]!.id;
     play();
     await settle();
     time.advance(1000);
@@ -280,30 +282,127 @@ describe("createHostRuntime", () => {
     expect(stageLog).toEqual(["start echo 3", "stop echo"]);
     // Menu opened, game picked, game started, game ended.
     expect(changes()).toBe(4);
-    expect(runtime.phase).toBe("lobby");
+    expect(runtime.phase).toBe("results");
     expect(ofType("room:phase").map((message) => message.d.phase)).toEqual([
       "menu",
       "playing",
-      "lobby",
+      "results",
+    ]);
+    // echoGame ties every player at place 1 once it ends (test/runtime/fixtures.ts).
+    expect(runtime.results).toMatchObject({
+      headline: "It's a tie!",
+      canPlayAgain: true,
+      hint: null,
+    });
+    expect(runtime.results?.standings.map((entry) => entry.player.id)).toEqual([
+      vip,
+      second,
+      third,
     ]);
 
-    time.advance(1000);
     const last = ofType("controller:state").at(-1);
+    const vipName = lobby.players[0]!.name;
     expect(last?.d).toEqual({
       gameId: null,
       views: [
-        { to: [vip], view: { screen: "lobby", data: { vip: true } } },
         {
-          to: lobby.players.slice(1).map((player) => player.id),
-          view: { screen: "lobby", data: { vip: false } },
+          to: [vip],
+          view: {
+            screen: "results",
+            data: {
+              title: "Echo",
+              vipName,
+              place: 1,
+              of: 3,
+              vip: { canPlayAgain: true, hint: null },
+            },
+          },
+        },
+        {
+          to: [second, third],
+          view: { screen: "results", data: { title: "Echo", vipName, place: 1, of: 3 } },
         },
       ],
     });
 
-    // The loop is stopped: nothing ticks or sends any more.
+    // The loop is stopped: nothing ticks or sends any more without a presence change.
     const count = ofType("controller:state").length;
     time.advance(5000);
     expect(ofType("controller:state")).toHaveLength(count);
+  });
+
+  it("ignores results actions from anyone but the VIP", async () => {
+    const { runtime, handle, play, second, time } = setup();
+    play();
+    await settle();
+    handle(inputMessage(second, { type: "end" }));
+    time.advance(17);
+
+    handle(playAgainAction(second));
+    handle(backAction(second));
+    expect(runtime.phase).toBe("results");
+    expect(runtime.running).toBeNull();
+  });
+
+  it("play-again restarts the same game with a new seed and the currently seated players", async () => {
+    const { runtime, handle, play, vip, time, ofType } = setup();
+    play();
+    await settle();
+    handle(inputMessage(vip, { type: "end" }));
+    time.advance(17);
+    expect(runtime.phase).toBe("results");
+
+    handle(playAgainAction(vip));
+    await settle();
+
+    expect(runtime.phase).toBe("playing");
+    expect(runtime.results).toBeNull();
+    expect(runtime.running?.game.id).toBe("echo");
+    expect(echoState(runtime).players).toHaveLength(3);
+    expect(ofType("room:phase").map((message) => message.d.phase)).toEqual([
+      "menu",
+      "playing",
+      "results",
+      "playing",
+    ]);
+  });
+
+  it("back-to-menu from results reopens the menu for the VIP", async () => {
+    const { runtime, handle, play, vip, second, time, ofType } = setup();
+    play();
+    await settle();
+    handle(inputMessage(second, { type: "end" }));
+    time.advance(17);
+    expect(runtime.phase).toBe("results");
+
+    handle(backAction(vip));
+    expect(runtime.phase).toBe("menu");
+    expect(runtime.results).toBeNull();
+    expect(ofType("room:phase").map((message) => message.d.phase)).toEqual([
+      "menu",
+      "playing",
+      "results",
+      "menu",
+    ]);
+  });
+
+  it("recomputes canPlayAgain when the seated count changes during results", async () => {
+    const { runtime, handle, play, second, lobby, time } = setup({
+      games: [echoGame({ min: 3, max: 3 })],
+    });
+    play();
+    await settle();
+    handle(inputMessage(second, { type: "end" }));
+    time.advance(17);
+    expect(runtime.results?.canPlayAgain).toBe(true);
+
+    // A seat kept for a dropped phone still counts (session-flow.md), so the seat must actually
+    // free up (the player left for good) to bring the fit below 3.
+    const dropped = { ...lobby, players: lobby.players.filter((p) => p.id !== second) };
+    handle({ t: "player:left", d: { id: second, reason: "left" } }, dropped);
+    expect(runtime.results?.canPlayAgain).toBe(false);
+    expect(runtime.results?.hint).toBe("Echo needs 3 players");
+    expect(runtime.results?.headline).toBe("It's a tie!");
   });
 
   it("syncs the host to the room clock on welcome and judges inputs on game time", async () => {

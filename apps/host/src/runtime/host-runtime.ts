@@ -1,12 +1,14 @@
 import { roomClock } from "@couchcade/game-sdk/clock";
 import type { RoomClock } from "@couchcade/game-sdk/clock";
-import type { CouchcadeGame } from "@couchcade/game-sdk/contract";
+import type { CouchcadeGame, Outcome } from "@couchcade/game-sdk/contract";
 import type { GameRegistry } from "@couchcade/game-sdk/registry";
 import type { ControllerView, HostToRelayMessage, RelayToHostMessage } from "@couchcade/protocol";
 import type { LobbyState } from "../screens/lobby/lobby-state.ts";
 import { seatedPlayers, vip } from "../screens/lobby/lobby-state.ts";
 import { createGameMenu } from "../screens/menu/menu.ts";
 import type { Countdown, GameMenu, MenuGame } from "../screens/menu/menu.ts";
+import { createGameResults } from "../screens/results/results.ts";
+import type { GameResults, ResultsStanding } from "../screens/results/results.ts";
 import { createFixedStepLoop } from "./fixed-step.ts";
 import type { FixedStepLoop } from "./fixed-step.ts";
 import { createGameRunner } from "./game-runner.ts";
@@ -40,13 +42,23 @@ export interface RunningGame {
   readonly runner: GameRunner;
 }
 
-/** The phases this runtime drives today. Results, calibration and motion check come later. */
-export type HostPhase = "lobby" | "menu" | "playing";
+/** The phases this runtime drives today. Calibration and motion check come later. */
+export type HostPhase = "lobby" | "menu" | "playing" | "results";
 
 /** What the TV menu draws. */
 export interface MenuScreenState {
   games: MenuGame[];
   countdown: Countdown | null;
+}
+
+/** What the TV results screen draws. */
+export interface ResultsScreenState {
+  game: CouchcadeGame;
+  standings: ResultsStanding[];
+  podium: ResultsStanding[];
+  headline: string;
+  canPlayAgain: boolean;
+  hint: string | null;
 }
 
 export interface HostRuntime {
@@ -55,6 +67,8 @@ export interface HostRuntime {
   readonly running: RunningGame | null;
   /** The menu's games and countdown while the phase is `menu`, else null. */
   readonly menu: MenuScreenState | null;
+  /** The last game's standings while the phase is `results`, else null. */
+  readonly results: ResultsScreenState | null;
   /** Feeds one relay message, with the lobby state after that message was applied. */
   handle(message: RelayToHostMessage, lobby: LobbyState): void;
   /** Tells the runtime the socket closed; it reconnects and gets a new `room:welcome`. */
@@ -67,8 +81,8 @@ export interface HostRuntime {
  * Runs the night on the TV (docs/architecture/session-flow.md, "The night, phase by phase", and
  * platform.md, "How the host runs a game"): the VIP opens the game menu from the lobby, picks a
  * game, a 3 second countdown starts it, the game ticks at a fixed 60 Hz, views go to phones
- * through the view sync, and when the game has an outcome, host and phones return to the lobby.
- * Results (CC-3.3) will replace that last step.
+ * through the view sync, and when the game has an outcome, the results screen shows one game's
+ * placements until the VIP picks "Play again" (restarts the same game) or "Back to menu".
  */
 export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
   const clock = options.clock ?? roomClock;
@@ -81,6 +95,7 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
   const views = createViewSync({ send: options.send, now, schedule, warn });
   let lobby: LobbyState | null = null;
   let running: (RunningGame & { loop: FixedStepLoop }) | null = null;
+  let results: GameResults | null = null;
   /** The phase last sent to the relay with `room:phase`. */
   let phase: HostPhase = "lobby";
 
@@ -122,8 +137,15 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
     views.show(null, lobbyViews);
   }
 
+  /** Every seated phone's results view: the VIP's actions, others' placement or `next-game`. */
+  function showResultsViews(): void {
+    if (results === null) return;
+    views.show(null, results.views());
+  }
+
   function start(game: CouchcadeGame, state: LobbyState): void {
     menu.close(game.id);
+    results = null;
     const runner = createGameRunner(game, {
       players: seatedPlayers(state),
       seed: createSeed(),
@@ -134,7 +156,7 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
       schedule,
       onTick: () => {
         const outcome = runner.step();
-        if (outcome) end();
+        if (outcome) end(outcome);
         else views.show(game.id, runner.views());
       },
     });
@@ -170,14 +192,33 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
       );
   }
 
-  function end(): void {
+  /** The game ended: stops the loop and scene and shows the results screen (session-flow.md,
+   * "Results"). "Play again" restarts the same game, "Back to menu" opens the menu. */
+  function end(outcome: Outcome): void {
     if (running === null) return;
-    const { game, loop } = running;
+    const { game, runner, loop } = running;
     loop.stop();
     options.stage.stop(game);
     running = null;
-    setPhase("lobby");
-    showPlatformViews();
+    results = createGameResults({
+      game,
+      outcome,
+      players: runner.players,
+      lobby: () => lobby,
+      onPlayAgain: (g) => {
+        results = null;
+        if (lobby !== null) start(g, lobby);
+      },
+      onBackToMenu: () => {
+        results = null;
+        // The VIP is still seated: `action` below only reaches here after matching them.
+        if (lobby === null) return;
+        const leaderId = vip(lobby)?.id;
+        if (leaderId !== undefined) menu.action(leaderId, { action: "start" });
+      },
+    });
+    setPhase("results");
+    showResultsViews();
     options.onChange?.();
   }
 
@@ -192,6 +233,19 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
 
     get menu() {
       return phase === "menu" ? { games: menu.games(), countdown: menu.countdown } : null;
+    },
+
+    get results() {
+      return phase === "results" && results !== null
+        ? {
+            game: results.game,
+            standings: results.standings,
+            podium: results.podium,
+            headline: results.headline,
+            canPlayAgain: results.canPlayAgain,
+            hint: results.hint,
+          }
+        : null;
     },
 
     handle(message, state) {
@@ -215,14 +269,22 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
           }
           return;
         case "ui:action":
-          if (running === null) menu.action(message.from, message.d);
+          if (running !== null) return;
+          if (phase === "results") results?.action(message.from, message.d);
+          else menu.action(message.from, message.d);
           return;
         default:
-          // Presence changed: the VIP, the seated count and so the grey cards may have changed.
-          // Phones that joined or came back get their view too.
+          // Presence changed: the VIP, the seated count and so the grey cards, "can play again" or
+          // "not in this game" state may have changed. Phones that joined or came back get their
+          // view too.
           if (running === null) {
-            showPlatformViews();
-            if (phase === "menu") options.onChange?.();
+            if (phase === "results") {
+              showResultsViews();
+              options.onChange?.();
+            } else {
+              showPlatformViews();
+              if (phase === "menu") options.onChange?.();
+            }
           }
       }
     },

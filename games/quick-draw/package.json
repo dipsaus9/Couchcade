@@ -12,6 +12,7 @@
   "dependencies": {
     "@couchcade/game-sdk": "workspace:*",
     "@couchcade/protocol": "workspace:*",
+    "@couchcade/stage": "workspace:*",
     "@couchcade/theme": "workspace:*",
     "@couchcade/ui": "workspace:*",
     "@couchcade/utils": "workspace:*",

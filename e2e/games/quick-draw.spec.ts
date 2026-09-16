@@ -104,7 +104,7 @@ test("two bots play a full match and the faster one wins", async ({ host, phones
     await expect(ana.getByText(`${round} ${round === 1 ? "point" : "points"}`)).toBeVisible();
   }
 
-  // The match ends after round 3's result: Ana has 3 points and everyone is back in the lobby.
+  // The match ends after round 3's result: Ana has 3 points and the results screen shows her win.
   await expect.poll(async () => (await tvState(host))?.phase, { timeout: 10_000 }).toBe("over");
   const final = await tvState(host);
   expect(final?.round).toBe(3);
@@ -112,11 +112,13 @@ test("two bots play a full match and the faster one wins", async ({ host, phones
     { name: "Ana", points: 3 },
     { name: "Ben", points: 0 },
   ]);
-  await expect(host.getByRole("region", { name: "Players" })).toBeVisible();
-  for (const [phone, name] of [
-    [ana, "Ana"],
-    [ben, "Ben"],
-  ] as const) {
-    await expect(phone.getByRole("heading", { name: `You're in, ${name}` })).toBeVisible();
-  }
+
+  // The TV shows the final standings. Only Ana, the VIP, gets "Play again" and "Back to menu"; Ben
+  // just sees his placement (docs/architecture/session-flow.md, "Results").
+  const tvResults = host.getByRole("region", { name: "Results" });
+  await expect(tvResults.getByRole("heading", { name: "Ana wins!" })).toBeVisible();
+  await expect(ana.getByRole("button", { name: "Play again" })).toBeVisible();
+  await expect(ana.getByRole("button", { name: "Back to menu" })).toBeVisible();
+  await expect(ben.getByText("2nd")).toBeVisible();
+  await expect(ben.getByRole("button", { name: "Play again" })).toHaveCount(0);
 });

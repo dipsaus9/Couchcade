@@ -1,125 +1,93 @@
-import { font, motion, world } from "@couchcade/theme";
-import type { HostSceneData, Player } from "@couchcade/game-sdk/contract";
-import { Scene } from "phaser";
-import type { GameObjects, Types } from "phaser";
+import { motion, world } from "@couchcade/theme";
+import type { HostSceneData } from "@couchcade/game-sdk/contract";
+import { StageScene, calloutStyle } from "@couchcade/stage";
+import type { Callout, Scoreboard } from "@couchcade/stage";
+import { Math as PhaserMath } from "phaser";
+import type { GameObjects, Tweens } from "phaser";
 import type { QuickDrawState } from "../shared/index.ts";
 import { cuesBetween, quickDrawCueEvent } from "./cues.ts";
 import type { QuickDrawCue } from "./cues.ts";
-import {
-  drawBackdrop,
-  drawCrow,
-  drawDust,
-  drawFlag,
-  drawGlint,
-  drawPanel,
-  drawPip,
-  drawShape,
-  drawTumbleweed,
-  muzzle,
-} from "./draw.ts";
-import type { PipLook } from "./draw.ts";
-import { bottomPanel, callout, safeArea, scoreboard, worldTextPx } from "./layout.ts";
-import { palette, pipColors, seatLook, textColor } from "./palette.ts";
+import { calloutAt } from "./layout.ts";
+import { InstructionPanel, PipTag, bangText } from "./overlays.ts";
 import { present } from "./present.ts";
 import type { Presentation } from "./present.ts";
-
-type Text = GameObjects.Text;
+import { loadSprites } from "./sprites.ts";
+import { PipActor, Props, buildBackdrop } from "./world.ts";
+import { worldPipLook } from "./world-pip.ts";
 
 /** Scene key: the game id, which the host stage also uses to add and remove the scene. */
 export const quickDrawSceneKey = "quick-draw";
 
-/** How far the DRAW! pop grows, after its first frame. */
-const popScale = 0.12;
+/**
+ * How far into the `celebrate` pop-in (`Back.Out`) the callout first reaches full size. DRAW!
+ * starts there, so it is fully readable on its first frame and the overshoot plays after it.
+ */
+const readableAtMs = (() => {
+  for (let ms = 0; ms < motion.celebrate.ms; ms++) {
+    if (PhaserMath.Easing.Back.Out(ms / motion.celebrate.ms) >= 1) return ms;
+  }
+  return motion.celebrate.ms;
+})();
 
-const pixelText = (px: number, fill: string): Types.GameObjects.Text.TextStyle => ({
-  fontFamily: font.pixel,
-  fontSize: `${px}px`,
-  fontStyle: "bold",
-  color: fill,
-});
-
-const uiText = (px: number): Types.GameObjects.Text.TextStyle => ({
-  fontFamily: font.ui,
-  fontSize: `${px}px`,
-  color: textColor.ink,
-});
-
-interface PipTexts {
-  score: Text;
-  label: Text;
-  flag: Text;
-}
+/** How far a Pip's tag sits above its feet: the Pip's height and a little air. */
+const tagAboveFeet = 26;
 
 /**
- * Quick Draw on the TV: a 480×270 desert street, drawn with placeholder shapes until CC-10.8
- * restyles it with `@couchcade/stage`. The host stage starts it with `HostSceneData`; every
- * frame it reads the latest state, emits the sound cues that changed (`quickDrawCueEvent`) and
- * draws `present(state)`. It never changes the state.
+ * Quick Draw on the TV: the desert street from the game's CC0 and hand-drawn sprites, with the
+ * stage's scoreboard, callouts and panels on the overlay layer. The host stage starts it with
+ * `HostSceneData`; every frame it reads the latest state, emits the sound cues that changed
+ * (`quickDrawCueEvent`) and shows `present(state)`. It never changes the state.
  */
-export default class QuickDrawScene extends Scene {
+export default class QuickDrawScene extends StageScene<QuickDrawState> {
   private host!: HostSceneData<QuickDrawState>;
-  private actors!: GameObjects.Graphics;
-  private overlay!: GameObjects.Graphics;
-  private calloutText!: Text;
-  private roundText!: Text;
-  private panelText!: Text;
-  private pipTexts: PipTexts[] = [];
-  private looks = new Map<string, PipLook>();
+  private props!: Props;
+  private pips: PipActor[] = [];
+  private tags: PipTag[] = [];
+  private bangs: GameObjects.Text[] = [];
+  private scoreboard!: Scoreboard;
+  private panel!: InstructionPanel;
   private previous: QuickDrawState | null = null;
-  private calloutKey: string | null = null;
+  private callout: { key: string; object: Callout; pop: Tweens.Tween | null } | null = null;
   private shakeNextFrame = false;
 
   constructor() {
     super({ key: quickDrawSceneKey });
   }
 
-  init(data: HostSceneData<QuickDrawState>): void {
-    this.host = data;
+  init(): void {
+    const host = this.hostData;
+    if (host === undefined) throw new Error("Quick Draw starts with HostSceneData");
+    this.host = host;
     this.previous = null;
-    this.calloutKey = null;
+    this.callout = null;
     this.shakeNextFrame = false;
+  }
+
+  preload(): void {
+    loadSprites(this.load, this.textures);
   }
 
   create(): void {
     const state = this.host.getState();
+    const view = present(state, { reducedMotion: this.reducedMotion });
     this.cameras.main.setRoundPixels(true);
-    drawBackdrop(this.add.graphics().setDepth(0));
-    this.actors = this.add.graphics().setDepth(10);
-    this.overlay = this.add.graphics().setDepth(20);
 
-    this.looks = new Map(
-      state.players.map((player, index) => {
-        const seat = this.findSeat(player.id);
-        const { jersey, shape } = seatLook(seat?.slot ?? index);
-        return [player.id, { jersey, shape, ...pipColors(seat?.profile) }];
-      }),
-    );
+    buildBackdrop(this);
+    this.props = new Props(this);
+    this.pips = view.pips.map((pip, index) => {
+      const seat = this.host.players.find((player) => player.id === pip.id);
+      return new PipActor(this, pip, worldPipLook(seat?.slot ?? index, seat?.profile));
+    });
 
-    const bodyPx = worldTextPx("body");
-    this.pipTexts = state.players.map(() => ({
-      score: this.add
-        .text(0, 0, "", pixelText(worldTextPx("score"), textColor.ink))
-        .setOrigin(0, 0.5)
-        .setDepth(21),
-      label: this.add.text(0, 0, "", pixelText(bodyPx, textColor.ink)).setOrigin(0.5).setDepth(21),
-      flag: this.add
-        .text(0, 0, "BANG!", pixelText(bodyPx, textColor.ink))
-        .setOrigin(0.5)
-        .setDepth(21),
-    }));
-    this.roundText = this.add.text(0, 0, "", uiText(bodyPx)).setOrigin(0.5).setDepth(21);
-    this.panelText = this.add
-      .text(bottomPanel.x + 8, bottomPanel.y + bottomPanel.height / 2, "", uiText(bodyPx))
-      .setOrigin(0, 0.5)
-      .setDepth(21);
-    this.calloutText = this.add
-      .text(callout.x, callout.y, "", pixelText(worldTextPx("callout"), textColor.sunny))
-      .setOrigin(0.5)
-      .setAngle(callout.angle)
-      // Callout treatment: 4 px Ink stroke and a hard 5 px Ink shadow straight down at 1080p.
-      .setStroke(textColor.ink, 2)
-      .setShadow(0, 1, textColor.ink, 0, true, true)
-      .setDepth(30);
+    this.scoreboard = this.addScoreboard({
+      players: this.host.players,
+      scores: this.scores(view),
+      round: { current: view.round },
+    });
+    this.panel = new InstructionPanel(this);
+    this.tags = view.pips.map(() => new PipTag(this));
+    this.bangs = view.pips.map(() => bangText(this));
+    this.overlay.add([this.panel, ...this.tags, ...this.bangs]);
 
     this.paint(state);
   }
@@ -128,129 +96,98 @@ export default class QuickDrawScene extends Scene {
     this.paint(this.host.getState());
   }
 
-  private findSeat(id: string): Player | undefined {
-    return this.host.players.find((player) => player.id === id);
+  private scores(view: Presentation): Record<string, number> {
+    return Object.fromEntries(view.pips.map((pip) => [pip.id, pip.points]));
   }
 
   private paint(state: QuickDrawState): void {
-    // The pop and shake play after DRAW!'s first frame, never before (spec, "TV scene").
+    // The shake plays after DRAW!'s first frame, never before (spec, "TV scene").
     if (this.shakeNextFrame) {
       this.shakeNextFrame = false;
-      if (!this.host.reducedMotion) this.cameras.main.shake(motion.ui.ms, 1 / world.width);
+      if (!this.reducedMotion) {
+        this.cameras.main.shake(
+          motion.celebrate.ms,
+          new PhaserMath.Vector2(
+            calloutStyle.shake / world.width,
+            calloutStyle.shake / world.height,
+          ),
+        );
+      }
     }
     for (const cue of cuesBetween(this.previous, state)) this.emitCue(cue);
     this.previous = state;
 
-    const view = present(state, { reducedMotion: this.host.reducedMotion });
-    this.drawActors(view);
-    this.drawOverlay(view);
-    this.drawCallout(view);
+    const view = present(state, { reducedMotion: this.reducedMotion });
+    this.paintWorld(view);
+    this.paintOverlays(view);
+    this.paintCallout(view);
   }
 
   private emitCue(cue: QuickDrawCue): void {
-    if (cue.type === "draw") this.shakeNextFrame = true;
     this.events.emit(quickDrawCueEvent, cue);
   }
 
-  private look(id: string): PipLook {
-    const look = this.looks.get(id);
-    if (look === undefined) throw new RangeError(`Quick Draw has no Pip for player ${id}`);
-    return look;
+  private paintWorld(view: Presentation): void {
+    this.props.showTumbleweed(view.tumbleweed);
+    this.props.showCrow(view.crow);
+    this.props.showDust(view.dust);
+    view.pips.forEach((pip, index) => this.pips[index]?.update(pip));
+
+    const glinting = view.glint
+      ? this.pips[view.pips.findIndex((pip) => pip.id === view.glint?.playerId)]
+      : undefined;
+    this.props.showSparkle(glinting?.muzzle ?? null, view.glint?.frame ?? 0);
   }
 
-  private drawActors(view: Presentation): void {
-    const g = this.actors.clear();
-    if (view.tumbleweed) drawTumbleweed(g, view.tumbleweed.x, view.tumbleweed.frame);
-    if (view.crow) drawCrow(g, view.crow.frame);
-
-    // Back rows first, so nearer Pips stand in front.
-    const order = view.pips
-      .map((pip, index) => ({ pip, index }))
-      .toSorted((a, b) => b.pip.slot.row - a.pip.slot.row);
-    for (const { pip, index } of order) {
-      drawPip(g, pip, this.look(pip.id));
-      const texts = this.pipTexts[index];
-      const flagAt = pip.flag === null ? null : drawFlag(g, pip, pip.flag);
-      texts?.flag.setVisible(flagAt !== null);
-      if (flagAt) texts?.flag.setPosition(flagAt.x, flagAt.y);
-    }
-
-    if (view.glint) {
-      const pip = view.pips.find((candidate) => candidate.id === view.glint?.playerId);
-      if (pip) {
-        const at = muzzle(pip);
-        drawGlint(g, at.x, at.y, view.glint.frame);
-      }
-    }
-    if (view.dust) drawDust(g, view.dust.x, view.dust.frame);
-  }
-
-  private drawOverlay(view: Presentation): void {
-    const g = this.overlay.clear();
-
-    // Scoreboard: player chips in seat order, the round counter in the middle.
-    const count = view.pips.length;
-    const leftCount = Math.ceil(count / 2);
-    const total = count * (scoreboard.chipWidth + scoreboard.gap) + scoreboard.roundChipWidth;
-    let x = Math.round((world.width - total) / 2);
-    const y = scoreboard.y;
-    const chipAt = (index: number): void => {
-      const pip = view.pips[index];
-      const texts = this.pipTexts[index];
-      if (!pip || !texts) return;
-      const look = this.look(pip.id);
-      drawPanel(g, x, y, scoreboard.chipWidth, scoreboard.height);
-      drawShape(g, look.shape, x + 9, y + scoreboard.height / 2, look.jersey);
-      texts.score.setText(String(pip.points)).setPosition(x + 18, y + scoreboard.height / 2);
-      x += scoreboard.chipWidth + scoreboard.gap;
-    };
-    for (let i = 0; i < leftCount; i++) chipAt(i);
-    const roundY = y - view.roundChipLift;
-    drawPanel(g, x, roundY, scoreboard.roundChipWidth, scoreboard.height);
-    this.roundText
-      .setText(`Round ${view.round}`)
-      .setPosition(x + scoreboard.roundChipWidth / 2, roundY + scoreboard.height / 2);
-    x += scoreboard.roundChipWidth + scoreboard.gap;
-    for (let i = leftCount; i < count; i++) chipAt(i);
-
-    // Labels over the Pips: times on Chalk, FOUL! on Signal.
+  private paintOverlays(view: Presentation): void {
+    this.scoreboard.setScores(this.scores(view)).setRound({ current: view.round });
+    this.panel.setText(view.panel);
     view.pips.forEach((pip, index) => {
-      const label = this.pipTexts[index]?.label;
-      if (!label) return;
-      label.setVisible(pip.label !== null);
-      if (!pip.label) return;
-      const cx = pip.slot.x + pip.label.offsetX;
-      const cy = Math.max(safeArea.y + scoreboard.height + 8, pip.slot.feetY - 32);
-      const foul = pip.label.tone === "foul";
-      label
-        .setText(pip.label.text)
-        .setColor(foul ? textColor.chalk : textColor.ink)
-        .setStroke(textColor.ink, foul ? 2 : 0)
-        .setPosition(cx, cy);
-      drawPanel(g, Math.round(cx - 15), cy - 6, 30, 11, foul ? palette.signal : palette.chalk);
+      this.tags[index]?.show(pip.label, pip.slot.x, pip.slot.feetY - tagAboveFeet);
+      const bang = this.bangs[index];
+      const actor = this.pips[index];
+      if (!bang || !actor) return;
+      bang.setVisible(pip.flag === 1);
+      if (pip.flag === 1) bang.setPosition(actor.flagTop.x, actor.flagTop.y - 1);
     });
-
-    drawPanel(g, bottomPanel.x, bottomPanel.y, bottomPanel.width, bottomPanel.height);
-    this.panelText.setText(view.panel);
   }
 
-  private drawCallout(view: Presentation): void {
+  /**
+   * DRAW! and the fake words use the stage callout, one at a time, in the same place and with the
+   * same entrance, so a fake looks exactly like DRAW!. The word is fully readable on its first
+   * frame (spec, "TV scene"), so the entrance skips ahead: the `celebrate` pop starts where the
+   * text first reaches full size and only its overshoot plays, and with reduced motion the word
+   * appears at once, without the fade. The screen shake starts on the frame after.
+   */
+  private paintCallout(view: Presentation): void {
     const shown = view.callout;
-    this.calloutText.setVisible(shown !== null);
-    if (!shown) {
-      this.calloutKey = null;
-      return;
+    const key = shown ? `${view.round}:${shown.kind}:${shown.text}` : null;
+    if (key === (this.callout?.key ?? null)) return;
+
+    if (this.callout) {
+      this.callout.pop?.remove();
+      this.callout.object.dismiss();
+      this.callout = null;
     }
-    const key = `${view.round}:${shown.kind}:${shown.text}`;
-    const firstFrame = key !== this.calloutKey;
-    this.calloutKey = key;
-    // DRAW! is fully readable on its first frame; the pop follows. Reduced motion: no scaling.
-    const popping =
-      shown.kind === "draw" &&
-      !firstFrame &&
-      !this.host.reducedMotion &&
-      shown.ageMs < motion.ui.ms;
-    const scale = popping ? 1 + popScale * Math.sin((Math.PI * shown.ageMs) / motion.ui.ms) : 1;
-    this.calloutText.setText(shown.text).setScale(scale);
+    if (shown === null || key === null) return;
+
+    const object = this.addCallout(shown.text, { x: calloutAt.x, y: calloutAt.y, shake: false });
+    this.tweens.killTweensOf(object);
+    object.setScale(1).setAlpha(1);
+    const pop = this.reducedMotion
+      ? null
+      : this.tweens.addCounter({
+          from: readableAtMs,
+          to: motion.celebrate.ms,
+          duration: motion.celebrate.ms - readableAtMs,
+          onUpdate: (tween) => {
+            if (object.active) {
+              const ms = tween.getValue() ?? motion.celebrate.ms;
+              object.setScale(PhaserMath.Easing.Back.Out(ms / motion.celebrate.ms));
+            }
+          },
+        });
+    this.callout = { key, object, pop };
+    this.shakeNextFrame = true;
   }
 }

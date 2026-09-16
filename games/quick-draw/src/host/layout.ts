@@ -1,49 +1,23 @@
-import { shape, typeScale, world } from "@couchcade/theme";
-import type { TypeRoleName } from "@couchcade/theme";
-
 /**
  * Where things sit in the 480×270 world (docs/games/quick-draw.md, "TV scene"). Every value is a
- * whole world pixel, so the stage's integer zoom keeps each pixel square.
+ * whole world pixel, so the stage's integer zoom keeps each pixel square. The stage
+ * scoreboard takes the top of the TV safe area and the instruction and room code panels its
+ * bottom 15%, so the street and the Pips stay between them.
  */
-
-/** World pixels to 1080p pixels: the TV zoom the type scale is written for. */
-export const tvZoom = 1080 / world.height;
-
-/** A type role's size in world pixels: `callout` is 160 px at 1080p, so 40 world px. */
-export function worldTextPx(role: TypeRoleName): number {
-  return Math.round(typeScale[role].tv / tvZoom);
-}
-
-/** The TV safe area on every side (HOUSE_STYLE `safe-tv`). */
-export const safeArea = {
-  x: Math.round(world.width * shape.safeTv),
-  y: Math.round(world.height * shape.safeTv),
-} as const;
 
 /** Horizon in the upper third. */
 export const horizonY = 90;
 
-/** Scoreboard row along the top safe area. */
-export const scoreboard = { y: safeArea.y, chipWidth: 40, roundChipWidth: 56, height: 22, gap: 4 };
-
-/** Bottom instruction panel. The bottom-right corner stays free for the stage's room code panel. */
-export const bottomPanel = {
-  x: safeArea.x,
-  y: world.height - safeArea.y - 26,
-  width: 300,
-  height: 26,
-};
+/** The dusty main street: a band of 16px street tiles the Pips stand on. */
+export const street = { top: 128, rows: 5 } as const;
 
 /** Centre of the DRAW! callout and the fake words: same style, same place. */
-export const callout = { x: world.width / 2, y: 118, angle: -4 } as const;
+export const calloutAt = { x: 240, y: 98 } as const;
 
-/** A World Pip is 16×24. */
-export const pipSize = { width: 16, height: 24 } as const;
-
-/** Cacti on the street. The crow lands on the second one. */
+/** Cacti on the roadside, by their bottom-centre. The crow lands on the second one. */
 export const cacti = [
-  { x: 44, baseY: 150 },
-  { x: 446, baseY: 146 },
+  { x: 40, baseY: 124 },
+  { x: 444, baseY: 126 },
 ] as const;
 
 /** Where a Pip stands. `facing` is 1 for looking right, -1 for looking left. */
@@ -58,7 +32,7 @@ export interface PipSlot {
 
 const leftX = 150;
 const rightX = 330;
-const frontFeetY = 214;
+const frontFeetY = 200;
 const depthStaggerPx = 12;
 const columnGapPx = 28;
 
