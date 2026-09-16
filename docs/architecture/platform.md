@@ -2,9 +2,9 @@
 
 This is the design every platform and game story builds on. It covers how the TV, the phones and Cloudflare talk to each other, which package owns what, what a game has to provide, and the rules that keep Couchcade at €0.
 
-**For the owner.** Read [Decisions at a glance](#decisions-at-a-glance) and [Open decisions for the owner](#open-decisions-for-the-owner). That is about 15 minutes. Everything after that is the detail the stories build against.
+**For the owner.** Read [Decisions at a glance](#decisions-at-a-glance). That is about 15 minutes. Everything after that is the detail the stories build against.
 
-**For agents.** The sections after the open decisions are binding. Where this doc and a story disagree, stop and flag it. README.md, [TECH_STACK.md](../TECH_STACK.md) and [HOUSE_STYLE.md](../HOUSE_STYLE.md) still apply. This doc adds detail and doesn't repeat them.
+**For agents.** The sections after the decisions table are binding. Where this doc and a story disagree, stop and flag it. README.md, [TECH_STACK.md](../TECH_STACK.md) and [HOUSE_STYLE.md](../HOUSE_STYLE.md) still apply. This doc adds detail and doesn't repeat them.
 
 Status: draft for owner approval (CC-1.1). Written 16 September 2026.
 
@@ -13,7 +13,6 @@ Status: draft for owner approval (CC-1.1). Written 16 September 2026.
 ## Contents
 
 - [Decisions at a glance](#decisions-at-a-glance)
-- [Open decisions for the owner](#open-decisions-for-the-owner)
 - [Words used in this doc](#words-used-in-this-doc)
 - [How traffic flows](#how-traffic-flows)
 - [Package map and dependency direction](#package-map-and-dependency-direction)
@@ -31,7 +30,7 @@ Status: draft for owner approval (CC-1.1). Written 16 September 2026.
 
 ## Decisions at a glance
 
-These are settled by the README, TECH_STACK, the CC-1.3 spike or this doc. Approving the doc approves them.
+These are settled by the README, TECH_STACK, the CC-1.3 spike, the owner or this doc. Approving the doc approves them. Rows 15 to 17 were open choices that the owner decided on 16 September 2026.
 
 | # | Decision | In plain words |
 |---|---|---|
@@ -49,47 +48,9 @@ These are settled by the README, TECH_STACK, the CC-1.3 spike or this doc. Appro
 | 12 | Local dev uses the Cloudflare Vite plugin | Decided by spike CC-1.3: the real Worker and room run inside the Vite dev server. No second server process. |
 | 13 | Deploy from GitHub Actions on merge | Every merge to `main` builds, deploys to `workers.dev` and runs a smoke test that creates a room. |
 | 14 | Plan for the worst case on the free tier | Until CC-1.4 measures it, we assume every incoming message costs one of the 100,000 daily Durable Object requests. The budget section shows how long a game night lasts under that assumption. |
-
----
-
-## Open decisions for the owner
-
-These are real choices the docs and stories leave open. Each has a recommendation. The rest of this doc is written as if the recommendation is accepted. Changing one only changes the sections it names.
-
-### 1. Which clock is "host time"?
-
-Timing games (Quick Draw, Strike Night, Dinger Derby) compare when each player tapped. Phones and the TV need one shared clock for that.
-
-| Option | How it works | Cost per sync sample | Accuracy |
-|---|---|---|---|
-| **A. Room clock (recommended)** | The room on Cloudflare answers clock pings with its own time. The TV and every phone sync to that same clock. | 1 request | Best: one network hop per sample |
-| B. TV clock | Phones ping the TV through the room, the TV answers. | 2 requests | Worse: two hops add jitter |
-
-Recommendation: **A**. Half the cost and more accurate. Games never notice the difference, because the SDK converts everything to game time for them. Affects [Clock sync](#clock-sync) and the `clock:*` messages.
-
-### 2. What happens when someone joins while a game is running?
-
-Stories cover the 9th player (audience) but not a 3rd player arriving in the middle of a 2-player game.
-
-| Option | What the new player sees |
-|---|---|
-| **A. Take a seat, play from the next game (recommended)** | They get their colour and Pip straight away and wait on a "Next game soon" screen. The running game is untouched. |
-| B. Watch until the next game | They join as audience and are moved to a seat between games. |
-| C. Joining is closed during games | The phone says "A game is running. Try again in a minute." |
-
-Recommendation: **A**. It feels friendliest at a party and needs no extra relay logic. The TV lobby can show them right away. Affects [Room lifecycle](#room-lifecycle-and-join-flow) and CC-3.1.
-
-### 3. Deploys during a game night
-
-Agent PRs merge on their own, and every merge deploys. A deploy disconnects every open socket. Phones and the TV reconnect and the room restores from the last round snapshot, but the current round is lost.
-
-| Option | Effect |
-|---|---|
-| **A. Deploy freeze switch (recommended)** | A GitHub repository variable `DEPLOY_FREEZE`. When it is `true`, merges still land but the deploy job skips. You flip it before a game night and back afterwards. |
-| B. Deploy on every merge, no switch | Simplest. A merge at 21:00 on a Saturday interrupts the round in progress. |
-| C. Deploy once a day at a fixed time | No interruptions at night, but a fix takes up to a day to go live and the epic's "merges deploy automatically" becomes "merges deploy daily". |
-
-Recommendation: **A**. Costs nothing, keeps automatic deploys, and puts you in control on game nights. Affects CC-1.18.
+| 15 | One shared room clock (owner, 2026-09-16) | The room on Cloudflare answers clock pings with its own time, and the TV and every phone sync to it. That costs 1 request per sample instead of 2 through the TV, and one network hop is more accurate. Games only see game time. |
+| 16 | Mid-game joiners play from the next game (owner, 2026-09-16) | Someone who joins while a game is running gets a seat, colour and Pip straight away and waits on a "Next game soon" screen. The running game is untouched. |
+| 17 | Every merge deploys right away (owner, 2026-09-16) | There is no deploy freeze. A deploy disconnects every socket. Phones and the TV reconnect and the room restores from the last round snapshot, but a round in progress can be lost. The owner accepts that. |
 
 ---
 
@@ -500,7 +461,7 @@ Step by step:
 2. **Show.** The host connects, then shows a QR code for `https://<origin>/?room=CODE` and the code in the room code panel.
 3. **Join.** The phone opens `/?room=CODE` with the code filled in, or the player types it. The player enters a name. The Worker normalises and checks the name, checks Turnstile, asks the room for its status, creates a player id and returns a ticket and a rejoin token.
 4. **Seat.** On connect the room gives the player the lowest free slot (0 to 7). When all 8 slots are taken or reserved for a disconnected player, the phone joins with `slot: null` as audience.
-5. **Late join.** A player who joins during `playing` gets a seat and waits on the `next-game` screen. Games only receive players at `init`. (This is open decision 2.)
+5. **Late join.** A player who joins during `playing` gets a seat and waits on the `next-game` screen. Games only receive players at `init`. The owner decided this on 16 September 2026.
 6. **VIP.** The connected player with the lowest `joinedAt` is the VIP. When the VIP leaves, the next one takes over. The host decides this, not the relay.
 
 ### Tickets and rejoin tokens
@@ -675,7 +636,7 @@ export const registry = createLazyRegistry(
 
 ## Clock sync
 
-Phones judge timing locally ("tap the moment DRAW appears") and the host decides who was first. That only works if every device converts its own timestamps to one clock. This section assumes open decision 1 goes to option A, the room clock.
+Phones judge timing locally ("tap the moment DRAW appears") and the host decides who was first. That only works if every device converts its own timestamps to one clock. All devices sync to the room clock, as the owner decided on 16 September 2026.
 
 ### How it works (CC-1.14)
 
@@ -692,8 +653,6 @@ Phones judge timing locally ("tap the moment DRAW appears") and the host decides
 - For each input, the host runtime computes `atMs = input.at - gameStartRoomTime`, clamped to `[nowMs - 500, nowMs]`, and passes it in `InputContext`.
 - `displayLagMs` comes from the TV calibration screen (CC-3.8), stored in `localStorage` on the host. Games that judge reactions to something on screen subtract it.
 - Real-time games that need an input applied at the moment it happened use the rewind helper (CC-3.7). It keeps 200 ms of state history and rewinds at most 150 ms.
-
-If open decision 1 goes to option B, the TV answers `clock:ping` through the relay instead. The phone math stays the same, and each sample costs 2 requests.
 
 ---
 
@@ -762,7 +721,7 @@ flowchart LR
 - The host app has no client-side routes under `/host/`, so the single-page fallback, which serves the controller's `index.html`, never catches a host URL.
 - Security headers for static files come from a `_headers` file generated at build from `src/security/headers.ts`, so static requests still skip the Worker. CC-2.1 and CC-2.7 can revise this.
 - There are no preview deploys. Cloudflare doesn't create preview URLs for Workers with Durable Objects.
-- `.github/workflows/deploy.yml` runs after CI succeeds on `main`, skips when the `DEPLOY_FREEZE` variable is `true` (open decision 3), deploys with `cloudflare/wrangler-action`, then runs `tooling/smoke/`. A failing smoke test fails the workflow.
+- `.github/workflows/deploy.yml` runs after CI succeeds on `main` and deploys every merge right away, with no freeze switch (owner decision, 16 September 2026). It deploys with `cloudflare/wrangler-action`, then runs `tooling/smoke/`. A failing smoke test fails the workflow.
 
 ---
 
