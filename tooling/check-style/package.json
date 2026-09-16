@@ -1,0 +1,20 @@
+{
+  "name": "@couchcade/check-style",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Enforces house style and shared/-purity rules from docs/HOUSE_STYLE.md and docs/architecture/platform.md: colours, fonts, v-html, new Date() and DOM/timer globals in games/*/src/shared/, plus the sprite palette/grid check from tooling/assets.",
+  "type": "module",
+  "scripts": {
+    "check:style": "node src/cli.ts",
+    "typecheck": "tsc",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@couchcade/config": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/pngjs": "catalog:",
+    "pngjs": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
