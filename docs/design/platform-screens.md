@@ -4,7 +4,7 @@ The design canvas for every screen around the games: joining, the lobby, the gam
 
 **Canvas:** [Couchcade Platform Screens](https://claude.ai/artifact/XEmb9sFHz2dVKYMVrKYZEz)
 
-Status: waiting for owner approval (CC-4.1).
+Status: approved by the owner on 2026-09-16 (CC-4.1).
 
 ---
 
@@ -15,6 +15,7 @@ Status: waiting for owner approval (CC-4.1).
 - [TV screens](#tv-screens)
 - [Phone screens](#phone-screens)
 - [Pip parts sheet](#pip-parts-sheet)
+- [Owner decisions (2026-09-16)](#owner-decisions-2026-09-16)
 - [Proposed additions to the house style](#proposed-additions-to-the-house-style)
 - [Not in this canvas](#not-in-this-canvas)
 
@@ -181,13 +182,21 @@ The "free plays used up" time is shown in local Dutch summer time (00:00 UTC).
 | Shape | Panels with Sky tabs; Pips carry the 4px (TV) or 3px (phone) Ink outline at every size |
 | Content | Anatomy, skin tones, 8 hairstyles (short, bun, cap, long, curls, buzz, ponytail, bald), jerseys, hair colours, 4 expressions (neutral, happy, surprised, sad), Interface Pip next to the 16×24 World Pip, and the three sizes used on screens (96, 56 and 44px heads) |
 
-The chest shape on the jersey is a design decision for approval: it keeps a Pip recognisable without colour, in line with the house style rule that shapes appear wherever player colours do.
+The chest shape on the jersey was approved by the owner on 2026-09-16. It keeps a Pip recognisable without colour, in line with the house style rule that shapes appear wherever player colours do.
 
 ---
 
+## Owner decisions (2026-09-16)
+
+The owner approved the canvas and these three decisions:
+
+1. **Jersey shape.** Every Pip jersey shows the player's shape in Chalk on the chest.
+2. **Tints.** The `ink-20`, `ink-45` and `ink-70` tints below become theme tokens. CC-4.2 adds them to `@couchcade/theme`. `ink-45` is for disabled text only.
+3. **Kick button.** The TV lobby card uses a 64px-high button for Kick.
+
 ## Proposed additions to the house style
 
-The canvas needed a few values the house style doesn't define yet. If the owner approves them, CC-4.2 adds them to `@couchcade/theme`:
+The canvas needed a few values the house style doesn't define yet. The owner approved all of them on 2026-09-16, and CC-4.2 adds them to `@couchcade/theme`:
 
 | Proposal | Value | Used for |
 |---|---|---|
