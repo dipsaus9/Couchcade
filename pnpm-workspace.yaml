@@ -1,0 +1,53 @@
+packages:
+  - apps/*
+  - games/*
+  - packages/*
+  # Tools and the E2E suite are workspace packages too, so they can depend on
+  # internal packages and own their dependencies. Root scripts delegate to them.
+  - tooling/*
+  - e2e
+  # spikes/ is deliberately left out: each spike is throwaway and has its own lockfile.
+
+# Wait a day before installing a newly published version (supply chain).
+minimumReleaseAge: 1440
+
+# Only these dependencies may run install scripts.
+allowBuilds:
+  esbuild: true
+  workerd: true
+
+# The only place dependency versions live. Packages use "catalog:".
+catalog:
+  # Toolchain
+  typescript: ^6.0.3
+  vite: ^8.3.0
+  vitest: ~4.1.11 # Held below 4.2 and 5: @cloudflare/vitest-plugin needs Vitest 4.1
+  vue-tsc: ^3.3.11
+  oxlint: ^1.83.0
+  oxfmt: ^0.68.0
+  "@types/node": ^24.13.4
+
+  # Cloudflare
+  "@cloudflare/vite-plugin": ^1.54.9
+  "@cloudflare/vitest-plugin": ^1.1.9
+  "@cloudflare/workers-types": ^5.20260914.1
+  wrangler: ~4.131.2
+
+  # Runtime libraries
+  vue: ^3.5.42
+  "@vitejs/plugin-vue": ^6.0.9
+  phaser: ^4.2.1
+  zod: ^4.6.5
+  partyserver: ~0.5.10
+  partysocket: ^1.3.0
+  nipplejs: ^1.0.4
+  planck: ^1.5.0
+
+  # Testing, budgets and boundaries
+  "@playwright/test": ~1.63.0
+  fast-check: ^4.10.0
+  axe-core: ^4.13.0
+  size-limit: ^13.1.1
+  "@size-limit/preset-app": ^13.1.1
+  "@lhci/cli": ~0.15.1
+  dependency-cruiser: ^18.3.0

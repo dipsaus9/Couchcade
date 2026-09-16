@@ -1,0 +1,29 @@
+{
+  "name": "couchcade",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm -r --parallel --if-present run dev",
+    "check": "oxfmt --check && oxlint && pnpm -r --if-present run typecheck",
+    "test": "pnpm -r --if-present run test",
+    "e2e": "pnpm --filter ./e2e --if-present run e2e",
+    "build": "pnpm -r --if-present run build",
+    "deploy": "pnpm run build && pnpm --filter @couchcade/server --if-present run deploy",
+    "check:style": "pnpm --filter ./tooling/check-style --if-present run check:style",
+    "check:deps": "pnpm --filter ./tooling/check-deps --if-present run check:deps",
+    "budgets": "pnpm --filter ./tooling/budgets --if-present run budgets",
+    "create-game": "pnpm --filter ./tooling/create-game --if-present run create-game",
+    "assets:recolour": "pnpm --filter ./tooling/assets --if-present run assets:recolour",
+    "trace:record": "pnpm --filter @couchcade/controller --if-present run trace:record",
+    "format": "oxfmt",
+    "lint": "oxlint"
+  },
+  "devDependencies": {
+    "oxfmt": "catalog:",
+    "oxlint": "catalog:"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "pnpm@11.27.0"
+}

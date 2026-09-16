@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Local Cloudflare state (Durable Objects, KV, caches)
+.wrangler/
+
+# Local secrets: never commit
+.env
+.env.*
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+apps/server/.dev.vars
+
+# Story worktrees
+.worktrees/
+
+# Test and budget reports
+coverage/
+playwright-report/
+test-results/
+.lighthouseci/
+
+# Editors and OS
+.DS_Store
+*.log
