@@ -1,0 +1,25 @@
+{
+  "name": "@couchcade/protocol",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Envelope, platform message schemas, HTTP API schemas, encode/decode with the 1 KB cap and close codes.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@couchcade/config": "workspace:*",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}
