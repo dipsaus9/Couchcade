@@ -1,0 +1,20 @@
+{
+  "name": "@couchcade/check-deps",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Enforces the import boundaries from docs/architecture/platform.md with dependency-cruiser.",
+  "type": "module",
+  "scripts": {
+    "check:deps": "node src/cli.ts",
+    "typecheck": "tsc",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@couchcade/config": "workspace:*",
+    "@types/node": "catalog:",
+    "dependency-cruiser": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "vue": "catalog:"
+  }
+}
