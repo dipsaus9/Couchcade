@@ -43,6 +43,8 @@ catalog:
   nipplejs: ^1.0.4
   uqr: ^0.1.3 # QR codes on the TV lobby (MIT, no dependencies)
   planck: ^1.5.0
+  pngjs: ^7.0.0 # Pure-JS PNG read/write for the CC0 asset pipeline (MIT, no native build)
+  "@types/pngjs": ^6.0.5
 
   # Testing, budgets and boundaries
   "@playwright/test": ~1.63.0
