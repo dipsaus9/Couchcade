@@ -1,0 +1,39 @@
+{
+  "name": "@couchcade/game-sdk",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The game contract, defineGame, the auto-discovery registry and the contract test kit. Tier 2 core: imports protocol, theme and utils only.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*/index.ts",
+    "./testing": "./testing/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@couchcade/protocol": "workspace:*",
+    "@couchcade/theme": "workspace:*",
+    "@couchcade/utils": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@couchcade/config": "workspace:*",
+    "phaser": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:",
+    "vue": "catalog:"
+  },
+  "peerDependencies": {
+    "vitest": "catalog:"
+  },
+  "peerDependenciesMeta": {
+    "vitest": {
+      "optional": true
+    }
+  }
+}
