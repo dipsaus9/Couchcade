@@ -1,10 +1,10 @@
 ---
 id: CC-4.3
 title: Self-host subsetted Fredoka and Pixelify Sans fonts
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-16 23:16'
+updated_date: '2026-09-16 23:19'
 labels:
   - story
 dependencies:
@@ -56,3 +56,9 @@ Re-subsetting: run 'pnpm fonts:subset' (delegates to tooling/fonts, node src/cli
 
 Cross-story flag for CC-2.4 (player-name validation, not yet built): docs/architecture/security.md 'Player names' says the name allowlist 'must match the glyphs in the subsetted fonts (CC-4.x)'. This story's charset is English-only Basic Latin (per its own brief), with no Latin-1 Supplement / Latin Extended-A accented letters - so a name like 'Renée' would show tofu boxes on the TV today. Recommendation for whoever picks up CC-2.4: either (a) restrict the name allowlist to plain ASCII letters to match this font subset, or (b) file a follow-up to re-run tooling/fonts/ with an expanded charset (plenty of budget headroom: 20,588 of 40,960 bytes used) before CC-2.4 ships accented-letter support. Did not expand scope here since it wasn't in this story's brief.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Both fonts now load from Couchcade's own origin, subsetted to English + the house-style punctuation, well inside the 40 KB budget. tooling/fonts/ (a new tool package, subset-font/harfbuzzjs WASM, no python) fetches the pinned upstream OFL Fredoka and Pixelify Sans variable fonts and subsets them: fredoka.woff2 (wght 500-700 variable, wdth pinned) at 17,464 B and pixelify-sans.woff2 (wght pinned to 700) at 3,124 B, 20,588 B total against the 40 KB budget. Each WOFF2 ships with its upstream OFL.txt in packages/theme/fonts/<font>/. packages/theme/src/generate/fonts.ts adds the @font-face rules (font-display: swap, weights matching typeScale) to the theme's generated CSS; apps/controller and apps/host both serve the two files at fixed /fonts/*.woff2 paths in dev and at build, so they resolve for both apps' pages and for apps/server's merged static assets. Verified with pnpm check/test/build, e2e (pnpm e2e, chromium+webkit, all green), and a headless-Chromium check of the real wrangler dev bundle: zero CSP violations, document.fonts reports both families loaded on / and /host/. Reviewer: pass, round 1, no findings.
+<!-- SECTION:FINAL_SUMMARY:END -->
