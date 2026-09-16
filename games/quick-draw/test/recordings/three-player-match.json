@@ -1,0 +1,242 @@
+{
+  "recording": {
+    "gameId": "quick-draw",
+    "seed": 20260916,
+    "players": [
+      {
+        "id": "AAAAAAAA",
+        "name": "Player 1",
+        "slot": 0,
+        "profile": {
+          "skin": 0,
+          "hair": 0,
+          "hairColour": 0
+        },
+        "joinedAt": 1789516800000,
+        "connected": true
+      },
+      {
+        "id": "BBBBBBBB",
+        "name": "Player 2",
+        "slot": 1,
+        "profile": {
+          "skin": 1,
+          "hair": 1,
+          "hairColour": 1
+        },
+        "joinedAt": 1789516801000,
+        "connected": true
+      },
+      {
+        "id": "CCCCCCCC",
+        "name": "Player 3",
+        "slot": 2,
+        "profile": {
+          "skin": 2,
+          "hair": 2,
+          "hairColour": 2
+        },
+        "joinedAt": 1789516802000,
+        "connected": true
+      }
+    ],
+    "events": [
+      {
+        "tick": 254,
+        "playerId": "AAAAAAAA",
+        "input": {
+          "type": "draw",
+          "payload": {
+            "round": 1
+          }
+        },
+        "atMs": 4111.666666666668
+      },
+      {
+        "tick": 254,
+        "playerId": "BBBBBBBB",
+        "input": {
+          "type": "draw",
+          "payload": {
+            "round": 1
+          }
+        },
+        "atMs": 4098.666666666668
+      },
+      {
+        "tick": 255,
+        "playerId": "CCCCCCCC",
+        "input": {
+          "type": "draw",
+          "payload": {
+            "round": 1
+          }
+        },
+        "atMs": 4128.666666666668
+      },
+      {
+        "tick": 629,
+        "playerId": "AAAAAAAA",
+        "input": {
+          "type": "draw",
+          "payload": {
+            "round": 2
+          }
+        },
+        "atMs": 10363.333333333374
+      },
+      {
+        "tick": 865,
+        "playerId": "BBBBBBBB",
+        "input": {
+          "type": "draw",
+          "payload": {
+            "round": 2
+          }
+        },
+        "atMs": 14283.00000000004
+      },
+      {
+        "tick": 1373,
+        "playerId": "BBBBBBBB",
+        "input": {
+          "type": "draw",
+          "payload": {
+            "round": 3
+          }
+        },
+        "atMs": 22750.000000000065
+      },
+      {
+        "tick": 1396,
+        "playerId": "AAAAAAAA",
+        "input": {
+          "type": "draw",
+          "payload": {
+            "round": 3
+          }
+        },
+        "atMs": 23145.000000000065
+      },
+      {
+        "tick": 1397,
+        "playerId": "CCCCCCCC",
+        "input": {
+          "type": "draw",
+          "payload": {
+            "round": 3
+          }
+        },
+        "atMs": 23162.000000000065
+      },
+      {
+        "tick": 1883,
+        "playerId": "AAAAAAAA",
+        "input": {
+          "type": "draw",
+          "payload": {
+            "round": 4
+          }
+        },
+        "atMs": 31261.666666667257
+      },
+      {
+        "tick": 1883,
+        "playerId": "BBBBBBBB",
+        "input": {
+          "type": "draw",
+          "payload": {
+            "round": 4
+          }
+        },
+        "atMs": 31261.666666667257
+      },
+      {
+        "tick": 1884,
+        "playerId": "CCCCCCCC",
+        "input": {
+          "type": "draw",
+          "payload": {
+            "round": 4
+          }
+        },
+        "atMs": 31278.666666667257
+      }
+    ],
+    "ticks": 2064
+  },
+  "finalState": {
+    "phase": "over",
+    "round": 4,
+    "nowMs": 34400.00000000072,
+    "phaseAtMs": 34400.00000000072,
+    "drawDueMs": 31016.666666667257,
+    "drawAtMs": 31016.666666667494,
+    "fakes": [],
+    "players": [
+      {
+        "id": "AAAAAAAA",
+        "name": "Player 1",
+        "points": 2,
+        "bestMs": 245,
+        "left": false,
+        "result": {
+          "kind": "valid",
+          "ms": 245,
+          "atMs": 31261.666666667257
+        }
+      },
+      {
+        "id": "BBBBBBBB",
+        "name": "Player 2",
+        "points": 3,
+        "bestMs": 232,
+        "left": false,
+        "result": {
+          "kind": "valid",
+          "ms": 245,
+          "atMs": 31261.666666667257
+        }
+      },
+      {
+        "id": "CCCCCCCC",
+        "name": "Player 3",
+        "points": 0,
+        "bestMs": 262,
+        "left": false,
+        "result": {
+          "kind": "valid",
+          "ms": 262,
+          "atMs": 31278.666666667257
+        }
+      }
+    ],
+    "winners": ["AAAAAAAA", "BBBBBBBB"],
+    "rng": 3205498963,
+    "wordSeed": 20260916,
+    "wordsShown": 1,
+    "roundStart": {
+      "rng": 3277016460,
+      "wordsShown": 1
+    }
+  },
+  "outcome": {
+    "placements": [
+      {
+        "playerId": "BBBBBBBB",
+        "place": 1,
+        "score": 3
+      },
+      {
+        "playerId": "AAAAAAAA",
+        "place": 2,
+        "score": 2
+      },
+      {
+        "playerId": "CCCCCCCC",
+        "place": 3,
+        "score": 0
+      }
+    ]
+  }
+}
