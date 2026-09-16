@@ -1,0 +1,25 @@
+{
+  "name": "@couchcade/game-quick-draw",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Quick Draw: wait for DRAW on the TV, then tap first. Spec in docs/games/quick-draw.md.",
+  "type": "module",
+  "sideEffects": false,
+  "scripts": {
+    "typecheck": "tsc",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@couchcade/game-sdk": "workspace:*",
+    "@couchcade/protocol": "workspace:*",
+    "@couchcade/utils": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@couchcade/config": "workspace:*",
+    "fast-check": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}
