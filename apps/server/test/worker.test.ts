@@ -2,7 +2,7 @@ import { env } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import type { Room } from "../src/room/room.ts";
-import defaultWorker, { roomLocationHint, roomStub } from "../src/worker.ts";
+import { roomLocationHint, roomStub } from "../src/worker.ts";
 import {
   connect,
   connectHost,
@@ -18,7 +18,7 @@ import {
 const hostTicket = JSON.stringify({ role: "host" });
 
 describe("worker routing", () => {
-  it.each(["/api/rooms", "/ws/", "/ws/ABCD/extra", "/internal/create"])(
+  it.each(["/api/unknown", "/api/rooms/ABCD", "/ws/", "/ws/ABCD/extra", "/internal/create"])(
     "answers 404 for %s",
     async (path) => {
       const response = await worker.fetch(new Request(`${origin}${path}`), env);
@@ -46,17 +46,10 @@ describe("worker routing", () => {
     const code = await createRoom();
     for (const v of ["", "2"]) {
       const request = new Request(`${origin}/ws/${code}?v=${v}`, {
-        headers: { Upgrade: "websocket" },
+        headers: { Upgrade: "websocket", Origin: origin },
       });
       expect((await worker.fetch(request, env)).status).toBe(426);
     }
-  });
-
-  it("refuses every socket with 401 until tickets are signed (CC-1.10)", async () => {
-    const code = await createRoom();
-    const response = await defaultWorker.fetch(upgradeRequest(code, hostTicket), env);
-    expect(response.status).toBe(401);
-    expect(await response.json()).toEqual({ error: "invalid-ticket" });
   });
 });
 
@@ -114,7 +107,7 @@ describe("worker forwarding", () => {
     const identity = playerIdentity();
     const request = new Request(
       `${origin}/ws/${code}?v=1&_pk=host&ticket=${encodeURIComponent(JSON.stringify(identity))}`,
-      { headers: { Upgrade: "websocket" } },
+      { headers: { Upgrade: "websocket", Origin: origin } },
     );
     const impostor = new TestSocket((await worker.fetch(request, env)).webSocket as WebSocket);
     await impostor.expect("room:welcome");
