@@ -4,7 +4,7 @@ title: Serve strict security headers and CSP from the Worker
 status: Done
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-16 21:34'
+updated_date: '2026-09-16 21:46'
 labels:
   - story
 dependencies:
@@ -61,6 +61,8 @@ References amended again: added README.md. Found via this story's own pre-deploy
 Correction to the earlier note: the CSP was NOT relaxed. headers.ts and README.md are back to the exact README CSP (README.md ends up unedited; removed from References). Root cause of the pre-deploy CSP check's violation on /host/ (event: violatedDirective style-src-elem, blockedURI inline) was apps/host/src/main.ts injecting the theme tokens at runtime via document.createElement('style') + document.head.append — a genuine bug, not a CSP gap. apps/controller already solved this at build time with a Vite virtual module ('virtual:couchcade-theme.css', see its vite.config.ts comment: 'so ... the CSP needs no inline styles'); apps/host was missing that plugin. Fix: added the same themeCss() plugin to apps/host/vite.config.ts and switched main.ts to 'import "virtual:couchcade-theme.css"', matching apps/controller exactly. References amended: added apps/host/vite.config.ts and apps/host/src/main.ts, removed README.md (unedited). Note on the Vue :style binding on apps/host/src/App.vue's .frame element (TV-frame scaling): it never violated CSP in the first place — Chromium's securitypolicyviolation event only fired once, for style-src-elem (the injected <style> tag above), never for style-src-attr; Vue sets individual style properties via the CSSOM (el.style.prop = value), which browsers don't treat as the 'style' attribute CSP restricts, unlike el.style.cssText or setAttribute('style', ...). Re-verified after the fix: pnpm build (real host+controller+server build), wrangler dev --local serving the built dist/public, curl confirms every header on / and /host/, headless Chromium (Playwright chromium 153) with a securitypolicyviolation listener shows zero violations on either page, and tooling/smoke passed end-to-end (create room, open host socket, room:welcome, room:end) against that same server. Servers killed after verification; no scratch files committed.
 
 Review: story-reviewer verdict pass (round 1). All 3 acceptance criteria met, no scope violations, no findings. Reviewer independently re-ran apps/host's build, the write-headers-file.ts script and the full apps/server test suite (123/123) and confirmed the results in this report.
+
+Pushed and opened draft PR #58. CI on the first push failed on 'test' (games/quick-draw contract.test.ts timeout, packages/game-sdk/testing/contract.ts:209) — confirmed pre-existing and unrelated to this story (identical failure reproduces on main at the exact base commit 21f8e54, ~20% baseline flake rate over the last 10 main runs; games/quick-draw and packages/game-sdk are untouched by this diff). PR #59 (opened by another worker) fixed it with a 30s timeout and merged to main while this PR was open; merged origin/main into CC-2.7/security-headers, reinstalled, re-verified (check/test/check:deps/build all green locally), and pushed. All 6 required CI checks now pass: check, check:style, check:deps, test, build, e2e. PR #58 is a mergeable, open draft.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
