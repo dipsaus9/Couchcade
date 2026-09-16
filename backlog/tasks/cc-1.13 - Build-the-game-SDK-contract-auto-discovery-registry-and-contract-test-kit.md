@@ -1,10 +1,10 @@
 ---
 id: CC-1.13
 title: 'Build the game SDK contract, auto-discovery registry and contract test kit'
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-16 16:29'
+updated_date: '2026-09-16 16:30'
 labels:
   - story
 dependencies:
@@ -67,4 +67,12 @@ Design notes: testGameContract(game, options?) infers the folder from a games/<i
 Review round 1: block on scope only (package scaffolding tsconfig.json, vitest.config.ts, src/index.ts, test/ and pnpm-lock.yaml). All 5 criteria met. Fix: References amended to add packages/game-sdk/ (existing refs re-passed). pnpm-lock.yaml stays out of References by orchestrator rule (implied bookkeeping, otherwise every package story collides). Advisory taken: the kit's id check now uses isGameId. Advisory left: scene is not checked against registered palettes (theme's registry is Vite-only; the type covers it).
 
 References narrowed from packages/game-sdk/ to the exact scaffolding paths (tsconfig.json, vitest.config.ts, src/index.ts, test/), because packages/game-sdk/ prefix-collided with To Do stories CC-1.14, CC-3.6, CC-3.7, CC-3.8 and CC-8.2.
+
+Review round 2: pass. All 5 criteria met, no scope violations, no findings.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added packages/game-sdk (tier 2 core). The contract module has CouchcadeGame and CouchcadeController as in the amended platform.md, defineGame, defineController, fixed 60 Hz step helpers and definition checks, including the 16-character title cap. The registry module has createRegistry for the host (eager glob over games/*/src/index.ts: ids from folders, unique, sorted by title) and createControllerRegistry for phones (lazy glob over games/*/src/controller/index.ts, UnknownGameError for an unknown id). Both work with an empty glob. The testing kit has testGameContract(game, options?): kebab-case id equal to its folder, player bounds, seed-deterministic JSON-safe init, pure and repeatable onPlayerInput/onTick, replay determinism, valid views and outcomes, and the optional hooks. It also has createFakeRoom (manual tick clock, input clamping), replay, createPlayers and sampleInputs (derived from inputSchema). Two fixture games (draw-race, a Quick Draw-like reaction game, and pick-a-number, turn-based) pass the kit. 102 unit tests.
+<!-- SECTION:FINAL_SUMMARY:END -->
