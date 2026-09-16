@@ -1,12 +1,12 @@
 ---
 id: CC-1.4
 title: 'Spike: measure free-tier Durable Object request counting on a real deploy'
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-09-16 12:24'
+updated_date: '2026-09-16 14:48'
 labels:
   - story
-  - needs-info
 dependencies: []
 references:
   - spikes/free-tier-probe/
@@ -38,4 +38,6 @@ Branch: CC-1.4/free-tier-probe
 
 <!-- SECTION:NOTES:BEGIN -->
 Needs owner action: Cloudflare account created and `npx wrangler login` done on this machine. Remove needs-info once confirmed.
+
+Owner confirmed Cloudflare login on 2026-09-16: `npx wrangler login` done, `wrangler whoami` shows account 35ee53c3b77e566a5e8e2242f752f668. needs-info label removed.
 <!-- SECTION:NOTES:END -->
