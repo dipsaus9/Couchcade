@@ -4,7 +4,7 @@ title: 'Build the CC0 asset pipeline: palette recolour, palette check and credit
 status: Done
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-16 21:27'
+updated_date: '2026-09-16 21:32'
 labels:
   - story
 dependencies:
@@ -63,6 +63,8 @@ Delivery notes (CC-4.9):
 - Credits format: games/<id>/CREDITS.md is a markdown table `| Asset | Author | Source | Licence |`; licence must match /^CC0(\s|$)/i (accepts "CC0" and "CC0 1.0"); source must be an http(s) URL. A missing CREDITS.md is an aggregation error only when games/<id>/assets/ exists and isn't empty (games/quick-draw has neither today, so it isn't an error). docs/CREDITS.md is generated (pnpm --filter ./tooling/assets run credits) and committed; test/credits.test.ts asserts it matches aggregateCredits(realRepoRoot) exactly (drift check) and that validation passes on the current tree (currently "No CC0 assets are in use yet.", since no game ships assets).
 - Tests use PNGs generated in-memory with pngjs (test/png-fixtures.ts) rather than checked-in binaries. 43 tests in tooling/assets; full pnpm check/test/check:deps/build pass on the branch.
 - Implied bookkeeping outside the file-level References (per WORKER_BRIEF): pnpm-lock.yaml, and the pngjs/@types/pngjs catalog additions in pnpm-workspace.yaml.
+
+CI on PR #56: check, check:style, check:deps and build all pass. The "test" job is red, but on an unrelated, pre-existing failure: packages/game-sdk/testing/contract.ts's fast-check property test "onPlayerInput and onTick are pure and repeatable" (games/quick-draw/test/contract.test.ts) times out at 5000ms on GitHub-hosted runners. Confirmed pre-existing and unrelated to this story: it also fails on main's own post-merge CI (run 35151140675, the CC-4.6 merge) and passed on the run immediately before that (35150517904, CC-10.4) — so it started failing when CC-4.6 (stage package) landed on main, not from anything in tooling/assets or docs/CREDITS.md. It passes locally (pnpm test, 86/86 in games/quick-draw) every time. Retried twice on CI with the same result. Left unfixed: packages/game-sdk and packages/stage are outside CC-4.9's References; fixing it here would be scope creep and this already blocks every PR against main, not just this one. Recommend a follow-up (raise the test's timeout, or find what in CC-4.6 slowed it down) landed directly, since it blocks all merges.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
