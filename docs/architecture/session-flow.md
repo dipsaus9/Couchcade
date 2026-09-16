@@ -2,11 +2,11 @@
 
 This is the design for everything around a game: the menu, results, late joiners and audience, phones that drop, a TV that refreshes, and the SDK helpers that real-time games share (input batching, rewind, TV lag calibration, physics and the create-game template). The CC-3 stories build it, and CC-8 party mode plugs into it.
 
-**For the owner.** Read [Decisions at a glance](#decisions-at-a-glance), [Owner decisions](#owner-decisions-2026-09-16) and [Open decision for the owner](#open-decision-for-the-owner). That takes about 15 minutes. The rest is detail for the stories.
+**For the owner.** Read [Decisions at a glance](#decisions-at-a-glance) and [Owner decisions](#owner-decisions-2026-09-16). That takes about 15 minutes. The rest is detail for the stories.
 
 **For agents.** Everything after the owner sections is binding for CC-3.2 to CC-3.11, like [platform.md](platform.md) and [security.md](security.md). This doc doesn't repeat them. It adds what they leave open. Where this doc, platform.md, security.md and a story disagree, stop and flag it. [Conflicts found while writing this doc](#conflicts-found-while-writing-this-doc) lists the ones already known.
 
-Status: draft, waiting for owner approval (CC-3.1). The owner decided rows 2, 8 and 13 on 16 September 2026. Row 16 is still open, and the doc assumes the recommended answer.
+Status: approved by the owner on 16 September 2026 (CC-3.1), with the decisions in rows 2, 8, 13 and 16.
 
 ---
 
@@ -14,7 +14,6 @@ Status: draft, waiting for owner approval (CC-3.1). The owner decided rows 2, 8 
 
 - [Decisions at a glance](#decisions-at-a-glance)
 - [Owner decisions (2026-09-16)](#owner-decisions-2026-09-16)
-- [Open decision for the owner](#open-decision-for-the-owner)
 - [Words used in this doc](#words-used-in-this-doc)
 - [The night, phase by phase](#the-night-phase-by-phase)
 - [Game menu](#game-menu)
@@ -36,7 +35,7 @@ Status: draft, waiting for owner approval (CC-3.1). The owner decided rows 2, 8 
 
 ## Decisions at a glance
 
-Approving this doc approves these. Rows 2, 8 and 13 are [owner decisions](#owner-decisions-2026-09-16). Row 16 is the one [open decision](#open-decision-for-the-owner) and shows the recommended answer.
+Approving this doc approves these. Rows 2, 8, 13 and 16 are [owner decisions](#owner-decisions-2026-09-16) from 16 September 2026.
 
 | # | Decision | In plain words |
 |---|---|---|
@@ -55,31 +54,18 @@ Approving this doc approves these. Rows 2, 8 and 13 are [owner decisions](#owner
 | 13 | TV lag is measured by tapping along to a steady flash | That measures the TV's delay without anyone's reaction time, so games can subtract it. Measured on demand from the lobby and remembered per laptop. (owner, 2026-09-16) |
 | 14 | Physics is a pure step over plain numbers | The Planck.js world is rebuilt from game state on every step. The same inputs give the same positions in the same browser engine. |
 | 15 | `pnpm create-game` makes a small working game | It fills `games/<id>` only and prints a checklist for the spec, the scene palette and the E2E test. |
-| 16 | Planck must never reach phones | Found while writing this doc: the phone loads a game's `index.ts`, which pulls in physics through the rules. Phones get a controller-only entry instead. (Open decision 4) |
+| 16 | Planck must never reach phones | Found while writing this doc: the phone loads a game's `index.ts`, which pulls in physics through the rules. Phones load a controller-only entry instead. (owner, 2026-09-16) |
 
 ---
 
 ## Owner decisions (2026-09-16)
 
-The owner settled the three product choices in the first draft on 16 September 2026. The rest of the doc follows them.
+The owner settled the four product and architecture choices in the first draft on 16 September 2026. The rest of the doc follows them.
 
 1. **TV lag check: tap along to a steady flashing beat.** Players tap in time with a flash that repeats on a steady beat, not after it. That measures the TV's display lag without reaction time, so games that judge reactions to the screen subtract it. Reacting to a random flash, as CC-3.8 first read, was rejected because the value would be mostly reaction time. CC-3.8 criterion 1 is reworded to "Players tap along to 5 flashes on a steady beat" through `backlog-plan`.
 2. **VIP taps a game: a 3-second countdown the VIP can change or cancel.** The TV moves the Sunny focus ring to the card and counts down. Tapping another game restarts the count, and "Back" cancels. It uses the existing `pick-game` and `back-to-menu` actions, so the protocol doesn't change. Starting on the tap and a separate "Start game" button were rejected.
 3. **A phone drops during its turn: every turn-based game spec sets a turn timer.** The spec also says what happens when it runs out, for example a skipped turn or a weak automatic throw. The platform never pauses a game for a dropped phone and gets no new contract hook for short drops.
-
-## Open decision for the owner
-
-### 4. Give phones a controller-only entry per game
-
-Found while writing this doc. platform.md lets a game's `src/shared/` import `@couchcade/physics`, and the phone lazy-loads the game's `src/index.ts`, which imports `shared/`. The first physics game would ship Planck.js (tens of KB gzipped) to every phone and break the README's 25 KB per-game controller budget.
-
-| Option | What changes | Cost |
-|---|---|---|
-| **A. Controller-only entry for phones (recommended)** | Phones glob `games/*/src/controller/index.ts`, which exports `{ id, component: () => import("./Controller.vue") }`. dependency-cruiser forbids anything under `src/controller/` from reaching `planck`, `@couchcade/physics` or `phaser`, including through `shared/`. The host keeps loading `src/index.ts`. | A platform.md amendment, best made before CC-1.16 builds the phone registry. One more small file per game, which the create-game template generates. |
-| B. Keep the phone on `src/index.ts` and keep physics out of `shared/` | Physics games step Planck from `src/host/` instead of pure rules | Breaks pure, replayable rules for physics games. Rewind, restore and recorded replays stop working for them. |
-| C. Accept Planck on phones for physics games | Nothing changes | Physics games miss the 25 KB budget and load slower on 4G. |
-
-Until the owner decides, CC-1.16 can ship as specified, because Quick Draw has no physics.
+4. **Phones load a controller-only entry per game.** Found while writing this doc. platform.md lets a game's `src/shared/` import `@couchcade/physics`, and the phone lazy-loaded the game's `src/index.ts`, which imports `shared/`. The first physics game would have shipped Planck.js (tens of KB gzipped) to every phone and broken the README's 25 KB per-game controller budget. Now phones glob `games/*/src/controller/index.ts`, which exports `{ id, component: () => import("./Controller.vue") }`, and the host keeps loading `src/index.ts`. dependency-cruiser forbids anything under `src/controller/` from reaching `planck`, `@couchcade/physics` or `phaser`, including through `shared/`. Keeping physics out of `shared/` was rejected because it breaks pure, replayable rules, and accepting Planck on phones was rejected because of the budget.
 
 ---
 
@@ -540,7 +526,7 @@ games/<id>/
 ├── src/shared/rules.ts     # init, onPlayerInput, view, outcome, snapshot, restore
 ├── src/host/scene.ts       # a scene that draws the scores
 ├── src/controller/Controller.vue  # one big action that sends "tap"
-├── src/controller/index.ts  # phone entry: { id, component } (open decision 4)
+├── src/controller/index.ts  # phone entry: { id, component } (owner decision 4)
 ├── assets/.gitkeep
 ├── test/contract.test.ts   # testGameContract(game)
 ├── test/rules.test.ts      # first to 5 taps wins
@@ -597,9 +583,9 @@ A night of 15 games adds about 200 requests of session flow. A full audience of 
 
 ## Conflicts found while writing this doc
 
-These need a change outside this doc. Approving the doc approves the proposed fixes, except item 1, which waits for open decision 4. The named story makes each fix.
+These need a change outside this doc. Approving the doc approves the proposed fixes, and the named story makes each fix.
 
-1. **Planck would reach phones.** See [open decision 4](#open-decision-for-the-owner). If the owner picks the recommended answer, the platform.md amendment is best made before CC-1.16 builds the phone registry, and at the latest in CC-3.9's PR.
+1. **Planck would reach phones.** See [owner decision 4](#owner-decisions-2026-09-16). The platform.md amendment is best made before CC-1.16 builds the phone registry, and at the latest in CC-3.9's PR.
 2. **CC-3.6 criterion 2** says release and fire events "flush immediately". platform.md budget rule 4 says at once only if 250 ms have passed, otherwise at the 250 ms mark. platform.md wins, and CC-3.6 builds rule 2 of [Real-time input batching](#real-time-input-batching).
 3. **CC-3.8 criterion 1** ("tap when a flash appears") changes to tapping along to a steady beat (owner decision 1).
 4. **Snapshot size.** platform.md says a game snapshot is "1 KB max". The whole frame is 1 KB, so a game's part is 600 bytes. CC-3.5 enforces it in the host runtime. CC-1.13's `testGameContract` should check it once CC-3.5 lands.
@@ -624,4 +610,4 @@ These need a change outside this doc. Approving the doc approves the proposed fi
 | `pnpm create-game` | CC-3.11 |
 | Wake lock | CC-5.10 |
 | Party mode rules | CC-8.1 |
-| Phone controller entry (open decision 4) | CC-1.16 or CC-3.9 |
+| Phone controller entry (owner decision 4) | CC-1.16 or CC-3.9 |
