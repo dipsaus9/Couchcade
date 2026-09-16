@@ -273,19 +273,31 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
           if (phase === "results") results?.action(message.from, message.d);
           else menu.action(message.from, message.d);
           return;
+        case "player:joined":
+        case "player:reconnected": {
+          // A phone that came back (or a newer tab) has no view yet: send it the current one in the
+          // next send window, even when it didn't change.
+          const id = message.t === "player:joined" ? message.d.player.id : message.d.id;
+          views.forget(id);
+          break;
+        }
+        case "player:left":
+          // A short drop keeps the seat and the game isn't told. A freed seat ends that player's game.
+          if (message.d.reason !== "disconnected") running?.runner.leave(message.d.id);
+          break;
         default:
-          // Presence changed: the VIP, the seated count and so the grey cards, "can play again" or
-          // "not in this game" state may have changed. Phones that joined or came back get their
-          // view too.
-          if (running === null) {
-            if (phase === "results") {
-              showResultsViews();
-              options.onChange?.();
-            } else {
-              showPlatformViews();
-              if (phase === "menu") options.onChange?.();
-            }
-          }
+          break;
+      }
+      // Presence changed: the VIP, the seated count and so the grey cards, "can play again" or "not
+      // in this game" state may have changed. Phones that joined or came back get their view too.
+      // While a game runs, its next tick sends the views.
+      if (running !== null) return;
+      if (phase === "results") {
+        showResultsViews();
+        options.onChange?.();
+      } else {
+        showPlatformViews();
+        if (phase === "menu") options.onChange?.();
       }
     },
 
