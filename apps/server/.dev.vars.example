@@ -1,0 +1,10 @@
+# Local secrets for `pnpm dev`. Copy this file to apps/server/.dev.vars, which git ignores.
+# These are local test values only. Production secrets are set with `npx wrangler secret put`
+# (docs/architecture/security.md, "Owner checklist"). Never reuse these in production.
+
+# The passcode the host enters to create a room
+HOST_PASSCODE=change-me
+# Signs tickets and rejoin tokens with HMAC-SHA-256. At least 32 characters.
+TICKET_SIGNING_SECRET=change-me-to-a-long-random-string
+# Cloudflare's Turnstile test secret that always passes (used from CC-2.2)
+TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
