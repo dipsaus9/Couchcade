@@ -2,18 +2,18 @@
 
 This is the design for using phones as motion controllers: which sensors we read, how iPhones and Android phones get permission, how a phone learns which way is down, what each gesture sends to the TV, the touch fallback for every gesture, and how recorded sensor traces test all of it.
 
-**For the owner.** Read [Decisions at a glance](#decisions-at-a-glance) and [Open decisions for the owner](#open-decisions-for-the-owner). That takes about 15 minutes. The rest is detail for the stories.
+**For the owner.** Read [Decisions at a glance](#decisions-at-a-glance) and [Owner decisions](#owner-decisions-2026-09-16). That takes about 15 minutes. The rest is detail for the stories.
 
 **For agents.** Everything after the owner sections is binding for CC-5.2 to CC-5.10 and for every game controller that uses `@couchcade/motion`. [platform.md](platform.md), [security.md](security.md), [session-flow.md](session-flow.md), [platform-screens.md](../design/platform-screens.md), README.md, [TECH_STACK.md](../TECH_STACK.md) and [HOUSE_STYLE.md](../HOUSE_STYLE.md) still apply, and this doc doesn't repeat them. Where this doc, platform.md and a story disagree, stop and flag it. [Conflicts found while writing this doc](#conflicts-with-stories-and-other-docs) lists the ones already known.
 
-Status: waiting for owner approval (CC-5.1).
+Status: approved by the owner on 16 September 2026 (CC-5.1), with the decisions in rows 15 to 19.
 
 ---
 
 ## Contents
 
 - [Decisions at a glance](#decisions-at-a-glance)
-- [Open decisions for the owner](#open-decisions-for-the-owner)
+- [Owner decisions (2026-09-16)](#owner-decisions-2026-09-16)
 - [Words used in this doc](#words-used-in-this-doc)
 - [What phones give us](#what-phones-give-us)
 - [How Wii-style games map to our gestures](#how-wii-style-games-map-to-our-gestures)
@@ -32,7 +32,7 @@ Status: waiting for owner approval (CC-5.1).
 
 ## Decisions at a glance
 
-Approving this doc approves these.
+Approving this doc approves these. Rows 15 to 19 were open choices that the owner decided on 16 September 2026.
 
 | # | Decision | In plain words |
 |---|---|---|
@@ -50,23 +50,23 @@ Approving this doc approves these.
 | 12 | Aim and tilt stream at most 4 messages a second | The phone samples aim 15 times a second and packs up to 4 samples into each message. Tilt is sent only when it changes. |
 | 13 | Tests replay recorded motion | `pnpm trace:record` records real swings on real phones as JSON. Detectors are pure code that unit tests feed with those traces, because Playwright can't fake sensors. |
 | 14 | Screens stay awake | The phone holds the screen wake lock that session-flow.md already keeps on during the menu and every game. If the screen still locks, "Tap to resume" switches the sensors back on. |
+| 15 | Target Range is the first gyroscope game (owner, 2026-09-16) | Then Strike Night as the first swing game. |
+| 16 | The TV crosshair may trail by about 250 ms (owner, 2026-09-16) | Aim stays at 4 messages a second, smoothed on the TV. Hits use the phone's own aim. |
+| 17 | Full power at a firm swing (owner, 2026-09-16) | About 900 degrees a second. Swinging harder adds nothing. |
+| 18 | Keep the page in portrait (owner, 2026-09-16) | Android goes fullscreen and locks portrait. iPhones get a one-line hint to turn on Portrait Orientation Lock. |
+| 19 | No gyroscope, touch for swing, aim and flick (owner, 2026-09-16) | Those phones keep motion for tilt and shake. |
 
 ---
 
-## Open decisions for the owner
+## Owner decisions (2026-09-16)
 
-Each has a recommendation. Everything else in this doc follows from the approved platform, security and session flow docs.
+The owner approved the doc and took the recommendation on all five open choices. Rows 15 to 19 of the table above record them.
 
-1. **Which game tests the gyroscope first?** You asked for a game that really uses the phone's gyroscope. The candidates are Target Range (hold the phone like a bow, aim with the gyroscope, drag to draw, let go to shoot), Duck Season (a fast pointer at moving birds) and Strike Night (swing and twist for spin).
-   **Recommendation: Target Range.** Continuous gyroscope aim is the purest test of the sensor, everyone plays at once so every phone at the party gets tested in one round, and slow bow aiming hides the TV crosshair delay from decision 2. Strike Night follows as the first swing game. Until then, the trace recorder page shows live gyroscope readings for any phone (see [Recording](#recording-cc-59)).
-2. **Is a slightly trailing crosshair on the TV acceptable?** At the approved 4 messages a second, the TV shows each phone's aim about 250 ms behind the hand, smoothed so it glides instead of jumping. Shots and throws are always judged on the aim the phone had at that instant, so it's fair, it just looks a little floaty. The alternative is letting aim games send 15 messages a second, which uses almost 4 times the phone budget. 8 phones aiming at that rate would use up the day's free requests in about 15 minutes.
-   **Recommendation: accept the smoothed 4 per second.** Revisit only if Duck Season feels wrong in its playtest, or if the 20:1 request ratio is ever confirmed on the free plan, which would raise the phone cap to 15 per second anyway (platform.md).
-3. **How hard does a player have to swing for full power?** Option A: speed keeps growing up to the sensor's limit, so the hardest swing always wins. Option B: full power comes at a firm, controlled swing (about 900 degrees a second, a brisk bowling swing), and swinging harder adds nothing.
-   **Recommendation: B.** Wild swings with a phone and no wrist strap are how phones hit TVs. Nintendo still asks players to wear straps and leave room ([Nintendo tips](https://play.nintendo.com/news-tips/tips-tricks/tips-tricks-nintendo-switch-sports/)), and we have no strap. Skill comes from timing, angle and spin instead. Each game may tune the full-power point.
-4. **Should phones stop the screen rotating during motion games?** iPhones can't lock the page to portrait from the browser ([caniuse](https://caniuse.com/mdn-api_screenorientation_lock)). A sideways swing can flip the page to landscape halfway through a game. Android Chrome can lock portrait, but only in fullscreen.
-   **Recommendation: yes, where we can.** On Android, the "Tap to enable motion" tap also enters fullscreen and locks portrait until the game ends. On iPhone, the same screen adds one hint line, "Tip: turn on Portrait Orientation Lock". Motion controllers also stay usable if the page does rotate (see [flow rule 8](#permission-calibration-and-resume-flow)). This adds one line of copy to the approved motion screen.
-5. **What about phones without a gyroscope?** Some cheap Android phones only have an accelerometer. The original Wii Remote also had only an accelerometer and still did bowling and tennis, but Nintendo said it couldn't tell the angle of a swing ([Iwata Asks](https://www.nintendo.com/en-gb/Iwata-Asks/Iwata-Asks-Wii-MotionPlus/Read-more/1-The-Gyro-Sensor-A-New-Sense-Of-Control/1-The-Gyro-Sensor-A-New-Sense-Of-Control-225595.html)). Option A: those phones use the touch fallback for swing, aim and flick, and keep motion for tilt and shake. Option B: build a second, accelerometer-only swing and flick detector.
-   **Recommendation: A.** It is half the tuning work, and the touch fallback already exists and is fair. Build B only if a regular player turns out to have such a phone.
+1. **Target Range is the first gyroscope game, then Strike Night as the first swing game.** Continuous gyroscope aim is the purest test of the sensor. Everyone plays at once, so every phone at the party is tested in one round, and slow bow aiming hides the crosshair delay from decision 2. Until Target Range ships, the trace recorder page shows live gyroscope readings for any phone (see [Recording](#recording-cc-59)).
+2. **The TV crosshair may trail the hand by about 250 ms.** At the approved 4 messages a second the TV plays aim back smoothed, so it glides instead of jumping. Shots and throws are judged on the aim the phone had at that instant, so it stays fair. Sending 15 messages a second instead would let 8 phones use up the day's free requests in about 15 minutes. Revisit only if Duck Season feels wrong in its playtest, or if the 20:1 request ratio is confirmed on the free plan, which raises the phone cap to 15 per second anyway (platform.md).
+3. **Full power comes at a firm, controlled swing.** That's about 900 degrees a second, a brisk bowling swing. Swinging harder adds nothing. Wild swings with a phone and no wrist strap are how phones hit TVs. Nintendo still asks players to wear straps and leave room ([Nintendo tips](https://play.nintendo.com/news-tips/tips-tricks/tips-tricks-nintendo-switch-sports/)), and we have no strap. Skill comes from timing, angle and spin. Each game may tune the full-power point.
+4. **Phones stop the screen rotating where they can.** iPhones can't lock the page to portrait from the browser ([caniuse](https://caniuse.com/mdn-api_screenorientation_lock)), so a sideways swing could flip the page mid-game. On Android, the "Tap to enable motion" tap also enters fullscreen and locks portrait until the game ends. On iPhone, the motion permission screen adds one hint line: "Tip: turn on Portrait Orientation Lock". Motion controllers also stay usable if the page does rotate (see [flow rule 8](#permission-calibration-and-resume-flow)). CC-5.10 builds both.
+5. **Phones without a gyroscope use touch for swing, aim and flick.** They keep motion for tilt and shake, which only need the accelerometer. The original Wii Remote managed bowling with an accelerometer alone, but Nintendo said it couldn't tell the angle of a swing ([Iwata Asks](https://www.nintendo.com/en-gb/Iwata-Asks/Iwata-Asks-Wii-MotionPlus/Read-more/1-The-Gyro-Sensor-A-New-Sense-Of-Control/1-The-Gyro-Sensor-A-New-Sense-Of-Control-225595.html)). Accelerometer-only swing and flick detectors would double the tuning work, and the touch fallback is already fair. Build them only if a regular player turns out to have such a phone.
 
 ---
 
@@ -122,7 +122,7 @@ What that means for us: always call `requestPermission()` when it exists, on any
 |---|---|
 | Generic Sensor API (`Gyroscope`, `Accelerometer`, `RelativeOrientationSensor`) | Chromium only. Safari and Firefox don't have it, and the spec itself says it won't become a standard without a second engine ([W3C](https://w3c.github.io/sensors/), [MDN data](https://github.com/mdn/browser-compat-data/blob/main/api/Accelerometer.json)). It's also capped at 60 Hz, so nothing is gained. |
 | `deviceorientation` angles | Alpha drifts or jumps with the compass, beta and gamma suffer gimbal lock near vertical, and Samsung Internet once returned absolute values where relative ones were expected ([MDN data](https://github.com/mdn/browser-compat-data/blob/main/api/DeviceOrientationEvent.json), [spec](https://w3c.github.io/deviceorientation/)). We integrate the rotation rate ourselves and correct tilt with gravity, like the Wii MotionPlus did. |
-| `screen.orientation.lock()` on iPhone | Not supported in Safari for iOS. Chrome for Android supports it, usually only in fullscreen ([caniuse](https://caniuse.com/mdn-api_screenorientation_lock), [MDN](https://developer.mozilla.org/en-US/docs/Web/API/ScreenOrientation/lock)). See [open decision 4](#open-decisions-for-the-owner). |
+| `screen.orientation.lock()` on iPhone | Not supported in Safari for iOS. Chrome for Android supports it, usually only in fullscreen ([caniuse](https://caniuse.com/mdn-api_screenorientation_lock), [MDN](https://developer.mozilla.org/en-US/docs/Web/API/ScreenOrientation/lock)). See [owner decision 4](#owner-decisions-2026-09-16). |
 | Vibration for motion feedback | Safari for iOS has no Vibration API ([caniuse](https://caniuse.com/vibration)). |
 | WebDriver virtual sensors in E2E | The spec defines virtual sensors for automation ([spec](https://w3c.github.io/deviceorientation/#automation)), but we also test WebKit in Playwright. One fake adapter works everywhere. |
 
@@ -239,7 +239,7 @@ sequenceDiagram
 5. **Wake lock.** session-flow.md decision 9 keeps the screen wake lock on during the menu and every game (CC-5.10 builds it). The motion step's enable tap and every resume tap request it again with `navigator.wakeLock.request("screen")` if the API exists, because the browser drops the lock whenever the page is hidden. Where the API is missing, nothing else is tried. No looping hidden video tricks.
 6. **Resume.** When the page comes back from `hidden` during a motion game, the controller covers the screen with the approved "Tap to resume" big action. The tap restarts the adapter and the wake lock. Calibration from before the sleep is kept. Aim recentres at the player's next turn or draw.
 7. **Mid-game denial.** If the adapter reports no samples for 2 seconds while the page is visible, the controller switches that player to the fallback for the rest of the game and sends `motion:status { status: "unsupported" }`.
-8. **Orientation.** Motion maths uses the device frame, which ignores page rotation, so gestures work whatever the page does. During a motion game the controller doesn't show the "rotate your phone" error screen, and motion controllers are laid out so a single centred grip or pad works in either orientation. See [open decision 4](#open-decisions-for-the-owner) for locking portrait.
+8. **Orientation.** Motion maths uses the device frame, which ignores page rotation, so gestures work whatever the page does. During a motion game the controller doesn't show the "rotate your phone" error screen, and motion controllers are laid out so a single centred grip or pad works in either orientation. See [owner decision 4](#owner-decisions-2026-09-16) for locking portrait.
 
 ---
 
@@ -313,7 +313,7 @@ For Strike Night, Putt Club, Dinger Derby and Bandeja.
 1. The detector only listens while the grip is held (`mark({ type: "grip-down" | "grip-up", t })`). On grip-down it captures the current pose as the swing's reference, so forward means forward at that moment.
 2. A swing starts when the rotation rate magnitude passes 120 deg/s and ends when it stays under 60 deg/s for 100 ms, or at grip-up.
 3. The peak is the sample with the highest rotation rate magnitude. A swing whose peak is under `minPeak` (240 deg/s, game may tune) emits nothing.
-4. `speed = clamp((peak − minPeak) / (fullPeak − minPeak), 0, 1)`, with `fullPeak` 900 deg/s (game may tune). See [open decision 3](#open-decisions-for-the-owner).
+4. `speed = clamp((peak − minPeak) / (fullPeak − minPeak), 0, 1)`, with `fullPeak` 900 deg/s (game may tune). See [owner decision 3](#owner-decisions-2026-09-16).
 5. `angle`: linear acceleration rotated into the reference frame and summed over the 200 ms before the peak gives a velocity direction. `angle = atan2(v.X, v.Y)` in degrees.
 6. `spin`: mean rotation rate around the device `y` axis (`rotationRate.beta`) over the 120 ms up to the peak, divided by 540 deg/s, clamped.
 7. **When it emits** (game config `emitOn`):
@@ -358,7 +358,7 @@ For Target Range, Double Top and Duck Season.
 - It sends through the CC-3.6 input stream (`set`, see session-flow.md), which allows at most 4 messages per second. The value is the rolling window of the latest samples, as `aim: [[dtMs, yaw, pitch], …]`, at most 4 of them, newest last. `dtMs` is each sample's offset from the input's `at`, so it is 0 for the newest and negative for older ones. The stream's latest-wins rule means each message carries the samples taken since the last one. Four samples are about 60 bytes.
 - A sample that moved less than 0.01 from the last one sent is skipped. A phone held still sends nothing.
 - Only the player whose turn it is streams aim in turn-based games (Double Top). Simultaneous games (Target Range, Duck Season) stream for every player who is aiming.
-- The TV plays the samples back about 250 ms behind, so the crosshair moves smoothly rather than in 4 jumps a second. See [open decision 2](#open-decisions-for-the-owner) and [conflicts](#conflicts-with-stories-and-other-docs).
+- The TV plays the samples back about 250 ms behind, so the crosshair moves smoothly rather than in 4 jumps a second. See [owner decision 2](#owner-decisions-2026-09-16) and [conflicts](#conflicts-with-stories-and-other-docs).
 
 **Touch fallback: drag** (`fallbacks/aim.ts`)
 
@@ -479,7 +479,7 @@ Rules:
 People will swing phones in a living room. The design keeps that calm:
 
 1. **Grip-hold.** Swings and flicks only count while the thumb holds the grip. The grip is the big action circle from the house style, in the lower half of the screen, at least 56 px. Holding it forces a firm grip. A dropped grip mid-swing is a bowling release, never a thrown phone, because no gesture needs the phone to leave the hand.
-2. **Full power at a firm swing.** Speed and power max out at a controlled swing (900 deg/s for swings, 1,200 deg/s for flicks), so swinging wildly gains nothing. See [open decision 3](#open-decisions-for-the-owner).
+2. **Full power at a firm swing.** Speed and power max out at a controlled swing (900 deg/s for swings, 1,200 deg/s for flicks), so swinging wildly gains nothing. See [owner decision 3](#owner-decisions-2026-09-16).
 3. **Copy.** The approved permission screen says "Hold on tight." Game specs add a one-line space reminder on the first motion turn, in the referee voice, for example "Room to swing? Go for it."
 4. **Touch is always allowed.** "Use touch instead" is on the permission screen for anyone who'd rather not swing, for any reason.
 5. **No vibration dependency.** Haptics stay a bonus (HOUSE_STYLE). iPhones don't vibrate from the browser.
@@ -558,7 +558,7 @@ Found while writing this doc. None changes a decision the owner already approved
 | 4 | Approved motion-denied screen | The hint "Want motion? Allow it when the next game asks." may be wrong on iPhone, where WebKit returns the saved denial without asking again | CC-5.10 checks it on a real iPhone first | If the next game doesn't ask again, CC-5.10 proposes the recovery that works (for example "close this tab and join again") for a one-line owner OK |
 | 5 | Dinger Derby and Bandeja epics | They name a "tap fallback", while CC-5.4 names a swipe fallback | `fallbacks/swing.ts` offers both, and the game spec picks one | None. Inside CC-5.4's References. |
 | 6 | CC-5.9 References | Starting a dev page from `pnpm trace:record` needs a `trace:record` script in `apps/controller/package.json` and a Vite config for the recorder, both outside the listed folders | The recorder's Vite config and save endpoint live in `apps/controller/src/dev/trace-recorder/`. Only the script line touches `package.json`. | Add `apps/controller/package.json` to CC-5.9's References |
-| 7 | Open decision 4 | Adds a hint line to the approved motion screen | Only if the owner approves decision 4 | None |
+| 7 | Owner decision 4 | Adds a hint line to the approved motion permission screen | Approved by the owner on 16 September 2026 | CC-5.10 adds the line |
 
 ---
 

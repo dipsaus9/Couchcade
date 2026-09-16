@@ -1,10 +1,10 @@
 ---
 id: CC-5.1
 title: Write the motion controls design doc
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-16 16:36'
+updated_date: '2026-09-16 16:41'
 labels:
   - story
   - owner-gate
@@ -30,7 +30,7 @@ Branch: CC-5.1/motion-design-doc
 <!-- AC:BEGIN -->
 - [x] #1 docs/architecture/motion.md covers sensor choice (devicemotion on both platforms, rotationRate first), iOS permission UX, calibration, safety (grip-hold), trace format
 - [x] #2 It defines event contracts with fields and units for swing, aim, flick, tilt and shake, plus the touch fallback for each
-- [ ] #3 Owner approval is recorded in the task notes as "Approved by owner: <YYYY-MM-DD>" before the story is Done
+- [x] #3 Owner approval is recorded in the task notes as "Approved by owner: <YYYY-MM-DD>" before the story is Done
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -59,4 +59,12 @@ Research findings (2026-09-16), sources in docs/architecture/motion.md:
 Review (dipsaus-ai:story-reviewer, round 1): criteria 1 and 2 met, no scope violations, no findings. Criterion 3 is the owner gate and stays pending; the mechanical block is only that gate. Status stays In Progress until the owner approves.
 
 Review round 2 (after merging origin/main with session-flow.md and aligning to its CC-3.6 set/fire input stream, wake lock scope and motion-check transition): criteria 1 and 2 met, no scope violations, no findings. Criterion 3 is the owner gate.
+
+Approved by owner: 2026-09-16
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Wrote docs/architecture/motion.md, the motion controls design for CC-5.2 to CC-5.10: devicemotion on iPhone and Android with the gyroscope first and no compass or Generic Sensor API; permission requested inside a tap (iOS, and Chrome now too); 1-second rest calibration with a motion frame, pose tracker and runtime gravity-sign detection; event contracts with fields and units for swing, aim, flick, tilt and shake, each with a touch fallback of the same shape; the fit with the 4 inputs per second budget through the CC-3.6 set/fire stream; grip-hold safety; and trace format v1 for trace:record fixtures. All claims are sourced. The owner approved the doc on 2026-09-16, taking all five recommendations: Target Range is the first gyroscope game and Strike Night the first swing game, a smoothed TV crosshair about 250 ms behind at 4 messages/s, full power at about 900 deg/s, fullscreen plus a portrait lock on Android and a Portrait Orientation Lock hint on iPhone, and touch for swing/aim/flick on phones without a gyroscope. The doc's conflicts table lists follow-ups for other stories.
+<!-- SECTION:FINAL_SUMMARY:END -->
