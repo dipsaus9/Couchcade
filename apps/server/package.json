@@ -8,6 +8,7 @@
     "dev": "vite",
     "typecheck": "tsc",
     "test": "vitest run",
+    "build": "rm -rf dist/public && mkdir -p dist/public && cp -R ../controller/dist/. dist/public/ && cp -R ../host/dist dist/public/host",
     "deploy": "wrangler deploy"
   },
   "dependencies": {
@@ -20,6 +21,8 @@
     "@cloudflare/vitest-plugin": "catalog:",
     "@cloudflare/workers-types": "catalog:",
     "@couchcade/config": "workspace:*",
+    "@couchcade/controller": "workspace:*",
+    "@couchcade/host": "workspace:*",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:",
