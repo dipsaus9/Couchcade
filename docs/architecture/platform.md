@@ -63,7 +63,7 @@ These are settled by the README, TECH_STACK, the CC-1.3 spike, the owner or this
 | Relay | The Worker plus the Room Durable Object (`apps/server`). |
 | Room | One Room Durable Object, named by its 4-letter code. |
 | Player | A phone with a seat (slot 0 to 7, one colour and shape each). |
-| Audience | A phone without a seat, the 9th joiner and later. |
+| Audience | A phone without a seat, the 9th to 16th joiner. A room holds at most 16 phones (8 players + 8 audience); the 17th join gets `409 room-full` (owner decision, 16 September 2026). |
 | VIP | The connected player who joined first. Picks games and starts them. |
 | Ticket | A signed token, valid 60 seconds, that allows one WebSocket connection. |
 | Rejoin token | A signed token kept in `sessionStorage` that swaps for a fresh ticket after a disconnect. |
@@ -397,7 +397,7 @@ Bodies and responses are JSON, with schemas in `@couchcade/protocol`. Every erro
 | Endpoint | Body | Success | Errors |
 |---|---|---|---|
 | `POST /api/rooms` | `{ passcode, turnstile }` | 201 `{ code, ticket, rejoinToken }` | 401 wrong passcode, 403 Turnstile, 429 |
-| `POST /api/rooms/:code/join` | `{ name, turnstile, profile? }` | 200 `{ playerId, name, ticket, rejoinToken }` | 400 name, 403 Turnstile, 404 no room or TV away, 423 locked, 429 |
+| `POST /api/rooms/:code/join` | `{ name, turnstile, profile? }` | 200 `{ playerId, name, ticket, rejoinToken }` | 400 name, 403 Turnstile, 404 no room or TV away, 409 room-full (16 phones), 423 locked, 429 |
 | `POST /api/rooms/:code/rejoin` | `{ rejoinToken }` | 200 `{ ticket }` | 401 invalid token, 429 |
 
 Turnstile (CC-2.2), rate limits (CC-2.3) and name rules (CC-2.4) plug into these endpoints. Security details live in `docs/architecture/security.md` (CC-2.1).
@@ -460,7 +460,7 @@ Step by step:
 1. **Create.** The Worker checks the passcode and Turnstile, picks a code with `roomCode()` from `@couchcade/utils`, and calls `/internal/create`. If that room is already active, it picks another code, up to 5 attempts.
 2. **Show.** The host connects, then shows a QR code for `https://<origin>/?room=CODE` and the code in the room code panel.
 3. **Join.** The phone opens `/?room=CODE` with the code filled in, or the player types it. The player enters a name. The Worker normalises and checks the name, checks Turnstile, asks the room for its status, creates a player id and returns a ticket and a rejoin token.
-4. **Seat.** On connect the room gives the player the lowest free slot (0 to 7). When all 8 slots are taken or reserved for a disconnected player, the phone joins with `slot: null` as audience.
+4. **Seat.** On connect the room gives the player the lowest free slot (0 to 7). When all 8 slots are taken or reserved for a disconnected player, the phone joins with `slot: null` as audience. When 16 phones (8 players and 8 audience) are already in the room, the Worker refuses the join with `409 room-full`; the owner decided this on 16 September 2026.
 5. **Late join.** A player who joins during `playing` gets a seat and waits on the `next-game` screen. Games only receive players at `init`. The owner decided this on 16 September 2026.
 6. **VIP.** The connected player with the lowest `joinedAt` is the VIP. When the VIP leaves, the next one takes over. The host decides this, not the relay.
 
