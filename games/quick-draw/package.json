@@ -6,24 +6,30 @@
   "type": "module",
   "sideEffects": false,
   "scripts": {
-    "typecheck": "tsc",
+    "typecheck": "vue-tsc",
     "test": "playwright install chromium-headless-shell && vitest run"
   },
   "dependencies": {
     "@couchcade/game-sdk": "workspace:*",
     "@couchcade/protocol": "workspace:*",
     "@couchcade/theme": "workspace:*",
+    "@couchcade/ui": "workspace:*",
     "@couchcade/utils": "workspace:*",
     "phaser": "catalog:",
+    "vue": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@couchcade/config": "workspace:*",
+    "@vitejs/plugin-vue": "catalog:",
     "@vitest/browser-playwright": "catalog:",
+    "@vue/test-utils": "catalog:",
     "fast-check": "catalog:",
+    "jsdom": "^28.0.0",
     "playwright": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "vue-tsc": "catalog:"
   }
 }
