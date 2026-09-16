@@ -81,4 +81,6 @@ Arithmetic, on the safe assumption that every incoming message is a full Durable
 - If the dashboard proves 20:1 on Free, TECH_STACK's 15 per second stays valid (worst case 972,000 messages / 20 = 48,600 requests). Make the rate a single config constant so it can be raised.
 
 Implication outside CC-3.6: host-to-relay messages also count 1:1. A per-tick controller:state from the host at 10 per second would be 72,000 per 2 hours by itself, so the host send rate needs its own cap (follow-up).
+
+Correction to the rate-limit note: the exact total is 151 allowed out of 271 hits between 15:02:28Z and 15:04:45Z (22 + 22 + 4 x 22 + 0 + 19), against a configured limit of 10 per 60 s.
 <!-- SECTION:NOTES:END -->
