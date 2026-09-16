@@ -1,14 +1,15 @@
-import type { Page, WebSocketRoute } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import { expect, test } from "../src/fixtures.ts";
 import { joinRoom, openRoom } from "../src/flows.ts";
 
 // Bots play a whole Quick Draw match (docs/games/quick-draw.md): one TV, two phones, first to 3.
 //
-// Two gaps in the apps are bridged here, in the test only:
-// - Phones have no Start button yet (CC-3.2 and CC-4.8 add the game menu). The VIP's own relay
-//   socket carries `ui:action start` instead, through the real relay and host runtime.
-// - The phone never shows DRAW!, only the TV does. The bots watch the TV's game state: the spec
-//   wraps the host's stage in the Vite dev build to read the running game's state.
+// The match starts the way people start it: the VIP taps "Choose a game", then Quick Draw, and the
+// TV counts down from 3 (docs/architecture/session-flow.md, "Game menu").
+//
+// One gap in the apps is bridged here, in the test only: the phone never shows DRAW!, only the TV
+// does. The bots watch the TV's game state: the spec wraps the host's stage in the Vite dev build
+// to read the running game's state.
 
 /** How long each bot takes to react once the TV shows DRAW!. Valid taps land 100 to 1,500 ms in. */
 const reactionMs = { fast: 250, slow: 900 };
@@ -48,20 +49,6 @@ function tvState(host: Page): Promise<TvState | null> {
   return host.evaluate(() => window.__quickDrawState?.() ?? null);
 }
 
-/** Keeps the phone's latest relay socket, so the test can send on it as that phone. */
-async function captureRelaySocket(phone: Page): Promise<() => WebSocketRoute> {
-  let server: WebSocketRoute | null = null;
-  await phone.routeWebSocket(/\/ws\//, (socket) => {
-    server = socket.connectToServer();
-  });
-  // The route only covers pages loaded after it was added, and the phone is already open.
-  await phone.reload();
-  return () => {
-    if (!server) throw new Error("the phone has no relay socket");
-    return server;
-  };
-}
-
 /** Waits for DRAW! on the TV, then taps the fast bot first and the slow bot later. */
 async function playRound(host: Page, fast: Page, slow: Page, round: number): Promise<void> {
   // Fakes happen during `standoff` and never move the game to `draw`, so the bots never tap one.
@@ -87,7 +74,6 @@ test("two bots play a full match and the faster one wins", async ({ host, phones
   const code = await openRoom(host);
   const [ana, ben] = await phones(2);
   if (!ana || !ben) throw new Error("expected two phones");
-  const vipSocket = await captureRelaySocket(ana);
 
   // Ana joins first, so she is the VIP.
   await joinRoom(ana, code, "Ana");
@@ -95,9 +81,17 @@ test("two bots play a full match and the faster one wins", async ({ host, phones
   await expect(host.getByRole("region", { name: "Players" }).getByText("2/8")).toBeVisible();
 
   await watchTv(host);
-  vipSocket().send(JSON.stringify({ t: "ui:action", d: { action: "start" } }));
 
-  // The host registry picked Quick Draw, and both phones load its controller.
+  // Ana opens the game menu on her phone. The TV shows it, and Ben waits for her pick.
+  await ana.getByRole("button", { name: "Choose a game" }).tap();
+  const tvMenu = host.getByRole("region", { name: "Game menu" });
+  await expect(tvMenu.getByText("Quick Draw", { exact: true })).toBeVisible();
+  await expect(ben.getByText("Ana is choosing a game.")).toBeVisible();
+
+  // Ana picks Quick Draw. The TV counts down from 3, then the game starts and both phones load
+  // its controller.
+  await ana.getByRole("button", { name: "Quick Draw" }).tap();
+  await expect(tvMenu.getByText("Starting in")).toBeVisible();
   await expect.poll(async () => (await tvState(host))?.round).toBe(1);
   for (const phone of [ana, ben]) {
     await expect(phone.getByRole("status")).toHaveText("Round 1 · first to 3");

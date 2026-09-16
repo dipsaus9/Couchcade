@@ -7,6 +7,7 @@ import {
 } from "@couchcade/protocol";
 import type { JoinFailure } from "../join/api.ts";
 import type { JoinDraft } from "../join/form.ts";
+import { parseMenuView } from "../screens/menu/menu-view.ts";
 import type { StoredSession } from "./storage.ts";
 
 /** Why the phone left a room for good. The phone doesn't reconnect after any of these. */
@@ -51,8 +52,8 @@ export type PhoneEvent =
   | { type: "message"; message: RelayToPhoneMessage }
   | { type: "ended"; reason: EndReason };
 
-/** Which screen the phone shows. Game controllers arrive with CC-1.16. */
-export type PhoneScreen = "join" | "connecting" | "lobby" | "waiting";
+/** Which screen the phone shows. `showsGameController` decides about game controllers. */
+export type PhoneScreen = "join" | "connecting" | "lobby" | "menu" | "waiting";
 
 /**
  * The first state after the page loads. A stored session for the same room resumes it: a reload
@@ -140,7 +141,13 @@ export function screenOf(state: PhoneState): PhoneScreen {
   if (state.status !== "room") return state.status;
   const { view, gameId, phase } = state;
   if (view === null) return phase === "lobby" ? "lobby" : "waiting";
-  return gameId === null && view.screen === "lobby" ? "lobby" : "waiting";
+  if (gameId !== null) return "waiting";
+  if (view.screen === "lobby") return "lobby";
+  // Picking needs the socket and the TV. Until both are back, the waiting screen says why.
+  if (view.screen === "menu" && state.online && state.hostConnected && parseMenuView(view.data)) {
+    return "menu";
+  }
+  return "waiting";
 }
 
 const endReasonByCloseCode: Record<number, EndReason> = {

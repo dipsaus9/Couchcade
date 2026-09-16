@@ -5,6 +5,8 @@ import GameController from "./runtime/GameController.vue";
 import { showsGameController } from "./runtime/controller.ts";
 import JoinScreen from "./screens/join/JoinScreen.vue";
 import LobbyScreen from "./screens/lobby/LobbyScreen.vue";
+import { isVipLobby, parseMenuView } from "./screens/menu/menu-view.ts";
+import MenuScreen from "./screens/menu/MenuScreen.vue";
 import { waitingCopy } from "./screens/waiting/copy.ts";
 import WaitingScreen from "./screens/waiting/WaitingScreen.vue";
 import { createPhoneSession } from "./session/session.ts";
@@ -13,6 +15,11 @@ import { screenOf } from "./session/state.ts";
 const session = createPhoneSession();
 const state = session.state;
 const screen = computed(() => screenOf(state.value));
+const menuView = computed(() =>
+  state.value.status === "room" && state.value.view !== null && screen.value === "menu"
+    ? parseMenuView(state.value.view.data)
+    : null,
+);
 
 onBeforeUnmount(() => session.dispose());
 </script>
@@ -33,7 +40,10 @@ onBeforeUnmount(() => session.dispose());
       :code="state.session.code"
       :host-connected="state.hostConnected"
       :online="state.online"
+      :vip="isVipLobby(state.view)"
+      @send="session.send"
     />
+    <MenuScreen v-else-if="menuView" :view="menuView" @send="session.send" />
     <GameController
       v-else-if="showsGameController(state)"
       :state="state"

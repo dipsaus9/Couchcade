@@ -110,6 +110,9 @@ importers:
       '@couchcade/theme':
         specifier: workspace:*
         version: link:../../packages/theme
+      '@couchcade/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       '@couchcade/utils':
         specifier: workspace:*
         version: link:../../packages/utils

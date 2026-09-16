@@ -154,8 +154,43 @@ describe("lobby", () => {
     expect(waitingCopy(choosing)).toEqual({
       title: "Watch the TV",
       body: "The VIP is choosing a game.",
+      hint: "Your controller shows up here when it starts.",
     });
     expect(screenOf(reduce(lobby, game))).toBe("waiting");
+  });
+
+  it("names the VIP while they choose and shows the menu only to the phone that gets it", () => {
+    const choosing = inRoom(
+      reduce(
+        lobby,
+        message({
+          t: "controller:state",
+          d: { gameId: null, view: { screen: "vip-choosing", data: { name: "Noor" } } },
+        }),
+      ),
+    );
+    expect(waitingCopy(choosing).body).toBe("Noor is choosing a game.");
+
+    const menuView = message({
+      t: "controller:state",
+      d: {
+        gameId: null,
+        view: {
+          screen: "menu",
+          data: { games: [["quick-draw", "Quick Draw", 1]], picked: null, startsAt: null },
+        },
+      },
+    });
+    const menu = inRoom(reduce(lobby, menuView));
+    expect(screenOf(menu)).toBe("menu");
+    expect(screenOf({ ...menu, hostConnected: false })).toBe("waiting");
+    expect(screenOf({ ...menu, online: false })).toBe("waiting");
+
+    const broken = message({
+      t: "controller:state",
+      d: { gameId: null, view: { screen: "menu", data: { games: "nope" } } },
+    });
+    expect(screenOf(reduce(lobby, broken))).toBe("waiting");
   });
 
   it("waits when it joins a room that isn't in the lobby phase", () => {
