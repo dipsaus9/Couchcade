@@ -41,6 +41,7 @@ catalog:
   partyserver: ~0.5.10
   partysocket: ^1.3.0
   nipplejs: ^1.0.4
+  uqr: ^0.1.3 # QR codes on the TV lobby (MIT, no dependencies)
   planck: ^1.5.0
 
   # Testing, budgets and boundaries
