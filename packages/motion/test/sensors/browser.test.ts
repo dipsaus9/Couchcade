@@ -174,16 +174,20 @@ describe("samples", () => {
     expect(other).toHaveBeenCalledTimes(1);
   });
 
-  it("starts a listener only once however often it is started", () => {
+  it("starts a listener only once however often it is started, with one stop()", () => {
     const page = createFakePage();
     const adapter = createBrowserAdapter(page.env);
     const listener = vi.fn<(sample: MotionSample) => void>();
 
-    adapter.start(listener);
-    adapter.start(listener);
+    const stop = adapter.start(listener);
+    expect(adapter.start(listener)).toBe(stop);
     page.fire(gyroEvent(1));
-
     expect(listener).toHaveBeenCalledTimes(1);
+
+    stop();
+    page.fire(gyroEvent(2));
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(page.motionListenerCount()).toBe(0);
   });
 });
 

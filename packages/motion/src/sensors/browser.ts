@@ -75,17 +75,19 @@ export function browserMotionEnv(): BrowserMotionEnv {
  * - When the page is hidden, the adapter removes that listener and keeps the started listeners.
  *   It doesn't add it back by itself (motion.md adapter rule 5). Once the page is visible again,
  *   the "Tap to resume" handler calls `request()` and `start()`, and every started listener gets
- *   samples again. Starting a listener that is already started doesn't add it twice.
+ *   samples again. Starting a listener that is already started doesn't add it twice and returns
+ *   the same `stop()`.
  */
 export function createBrowserAdapter(env: BrowserMotionEnv = browserMotionEnv()): MotionAdapter {
-  const listeners = new Set<MotionListener>();
+  // Each started listener with its stop(). Starting it again returns the same stop().
+  const listeners = new Map<MotionListener, () => void>();
   let listening = false;
   let best: MotionCapability = "none";
 
   const onMotion: DeviceMotionHandler = (event) => {
     const sample = toMotionSample(event);
     best = bestCapability(best, sampleCapability(sample));
-    for (const listener of listeners) listener(sample);
+    for (const listener of listeners.keys()) listener(sample);
   };
 
   const listen = () => {
@@ -126,20 +128,22 @@ export function createBrowserAdapter(env: BrowserMotionEnv = browserMotionEnv())
     },
 
     start(listener) {
+      if (env.document.visibilityState !== "hidden") listen();
+      const started = listeners.get(listener);
+      if (started) return started;
+
       if (listeners.size === 0) {
         env.document.addEventListener("visibilitychange", onVisibilityChange);
       }
-      listeners.add(listener);
-      if (env.document.visibilityState !== "hidden") listen();
-
-      let stopped = false;
-      return () => {
-        if (stopped) return;
-        stopped = true;
-        if (!listeners.delete(listener) || listeners.size > 0) return;
+      const stop = () => {
+        if (listeners.get(listener) !== stop) return;
+        listeners.delete(listener);
+        if (listeners.size > 0) return;
         pause();
         env.document.removeEventListener("visibilitychange", onVisibilityChange);
       };
+      listeners.set(listener, stop);
+      return stop;
     },
 
     capability: () => best,
