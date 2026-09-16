@@ -19,6 +19,12 @@ export const calloutStyle = {
   shake: metrics.outline,
 } as const;
 
+/**
+ * Phaser eases for the theme motion tokens the callout uses. `pop` is the `celebrate` pop-in: it
+ * overshoots and settles. The reduced motion fade is linear.
+ */
+const phaserEase: Record<string, string> = { pop: "Back.Out" };
+
 export interface CalloutOptions {
   /** Centre of the callout. Defaults to the centre of the world. */
   x?: number;
@@ -92,7 +98,7 @@ export class Callout extends GameObjects.Text {
         targets: this,
         scale: 1,
         duration: motion.celebrate.ms,
-        ease: "Back.Out",
+        ease: phaserEase[motion.celebrate.ease] ?? "Back.Out",
       });
       if (this.#shake) {
         cameras.main.shake(
