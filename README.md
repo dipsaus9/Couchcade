@@ -90,7 +90,7 @@ Fourteen games are planned. Each has its own epic in the backlog, and the names 
 
 | Game | Inspired by | Phone input | Players | Epic |
 |---|---|---|---|---|
-| **Quick Draw** | 1-2-Switch "Quick Draw", Kirby Super Star "Samurai Kirby" | Tap when the TV shouts DRAW; early is a foul | 2 (duel), up to 8 as a bracket | CC-10 |
+| **Quick Draw** | 1-2-Switch "Quick Draw", Kirby Super Star "Samurai Kirby" | Tap when the TV shouts DRAW; early is a foul | 2 to 8, everyone draws at once | CC-10 |
 | **Target Range** | Wii Sports Resort "Archery" | Aim with the phone like a bow, drag down to draw, let go to shoot | 1–8 at once | CC-11 |
 | **Strike Night** | Wii Sports "Bowling" | Hold the grip, swing, release; twist for spin | 1–4 in turns | CC-12 |
 | **Putt Club** | Wii Sports "Golf" putting, Mario Golf | Hold the grip and swing like a putter | 1–4 in turns | CC-13 |
@@ -371,7 +371,7 @@ Couchcade has no accounts, no chat, no email forms and no stored user content, s
 | Threat | Defence |
 |---|---|
 | Strangers or bots creating rooms | Host passcode required to create a room, rate-limited passcode attempts, Turnstile, 3 rooms per IP per minute, 1 active room per host session |
-| Guessing room codes | Turnstile on join, 10 join attempts per IP per minute, codes only valid while the host is connected, interactive challenge after 3 wrong codes |
+| Guessing room codes | Turnstile on join, 20 join attempts per IP per minute (every phone at a party shares one Wi-Fi IP), codes only valid while the host is connected |
 | Direct WebSocket connections | Signed HMAC ticket required (60-second expiry, bound to room and role); `Origin` must match |
 | Message flooding | Per-socket token bucket (20/s, burst 40); violators are disconnected and their reconnect token is revoked |
 | Malformed or oversized messages | 1 KB cap and schema validation; invalid messages are dropped |
