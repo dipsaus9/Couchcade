@@ -1,3 +1,4 @@
+import { choosingName } from "../menu/menu-view.ts";
 import type { PhoneState } from "../../session/state.ts";
 
 export interface WaitingCopy {
@@ -25,7 +26,12 @@ export function waitingCopy(state: Exclude<PhoneState, { status: "join" }>): Wai
     return { title: "Waiting for the TV", body: "The TV is reconnecting. Keep this page open." };
   }
   if (state.gameId === null && state.view?.screen === "vip-choosing") {
-    return { title: "Watch the TV", body: "The VIP is choosing a game." };
+    const name = choosingName(state.view);
+    return {
+      title: "Watch the TV",
+      body: name === null ? "The VIP is choosing a game." : `${name} is choosing a game.`,
+      hint: "Your controller shows up here when it starts.",
+    };
   }
   return {
     title: "Watch the TV",

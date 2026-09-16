@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import type { PlayerInfo } from "@couchcade/protocol";
+import type { PhoneToRelayMessage, PlayerInfo } from "@couchcade/protocol";
+import { CcButton } from "@couchcade/ui";
 import { computed } from "vue";
 import PlayerShape from "../../components/PlayerShape.vue";
 import { lookForSlot } from "../../session/look.ts";
+import { menuActions } from "../menu/menu-view.ts";
 
 // The phone in the lobby: its name, colour and shape (docs/design/platform-screens.md, "Lobby").
-// The Pip customiser (CC-6.5) and the VIP's game button (CC-3.2) come later; CC-4.8 restyles it.
+// The VIP also gets "Choose a game" and "Surprise me" (CC-3.2). The Pip customiser (CC-6.5) comes
+// later; CC-4.8 restyles it.
 
 const props = defineProps<{
   you: PlayerInfo;
@@ -13,7 +16,10 @@ const props = defineProps<{
   code: string;
   hostConnected: boolean;
   online: boolean;
+  /** True when the host made this phone the VIP. */
+  vip: boolean;
 }>();
+const emit = defineEmits<{ send: [message: PhoneToRelayMessage] }>();
 
 const look = computed(() => (props.role === "player" ? lookForSlot(props.you.slot) : null));
 </script>
@@ -43,6 +49,14 @@ const look = computed(() => (props.role === "player" ? lookForSlot(props.you.slo
       </template>
       <p v-if="!online" class="body">Reconnecting you as {{ you.name }}. Keep this page open.</p>
       <p v-else-if="!hostConnected" class="body">Waiting for the TV. Keep this page open.</p>
+    </div>
+
+    <div v-if="vip && look && online && hostConnected" class="vip">
+      <p class="body">You're the VIP. Pick the first game when everyone's in.</p>
+      <CcButton variant="primary" block @press="emit('send', menuActions.chooseGame())">
+        Choose a game
+      </CcButton>
+      <CcButton block @press="emit('send', menuActions.surpriseMe())">Surprise me</CcButton>
     </div>
 
     <p class="footnote">Room {{ code }}. The first player starts the game.</p>
@@ -109,6 +123,12 @@ const look = computed(() => (props.role === "player" ? lookForSlot(props.you.slo
 .body {
   margin: 0;
   font-size: var(--cc-text-body-phone);
+}
+
+.vip {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cc-space-3);
 }
 
 .footnote {

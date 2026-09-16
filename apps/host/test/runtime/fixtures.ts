@@ -79,6 +79,19 @@ export function startAction(from: string): RelayToHostMessage {
   return { t: "ui:action", from, d: { action: "start" } };
 }
 
+/** `pick-game` for `gameId`, or "Surprise me" without one. */
+export function pickAction(from: string, gameId?: string): RelayToHostMessage {
+  const d =
+    gameId === undefined
+      ? { action: "pick-game" as const }
+      : { action: "pick-game" as const, value: gameId };
+  return { t: "ui:action", from, d };
+}
+
+export function backAction(from: string): RelayToHostMessage {
+  return { t: "ui:action", from, d: { action: "back-to-menu" } };
+}
+
 /** Virtual time: a clock and a scheduler that only move when a test advances them. */
 export function createVirtualTime(start = 0) {
   let now = start;
