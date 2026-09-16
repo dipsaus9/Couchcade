@@ -142,7 +142,8 @@ describe("join", () => {
     expect(newerWelcome.d.you).toMatchObject({
       slot: (olderWelcome.d.you as { slot: number }).slot,
     });
-    await host.expect("player:joined");
+    // The host already knows the player, and re-sends their view to the newer tab.
+    expect(await host.expect("player:reconnected")).toMatchObject({ d: { id: identity.playerId } });
     expect(await host.drain()).toEqual([]);
   });
 
@@ -331,13 +332,13 @@ describe("leave", () => {
     expect(await host.drain()).toEqual([]);
   });
 
-  it("frees the seat of a phone that left", async () => {
+  it("frees the seat of a phone that left the room at once", async () => {
     const code = await createRoom();
     const host = await connectHost(code);
     const first = await joinPhone(code, host);
     await joinPhone(code, host);
 
-    first.socket.close();
+    first.socket.send({ t: "player:leave", d: {} });
     await host.expect("player:left");
     const next = await joinPhone(code, host);
     expect((next.welcome.you as { slot: number }).slot).toBe(0);
@@ -350,7 +351,7 @@ describe("leave", () => {
     const older = await connect(code, identity);
     await host.expect("player:joined");
     await connect(code, identity);
-    await host.expect("player:joined");
+    await host.expect("player:reconnected");
 
     await older.closed;
     expect(await host.drain()).toEqual([]);
