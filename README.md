@@ -288,7 +288,7 @@ apps  ──►  games  ──►  stage / ui / game-sdk / motion  ──►  th
 
 ## Creating a game
 
-1. Scaffold a new package in `games/<name>` (copy `games/quick-draw` as a template).
+1. Run `pnpm create-game <id>` to scaffold `games/<id>` (CC-3.11); it prints a checklist for the spec, scene palette and E2E test.
 2. Implement the contract:
 
 ```ts
@@ -473,7 +473,7 @@ Rules to stay inside the limits:
 1. Use the WebSocket Hibernation API (`ctx.acceptWebSocket()`) and store player data with `ws.serializeAttachment()`.
 2. Never use `setTimeout` or `setInterval` in a Durable Object; they block hibernation. Use alarms.
 3. Reject invalid requests in the Worker, before they reach a Durable Object.
-4. Phones send input only when it changes, at most 15 messages per second.
+4. Phones send input only when it changes, at most 4 messages per second (measured budget, CC-1.4).
 5. The host sends one batched `controller:state` per tick, not one message per phone.
 6. Answer keep-alive pings with `setWebSocketAutoResponse()`; the RTT `ping`/`pong` only runs with the dev overlay open.
 7. Snapshot per round, never per frame.

@@ -4,7 +4,7 @@ title: Add the TV lag calibration screen on the host
 status: To Do
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-16 12:27'
+updated_date: '2026-09-16 16:20'
 labels:
   - story
 dependencies:
@@ -30,13 +30,15 @@ Branch: CC-3.8/tv-lag-calibration
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Players tap when a flash appears 5 times; the median display lag is stored in localStorage on the host
-- [ ] #2 Games read the value through the SDK clock module; the default is 0
-- [ ] #3 Calibration can be skipped
+- [ ] #1 Games read the value through the SDK clock module; the default is 0
+- [ ] #2 Calibration can be skipped
+- [ ] #3 Players tap along to a steady flashing beat (3 practice flashes, then 5 that count); the median offset, which excludes reaction time, is stored in localStorage on the host (owner decision 2026-09-16)
 <!-- AC:END -->
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 Verify: pnpm check && pnpm test
+
+Amended 2026-09-16: owner chose beat-tap calibration (docs/architecture/session-flow.md decision 1). Network lag is handled separately by room-clock timestamps; this measures only the TV display delay (HDMI ~20-100 ms, Chromecast ~150-300 ms).
 <!-- SECTION:NOTES:END -->

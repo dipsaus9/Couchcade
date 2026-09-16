@@ -187,12 +187,12 @@ dependency-cruiser enforces all of these in `pnpm check:deps` (CC-1.19).
 3. Nothing imports from `apps/*`, `tooling/*` or `e2e/`.
 4. `apps/server` imports only `protocol`, `utils` and its own npm dependencies. The relay never sees game code, `game-sdk`, `theme` or UI.
 5. `apps/controller` never imports `phaser`, `stage`, `physics` or `audio`. That keeps the phone bundle within 80 KB.
-6. `apps/host` never imports a game's `src/controller/`, and the controller app never imports a game's `src/host/`. Both reach game code only through the game's `src/index.ts` and its lazy loaders.
+6. `apps/host` never imports a game's `src/controller/`, and the controller app never imports a game's `src/host/`. The host reaches game code only through the game's `src/index.ts` and its `hostScene` loader. The phone reaches game code only through the game's controller entry `src/controller/index.ts` (owner decision, 16 September 2026).
 7. Inside a game:
    - `src/shared/` imports only `utils`, `protocol`, `game-sdk` (types and pure helpers) and `physics`. No `phaser`, `vue`, DOM or timers.
    - `src/host/` may import `shared/`, `stage`, `audio`, `physics`, `theme`, `game-sdk` and `phaser`. Never `vue`, `ui` or `motion`.
-   - `src/controller/` may import `shared/`, `ui`, `motion`, `theme`, `game-sdk` and `vue`. Never `phaser`, `stage`, `audio` or `physics`.
-   - `src/index.ts` imports only `shared/` and `game-sdk`. It reaches `host/` and `controller/` only through dynamic `import()`.
+   - `src/controller/` may import `shared/`, `ui`, `motion`, `theme`, `game-sdk` and `vue`. Never `phaser`, `stage`, `audio` or `physics`. Nothing under `src/controller/` may reach `planck`, `@couchcade/physics` or `phaser`, not even through `shared/`; dependency-cruiser enforces this, so Planck.js never ships to phones.
+   - `src/index.ts` imports only `shared/` and `game-sdk`. It reaches `host/` only through dynamic `import()`, and never imports `controller/`.
 8. The registry glob lives in the apps, not in `game-sdk`. A package can't reach up into `games/`. See [Registry](#auto-discovery-registry).
 
 ---
@@ -497,6 +497,7 @@ games/<id>/
 ├── src/shared/         # rules, state, input schema, view: pure functions
 ├── src/host/           # Phaser scene, extends StageScene
 ├── src/controller/     # Vue component(s), built from @couchcade/ui
+│   └── index.ts        # phone entry: export default defineController({ id, component: () => import("./Controller.vue") })
 ├── assets/             # sprites and sounds, on palette
 ├── test/               # rules tests, testGameContract, one recorded replay
 └── CREDITS.md          # one entry per CC0 asset
@@ -567,12 +568,19 @@ export interface CouchcadeGame<
   restore?(players: readonly Player[], seed: number, snapshot: JsonValue): TState;
 
   hostScene: () => Promise<new () => Scene>;                 // () => import("./host/scene").then((m) => m.default)
-  controller: () => Promise<Component>;                      // () => import("./controller/Controller.vue").then((m) => m.default)
 }
 
 export function defineGame<TInput extends GameInput, TState, TView extends JsonValue>(
   game: CouchcadeGame<TInput, TState, TView>,
 ): CouchcadeGame<TInput, TState, TView>;
+
+// games/<id>/src/controller/index.ts: the phone entry (owner decision, 16 September 2026)
+export interface CouchcadeController {
+  id: string;                                                // same id as the game
+  component: () => Promise<Component>;                       // () => import("./Controller.vue").then((m) => m.default)
+}
+
+export function defineController(controller: CouchcadeController): CouchcadeController;
 ```
 
 Rules for game code:
@@ -596,7 +604,7 @@ Rules for game code:
 ### How the phone shows a controller (CC-1.16)
 
 1. `controller:state` with `gameId: null` shows a platform screen.
-2. With a `gameId`, the phone lazy-loads that game's `index.ts`, then its `controller()` component, and passes `ControllerProps`.
+2. With a `gameId`, the phone lazy-loads that game's controller entry `src/controller/index.ts`, then its `component()`, and passes `ControllerProps`. The phone never loads the game's `src/index.ts`, so rules and physics stay on the host.
 3. Every input goes through one `send` helper. It stamps `at` with `toHostTime(event.timeStamp)`, encodes and sends. Real-time games wrap it in the batching helper (CC-3.6).
 4. An unknown `gameId` shows "That game isn't on this phone yet. Reload the page." in the referee voice.
 
@@ -611,16 +619,16 @@ export const registry = createRegistry(
   import.meta.glob("../../../../games/*/src/index.ts", { eager: true, import: "default" }),
 );
 
-// apps/controller/src/runtime/games.ts: lazy, the phone loads one game when it starts
-import { createLazyRegistry } from "@couchcade/game-sdk/registry";
-export const registry = createLazyRegistry(
-  import.meta.glob("../../../../games/*/src/index.ts", { import: "default" }),
+// apps/controller/src/runtime/games.ts: lazy, the phone loads one controller entry when a game starts
+import { createControllerRegistry } from "@couchcade/game-sdk/registry";
+export const registry = createControllerRegistry(
+  import.meta.glob("../../../../games/*/src/controller/index.ts", { import: "default" }),
 );
 ```
 
 - `createRegistry` checks that ids are unique and match the folder name, and sorts games by title.
 - The phone never loads game code up front. The VIP's game list arrives in the `menu` view from the host. That keeps 14 games out of the phone's initial 80 KB.
-- `index.ts` only imports `shared/` and `defineGame`. Its `hostScene` and `controller` loaders are dynamic imports, so Phaser never reaches a phone and Vue controllers never reach the TV bundle.
+- `index.ts` only imports `shared/` and `defineGame`. Its `hostScene` loader is a dynamic import, so Phaser never reaches a phone. The phone loads `src/controller/index.ts` (`defineController`) instead, so Vue controllers never reach the TV bundle and rules or physics never reach the phone. The owner chose this on 16 September 2026 (session-flow doc, conflict 1).
 - Apps don't list games in `package.json`. The glob finds them, and each game's own dependencies resolve from its folder.
 - The CC-1.13 tests call `createRegistry` with a glob over `packages/game-sdk/testing/fixtures/`.
 
