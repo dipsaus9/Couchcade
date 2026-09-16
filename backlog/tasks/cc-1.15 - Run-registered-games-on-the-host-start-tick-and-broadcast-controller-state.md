@@ -1,10 +1,10 @@
 ---
 id: CC-1.15
 title: 'Run registered games on the host: start, tick and broadcast controller state'
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-16 20:39'
+updated_date: '2026-09-16 20:40'
 labels:
   - story
 dependencies:
@@ -66,4 +66,12 @@ Scope amended at pickup (worker, owner away): References were only apps/host/src
 Implementation: apps/host/src/runtime/ has games.ts (eager registry glob), fixed-step.ts (accumulator loop at 1000/60 ms, catch-up capped at 60 ticks per wake-up), game-runner.ts (init with seated players + crypto seed, input queue that drops senders not in the game and inputs failing inputSchema, step = inputs in arrival order with atMs = at - tick-0 room time clamped to 500 ms, onTick only if realtime, then outcome), view-sync.ts (per-phone diff, identical views share one entry, at most one send per 667 ms with a timer for pending changes so the latest views win, greedy split over 1 KB with a dev warning, a shared entry too big is halved, a single view over 1 KB is dropped with a warning), stage.ts (Phaser scene add/remove; main.ts attaches the booted game) and host-runtime.ts (host clock sync on room:welcome/clock:pong, VIP ui:action start -> first registry game when the seated count fits, room:phase playing, initial views, scene load then ticking; outcome -> loop and scene stop, room:phase lobby, lobby view {screen: lobby, data: null} to seated players; a welcome that says playing while no game runs (TV refresh) resets the room to lobby). The 667 ms constant lives in view-sync.ts until CC-3.6 creates @couchcade/game-sdk/input. Tests: 36 new unit tests on virtual time in apps/host/test/runtime/ with a test-only Echo game (no dependency on games/). Not exercised in a browser: games/ is empty on main and the phone shell has no Start button yet, so nothing can start a game end to end until Quick Draw (CC-10.x) and the phone start action land.
 
 Review gate round 1 (dipsaus-ai:story-reviewer): verdict pass. AC1-5 met, no scope violations. Advisories: (1) References were widened at pickup, so the PR description must say so for the owner; (2) controllerStateMinGapMs belongs in @couchcade/game-sdk/input once CC-3.6 creates it; (3) a start before Phaser's chunk loaded would run the game with no scene, fixed by making phaserStage wait for attachStage. pnpm-lock.yaml and the task file were left out of the reviewer diff on purpose. Test count correction: 34 new unit tests (not 36).
+
+After merging origin/main (CC-1.12 controller shell, CC-10.2 Quick Draw rules): the host registry glob now finds games/quick-draw; the host build bundles it, check:deps passes (223 modules), and a throwaway check confirmed registry.games is [quick-draw] and the runner steps it with 2 players without errors. Quick Draw's hostScene still rejects until CC-10.4, so the runtime warns and runs the game without a TV scene. Review advisory 3 fixed: phaserStage.start waits for attachStage.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added the host game runtime in apps/host/src/runtime/. games.ts builds the registry from an eager glob of games/*/src/index.ts (it now finds Quick Draw). The VIP's ui:action start picks the first registered game when the seated player count fits, calls init with the seated players and a crypto seed, sends room:phase playing and starts the Phaser scene (the stage waits for Phaser to boot; a scene that fails to load logs a dev warning and the game runs anyway). A fixed 60 Hz accumulator loop applies queued inputs in arrival order (dropping inputs that fail inputSchema or come from phones not in the game, with atMs on game time clamped to 500 ms), runs onTick for real-time games, then checks outcome. After each tick the view sync diffs every in-game player's view against what was last sent and sends only changed entries, grouped by identical view, at most once per 667 ms (1.5/s) with the latest views winning, split over 1 KB frames with a dev warning. On an outcome the loop and scene stop, room:phase lobby goes out and seated phones get the lobby view. The host also syncs to the room clock, and a TV refreshed mid-game resets the room to the lobby. It is wired into use-host-session.ts and App.vue (only the stage shows while playing). 34 unit tests on virtual time use a test-only Echo game. References were widened at pickup to cover this wiring, the tests and a zod devDependency. Nothing deployed.
+<!-- SECTION:FINAL_SUMMARY:END -->
