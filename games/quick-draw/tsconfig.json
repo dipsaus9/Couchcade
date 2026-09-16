@@ -1,8 +1,9 @@
 {
-  // Browser base: the TV scene in src/host/ needs DOM types for Phaser. That also puts DOM types
-  // in src/shared/: dependency-cruiser keeps phaser and vue out of it and Oxlint bans
+  // Vue base (itself DOM + base.json): the TV scene in src/host/ needs DOM types for Phaser, and
+  // the phone controller in src/controller/ is a Vue SFC. That puts DOM and JSX types in
+  // src/shared/ too: dependency-cruiser keeps phaser and vue out of it and Oxlint bans
   // Math.random, Date.now and performance.now there, but nothing here stops DOM globals or timers.
-  "extends": "@couchcade/config/tsconfig/base.json",
+  "extends": "@couchcade/config/tsconfig/vue.json",
   "compilerOptions": {
     // import.meta.glob in @couchcade/theme/scenes, and the Vitest browser mode types.
     "types": ["vite/client", "@vitest/browser-playwright"]
