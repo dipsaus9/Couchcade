@@ -4,7 +4,7 @@ title: Add the sensor trace recorder page and trace fixture format
 status: To Do
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-16 12:28'
+updated_date: '2026-09-16 16:44'
 labels:
   - story
 dependencies:
@@ -13,6 +13,7 @@ dependencies:
 references:
   - apps/controller/src/dev/trace-recorder/
   - packages/motion/test/traces/
+  - apps/controller/package.json
 parent_task_id: CC-5
 type: chore
 ordinal: 79000
@@ -37,4 +38,6 @@ Branch: CC-5.9/trace-recorder
 
 <!-- SECTION:NOTES:BEGIN -->
 Optional owner action: record a few swings, flicks, tilts and shakes on an iPhone and an Android phone.
+
+Amended 2026-09-16 (motion.md conflict 6): only the trace:record script line touches apps/controller/package.json.
 <!-- SECTION:NOTES:END -->
