@@ -1,6 +1,6 @@
 # Tech stack and hosting 🧾
 
-Couchcade must cost €0 to build and run. This document records what was checked, what was chosen, and what Phase 0 still has to prove.
+Couchcade must cost €0 to build and run. This document records what was checked, what was chosen, and what the spikes in epic CC-1 still have to prove.
 
 Research date: 16 September 2026, against official docs and pricing pages. Sources are at the bottom. Free tiers change, so check them again before relying on a number.
 
@@ -11,9 +11,10 @@ Research date: 16 September 2026, against official docs and pricing pages. Sourc
 - [Constraints](#constraints)
 - [Decisions](#decisions)
 - [Hosting](#hosting)
+- [Libraries](#libraries)
 - [Toolchain](#toolchain)
 - [CI/CD and repository services](#cicd-and-repository-services)
-- [Open questions for Phase 0](#open-questions-for-phase-0)
+- [Open questions for the CC-1 spikes](#open-questions-for-the-cc-1-spikes)
 - [Sources](#sources)
 
 ---
@@ -23,6 +24,10 @@ Research date: 16 September 2026, against official docs and pricing pages. Sourc
 - **€0.** No paid plans, no credit card on file, no usage-based billing.
 - **Low traffic.** The site may sleep when idle, or refuse service for the rest of the day when a free limit is reached.
 - **Public repository** on a free personal GitHub account.
+- **Small groups.** Usually 2–4 players, sometimes more; rooms hold up to 8.
+- **Mixed phones.** iPhone (Safari) and Android (Chrome), so everything must work in WebKit and Chromium.
+- **Big screen.** A laptop browser runs the host, shown on the TV over HDMI or cast to a Chromecast. Both add display lag, which timing games calibrate for.
+- **English only.** No translation layer.
 
 ---
 
@@ -31,11 +36,17 @@ Research date: 16 September 2026, against official docs and pricing pages. Sourc
 | Area | Decision | Cost |
 |---|---|---|
 | Relay and API | Cloudflare Workers Free + SQLite-backed Durable Objects | €0, no card |
+| Rooms and sockets | partyserver on the Durable Object, partysocket on host and phones | €0, open source |
+| Touch joystick | nipplejs | €0, MIT |
+| Physics | Planck.js | €0, MIT |
+| Joining | QR code with a 4-letter room code fallback; a host passcode to create rooms, open joining | €0 |
 | Host and controller apps | Workers Static Assets, served by the same Worker | €0, asset requests are unlimited |
 | Bot protection | Turnstile + Workers Rate Limiting binding | €0 |
 | Domain | `couchcade.<account>.workers.dev` | €0 (a custom domain means paying for a registration) |
 | Toolchain | pnpm workspaces, Vite 8, Vitest 4.1, Oxlint, Oxfmt, `vue-tsc` | €0, all open source |
 | Vite+ | Postponed until 1.0 | Free (MIT); postponed for maturity, not cost |
+| Testing | Unit tests for game and platform logic, one bot-plays-a-match E2E test per game, no coverage thresholds | €0 |
+| Game assets | Original, or CC0 packs recoloured to the palettes and credited in the game's `CREDITS.md` | €0 |
 | CI/CD | GitHub Actions; deploy with `cloudflare/wrangler-action` on push to `main` | €0 on a public repository |
 | Dependency updates | Renovate (Mend Community Cloud) | €0 |
 | Monitoring | Workers Logs (sampled) + a scheduled smoke test in Actions | €0 |
@@ -109,6 +120,31 @@ If the ratio doesn't apply on Free, phones batch input to at most 5 messages per
 8. Rooms are created with `locationHint: "weur"`, so the first request doesn't place a room far from EU players.
 9. Every deploy disconnects every socket. Host and phones reconnect automatically and the room restores from its last snapshot.
 10. Logs use a low `observability.head_sampling_rate`, so the 200,000 daily events last all day.
+
+---
+
+## Libraries
+
+Chosen during planning on 16 September 2026. Versions and licences checked on npm the same day.
+
+| Library | Version | Licence | Used for |
+|---|---|---|---|
+| partyserver | 0.5.x | ISC | The Room Durable Object: rooms, connections and broadcasting on top of the Hibernation API |
+| partysocket | 1.x | MIT | Reconnecting WebSocket client on the host and on phones |
+| nipplejs | 1.x | MIT | The virtual joystick in `@couchcade/ui` |
+| Planck.js (`planck`) | 1.x | MIT | 2D physics in `@couchcade/physics`, stepped at a fixed rate so matches are deterministic |
+
+### Why our own platform
+
+The platform is our own, on Cloudflare Workers Free, reusing these libraries for the parts that are easy to get wrong (rooms, reconnects, touch input, physics). Alternatives checked:
+
+| Option | Why not |
+|---|---|
+| AirConsole | Free tier is 2 players with ads, the SDK is all rights reserved, and games run inside their iframe. |
+| Playroom Kit | Closed source, 10 users a day on the free tier, no motion API. |
+| Rune | No shared TV screen, 4 players at most. |
+| Colyseus | Needs a second, Node-based host outside the €0 Cloudflare plan. |
+| Everything from scratch | More code to get right for rooms and reconnects than partyserver and partysocket already handle. |
 
 ---
 
@@ -187,7 +223,7 @@ Everything here is free for a public repository on GitHub Free:
 1. **No PR preview deploys.** Cloudflare doesn't create preview URLs for Workers that contain a Durable Object. Pull request E2E tests run against the local dev server in CI.
 2. **Deploy from Actions, not Workers Builds.** Actions can deploy only after every check passes and then run the smoke test. The first deploy is done by hand; after that, the CI token only gets the Workers `Editor` role on this one Worker, with `account_id` set in `wrangler.jsonc`.
 3. **Fork PRs get no secrets.** Nothing in the pull request pipeline needs Cloudflare credentials.
-4. **Visual baselines come from Linux.** Screenshots are generated in the pinned Playwright Docker image, never on a Mac. Vitest's `toMatchScreenshot` is still experimental.
+4. **A lean test bar.** CI runs unit tests and one bot-plays-a-match E2E test per game. There are no coverage thresholds and no visual regression suite.
 5. **Artifacts only on failure.** Playwright traces and Lighthouse reports are uploaded when a job fails, kept for 7 days.
 6. **Motion sensors can't be emulated.** Playwright has no accelerometer or gyroscope support, so `@couchcade/motion` reads sensors through an adapter that tests replace with recorded traces.
 7. **Scheduled workflows expire.** GitHub disables a cron smoke test after 60 days without repository activity.
@@ -198,15 +234,15 @@ No Sentry: it's a third-party script that sends error and IP data, which breaks 
 
 ---
 
-## Open questions for Phase 0
+## Open questions for the CC-1 spikes
 
-| Question | How to settle it |
-|---|---|
-| Does the 20:1 message ratio apply on the Free plan? | Deploy a test Worker, send a known number of messages, read the Durable Object request count in the dashboard. |
-| Does the Rate Limiting binding work on Free? | The docs show no plan restriction but don't name Free. Check it in the same deploy. |
-| Do Durable Object message handlers get 10 ms or 30 s of CPU on Free? | Undocumented. Keep the relay handler trivial so it doesn't matter. |
-| Do app WebSockets work through the Cloudflare Vite plugin dev server? | An open issue ([workers-sdk#15654](https://github.com/cloudflare/workers-sdk/issues/15654)) reports the dev server closing non-Vite sockets. Build a walking skeleton first: host and one phone over the local dev server. Fallback: run `wrangler dev` separately behind a Vite proxy. |
-| Is the median EU round trip under 120 ms? | Measure with the dev overlay after the first deploy. |
+| Question | How to settle it | Story |
+|---|---|---|
+| Does the 20:1 message ratio apply on the Free plan? | Deploy a test Worker, send a known number of messages, read the Durable Object request count in the dashboard. | CC-1.4 |
+| Does the Rate Limiting binding work on Free? | The docs show no plan restriction but don't name Free. Check it in the same deploy. | CC-1.4 |
+| Do Durable Object message handlers get 10 ms or 30 s of CPU on Free? | Undocumented. Keep the relay handler trivial so it doesn't matter. | None needed |
+| Do app WebSockets work through the Cloudflare Vite plugin dev server? | An open issue ([workers-sdk#15654](https://github.com/cloudflare/workers-sdk/issues/15654)) reports the dev server closing non-Vite sockets. A throwaway prototype exchanges messages between a host page and a phone page over the local dev server. Fallback: run `wrangler dev` separately behind a Vite proxy. | CC-1.3 |
+| Is the median EU round trip under 120 ms? | Measure with the dev overlay after the first deploy. | After CC-1.18 |
 
 ---
 
@@ -242,6 +278,11 @@ No Sentry: it's a third-party script that sends error and IP data, which breaks 
 - Ably limits: https://ably.com/docs/platform/pricing/limits
 - Pusher pricing: https://pusher.com/channels/pricing/
 - Supabase Realtime limits: https://supabase.com/docs/guides/realtime/limits
+
+**Libraries**
+- partyserver and partysocket: https://github.com/cloudflare/partykit
+- nipplejs: https://github.com/yoannmoinet/nipplejs
+- Planck.js: https://github.com/piqnt/planck.js
 
 **Toolchain**
 - Vite+ beta: https://voidzero.dev/posts/announcing-vite-plus-beta
