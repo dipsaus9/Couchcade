@@ -8,8 +8,8 @@ import {
 
 /**
  * The room's SQLite tables (docs/architecture/platform.md, "Room storage"). The room writes only
- * on create, join, leave, profile change and phase change, never per message. CC-2.5 and CC-2.6
- * set `kicked` and `revoked`, and CC-3.5 adds the `snapshot` table.
+ * on create, join, leave, seat release, profile change and phase change, never per message. CC-2.5
+ * and CC-2.6 set `kicked` and `revoked`, and CC-3.5 adds the `snapshot` table.
  *
  * Tables are created by `create()`, not on start, so a socket or request that reaches a room that
  * was never created leaves no tables behind.
@@ -31,7 +31,8 @@ CREATE TABLE IF NOT EXISTS players (
   joined_at INTEGER NOT NULL,
   left_at INTEGER,
   kicked INTEGER NOT NULL DEFAULT 0,
-  revoked INTEGER NOT NULL DEFAULT 0
+  revoked INTEGER NOT NULL DEFAULT 0,
+  released INTEGER NOT NULL DEFAULT 0
 );
 `;
 
@@ -50,7 +51,10 @@ export interface PlayerRecord {
   slot: number | null;
   profile: PipProfile;
   joinedAt: number;
+  /** Room time the player's socket last closed, or null while they are connected. */
   leftAt: number | null;
+  /** True once the seat was given up: the player left, or their seat window ran out. */
+  released: boolean;
 }
 
 type MetaRow = {
@@ -68,13 +72,17 @@ type PlayerRow = {
   profile: string;
   joined_at: number;
   left_at: number | null;
+  released: number;
 };
+
+const playerColumns = "id, name, slot, profile, joined_at, left_at, released";
 
 /** Every Pip part at its first option, until the player customises it (CC-6.5). */
 export const defaultProfile: PipProfile = { skin: 0, hair: 0, hairColour: 0 };
 
 export class RoomStorage {
   readonly #sql: SqlStorage;
+  #migrated = false;
 
   constructor(sql: SqlStorage) {
     this.#sql = sql;
@@ -98,6 +106,7 @@ export class RoomStorage {
       .exec("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'meta'")
       .toArray();
     if (exists.length === 0) return null;
+    this.#migrate();
     const [row] = this.#sql
       .exec<MetaRow>("SELECT code, created_at, locked, phase, host_seen_at FROM meta WHERE id = 1")
       .toArray();
@@ -122,24 +131,24 @@ export class RoomStorage {
 
   readPlayer(id: PlayerId): PlayerRecord | null {
     const [row] = this.#sql
-      .exec<PlayerRow>(
-        "SELECT id, name, slot, profile, joined_at, left_at FROM players WHERE id = ?",
-        id,
-      )
+      .exec<PlayerRow>(`SELECT ${playerColumns} FROM players WHERE id = ?`, id)
       .toArray();
-    if (!row) return null;
-    return {
-      id: row.id,
-      name: row.name,
-      slot: row.slot,
-      profile: parseProfile(row.profile),
-      joinedAt: row.joined_at,
-      leftAt: row.left_at,
-    };
+    return row ? toPlayerRecord(row) : null;
+  }
+
+  /** Players who disconnected and still hold their seat, in join order. */
+  readReservedPlayers(): PlayerRecord[] {
+    return this.#sql
+      .exec<PlayerRow>(
+        `SELECT ${playerColumns} FROM players WHERE left_at IS NOT NULL AND released = 0
+         ORDER BY joined_at`,
+      )
+      .toArray()
+      .map(toPlayerRecord);
   }
 
   /** Records a join. A player who joins again keeps their row, with `left_at` cleared. */
-  savePlayer(player: Omit<PlayerRecord, "leftAt">): void {
+  savePlayer(player: Omit<PlayerRecord, "leftAt" | "released">): void {
     this.#sql.exec(
       `INSERT INTO players (id, name, slot, profile, joined_at, left_at) VALUES (?, ?, ?, ?, ?, NULL)
        ON CONFLICT (id) DO UPDATE SET name = excluded.name, slot = excluded.slot,
@@ -156,9 +165,46 @@ export class RoomStorage {
     this.#sql.exec("UPDATE players SET profile = ? WHERE id = ?", JSON.stringify(profile), id);
   }
 
+  /** The player's socket closed. Their seat stays reserved until `releasePlayer`. */
   markLeft(id: PlayerId, now: number): void {
     this.#sql.exec("UPDATE players SET left_at = ? WHERE id = ?", now, id);
   }
+
+  /** Gives up the player's seat: they left the room, or their seat window ran out. */
+  releasePlayer(id: PlayerId, now: number): void {
+    this.#sql.exec(
+      "UPDATE players SET left_at = COALESCE(left_at, ?), released = 1 WHERE id = ?",
+      now,
+      id,
+    );
+  }
+
+  /**
+   * Adds columns that later stories introduced to a room created before them, so a room that lives
+   * through a deploy keeps working. Runs once per instance.
+   */
+  #migrate(): void {
+    if (this.#migrated) return;
+    this.#migrated = true;
+    const released = this.#sql
+      .exec("SELECT 1 FROM pragma_table_info('players') WHERE name = 'released'")
+      .toArray();
+    if (released.length === 0) {
+      this.#sql.exec("ALTER TABLE players ADD COLUMN released INTEGER NOT NULL DEFAULT 0");
+    }
+  }
+}
+
+function toPlayerRecord(row: PlayerRow): PlayerRecord {
+  return {
+    id: row.id,
+    name: row.name,
+    slot: row.slot,
+    profile: parseProfile(row.profile),
+    joinedAt: row.joined_at,
+    leftAt: row.left_at,
+    released: row.released === 1,
+  };
 }
 
 function parseProfile(text: string): PipProfile {

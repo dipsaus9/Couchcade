@@ -449,6 +449,68 @@ describe("createHostRuntime", () => {
     expect(runtime.phase).toBe("menu");
   });
 
+  it("re-sends a reconnected phone its lobby view, even though it didn't change", () => {
+    const { handle, second, lobby, ofType, time } = setup();
+    handle({ t: "player:joined", d: { player: lobby.players[2]! } });
+    const before = ofType("controller:state").length;
+    handle({ t: "player:reconnected", d: { id: second } });
+    time.advance(667);
+    expect(ofType("controller:state")).toHaveLength(before + 1);
+    expect(ofType("controller:state").at(-1)?.d.views).toEqual([
+      { to: [second], view: { screen: "lobby", data: { vip: false } } },
+    ]);
+  });
+
+  it("re-sends a reconnected phone its game view within the send cap, and the game isn't told", async () => {
+    const games = [echoGame({ leaves: true })];
+    const { runtime, handle, play, second, lobby, ofType, time } = setup({ games });
+    play();
+    await settle();
+    time.advance(1000);
+
+    const away = {
+      ...lobby,
+      players: lobby.players.map((p) => (p.id === second ? { ...p, connected: false } : p)),
+    };
+    handle({ t: "player:left", d: { id: second, reason: "disconnected" } }, away);
+    time.advance(1000);
+    expect(echoState(runtime).log.filter((entry) => entry.endsWith(":left"))).toEqual([]);
+    const before = ofType("controller:state").length;
+
+    handle({ t: "player:reconnected", d: { id: second } });
+    time.advance(1000 / 60);
+    expect(ofType("controller:state")).toHaveLength(before + 1);
+    expect(ofType("controller:state").at(-1)?.d).toEqual({
+      gameId: "echo",
+      views: [{ to: [second], view: { screen: "echo", data: { text: "" } } }],
+    });
+    time.advance(1000);
+    expect(ofType("controller:state")).toHaveLength(before + 1);
+  });
+
+  it("calls onPlayerLeft when a seat is freed mid-game and ends the game when it says so", async () => {
+    const games = [echoGame({ leaves: true })];
+    const { runtime, handle, play, vip, second, lobby, time } = setup({ games });
+    const third = lobby.players[2]!.id;
+    play();
+    await settle();
+
+    handle({ t: "player:left", d: { id: second, reason: "expired" } });
+    time.advance(1000 / 60);
+    expect(echoState(runtime).log.filter((entry) => entry.endsWith(":left"))).toEqual([
+      `${second}:left`,
+    ]);
+    expect(runtime.phase).toBe("playing");
+    handle(inputMessage(second, { type: "end" }));
+    time.advance(1000 / 60);
+    expect(runtime.phase).toBe("playing");
+
+    handle({ t: "player:left", d: { id: third, reason: "left" } });
+    time.advance(1000 / 60);
+    expect(runtime.phase).toBe("results");
+    expect(runtime.results?.standings.map((standing) => standing.player.id)).toContain(vip);
+  });
+
   it("stops the countdown, the loop and the scene on dispose", () => {
     const { runtime, handle, vip, time } = setup();
     handle(pickAction(vip));

@@ -2,7 +2,7 @@
   "name": "@couchcade/motion",
   "version": "0.0.0",
   "private": true,
-  "description": "Phone motion controls: the sensor adapter and permission request, calibration, gestures and touch fallbacks. Tier 3 kit: no npm dependencies.",
+  "description": "Phone motion controls: the sensor adapter and permission request, calibration, gestures and touch fallbacks. Tier 3 kit: imports game-sdk, no npm dependencies.",
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -12,6 +12,9 @@
   "scripts": {
     "typecheck": "tsc",
     "test": "vitest run"
+  },
+  "dependencies": {
+    "@couchcade/game-sdk": "workspace:*"
   },
   "devDependencies": {
     "@couchcade/config": "workspace:*",

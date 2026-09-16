@@ -38,7 +38,11 @@ export function isPhoneState(state: SocketState | null): state is PhoneSocketSta
   return state?.role === "player" || state?.role === "audience";
 }
 
-export function toPlayerInfo(state: PhoneSocketState, connected = true): PlayerInfo {
+/** The player as the host sees it, from a phone's socket state or a stored player row. */
+export function toPlayerInfo(
+  state: Pick<PhoneSocketState, "id" | "name" | "slot" | "profile" | "joinedAt">,
+  connected = true,
+): PlayerInfo {
   return {
     id: state.id,
     name: state.name,

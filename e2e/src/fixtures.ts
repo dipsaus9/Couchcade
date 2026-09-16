@@ -23,6 +23,13 @@ function phoneOptions(browserName: string): BrowserContextOptions {
 export interface PhoneOptions {
   /** Installs the fake sensor adapter hook before the page loads (see src/motion.ts). */
   motion?: MotionHookOptions;
+  /**
+   * Entries put in the phone's `sessionStorage` before the page loads, for example a stored
+   * `couchcade:session` to reopen a phone as the same player.
+   */
+  sessionStorage?: Record<string, string>;
+  /** Runs on the new page before it loads, for example to listen for its sockets. */
+  beforeLoad?(page: Page): void;
 }
 
 /** Opens `count` phones, each in a fresh context at the phone app (`/`). */
@@ -52,7 +59,16 @@ export const test = base.extend<DeviceFixtures>({
         const context = await browser.newContext(phoneOptions(browserName));
         contexts.push(context);
         if (options.motion) await injectFakeMotion(context, options.motion);
+        if (options.sessionStorage) {
+          await context.addInitScript((entries) => {
+            for (const [key, value] of Object.entries(entries)) {
+              // Only when missing, so a reload inside the test keeps what the app stored since.
+              if (sessionStorage.getItem(key) === null) sessionStorage.setItem(key, value);
+            }
+          }, options.sessionStorage);
+        }
         const page = await context.newPage();
+        options.beforeLoad?.(page);
         await page.goto("/");
         pages.push(page);
       }

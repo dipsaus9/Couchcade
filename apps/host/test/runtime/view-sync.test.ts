@@ -175,4 +175,19 @@ describe("createViewSync", () => {
     expect(sent).toHaveLength(1);
     expect(time.pending).toBe(0);
   });
+  it("sends a forgotten phone its unchanged view on the next show, inside the send cap", () => {
+    const { time, sent, sync } = setup();
+    sync.show("echo", viewsOf([sam, view("a")], [noor, view("b")]));
+    sync.forget(noor);
+    expect(sent).toHaveLength(1);
+
+    sync.show("echo", viewsOf([sam, view("a")], [noor, view("b")]));
+    expect(sent).toHaveLength(1);
+    time.advance(667);
+    expect(sent).toHaveLength(2);
+    expect(sent[1]).toEqual({
+      t: "controller:state",
+      d: { gameId: "echo", views: [{ to: [noor], view: view("b") }] },
+    });
+  });
 });
