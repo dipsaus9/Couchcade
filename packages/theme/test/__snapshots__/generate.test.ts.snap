@@ -1,0 +1,122 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`toCssVars > generates the :root stylesheet 1`] = `
+":root {
+  --cc-ink: #1E2A4A;
+  --cc-chalk: #FAFCFF;
+  --cc-sky: #8FD3F4;
+  --cc-sunny: #FFC83D;
+  --cc-turf: #37B26C;
+  --cc-signal: #EF4F5A;
+  --cc-ink-20: #CED2DB;
+  --cc-ink-20-on-sky: #78B1D2;
+  --cc-ink-45: #979EAE;
+  --cc-ink-70: #60697F;
+  --cc-player-cherry: #EF4F5A;
+  --cc-player-ocean: #2F7DE1;
+  --cc-player-sunny: #FFC83D;
+  --cc-player-turf: #37B26C;
+  --cc-player-grape: #8C5BD6;
+  --cc-player-tangerine: #FF8A3D;
+  --cc-player-bubblegum: #F277B6;
+  --cc-player-teal: #1FB5B0;
+  --cc-skin-1: #FBDDC0;
+  --cc-skin-2: #F5C9A0;
+  --cc-skin-3: #E8B083;
+  --cc-skin-4: #C68B5E;
+  --cc-skin-5: #8D5A3B;
+  --cc-skin-6: #5C3A24;
+  --cc-hair-1: #1E2A4A;
+  --cc-hair-2: #5C3A24;
+  --cc-hair-3: #E0A15E;
+  --cc-hair-4: #F4E3C1;
+  --cc-hair-5: #EF4F5A;
+  --cc-hair-6: #8C5BD6;
+  --cc-font-ui: "Fredoka", "Nunito", "Arial Rounded MT Bold", system-ui, sans-serif;
+  --cc-font-pixel: "Pixelify Sans", "Courier New", monospace;
+  --cc-text-callout-font: var(--cc-font-pixel);
+  --cc-text-callout-weight: 700;
+  --cc-text-callout-tv: 160px;
+  --cc-text-score-font: var(--cc-font-pixel);
+  --cc-text-score-weight: 700;
+  --cc-text-score-tv: 72px;
+  --cc-text-score-phone: 40px;
+  --cc-text-title-font: var(--cc-font-ui);
+  --cc-text-title-weight: 700;
+  --cc-text-title-tv: 56px;
+  --cc-text-title-phone: 28px;
+  --cc-text-action-font: var(--cc-font-ui);
+  --cc-text-action-weight: 700;
+  --cc-text-action-tv: 40px;
+  --cc-text-action-phone: 28px;
+  --cc-text-body-font: var(--cc-font-ui);
+  --cc-text-body-weight: 500;
+  --cc-text-body-tv: 32px;
+  --cc-text-body-phone: 18px;
+  --cc-text-small-font: var(--cc-font-ui);
+  --cc-text-small-weight: 500;
+  --cc-text-small-tv: 24px;
+  --cc-text-small-phone: 16px;
+  --cc-outline-phone: 3px;
+  --cc-outline-tv: 4px;
+  --cc-depth-rest: 0 6px 0 var(--cc-ink);
+  --cc-depth-pressed: 0 2px 0 var(--cc-ink);
+  --cc-depth-panel: 0 6px 0 var(--cc-ink);
+  --cc-press-offset: 4px;
+  --cc-radius-pill: 999px;
+  --cc-radius-panel: 20px;
+  --cc-radius-tag: 10px;
+  --cc-space-1: 4px;
+  --cc-space-2: 8px;
+  --cc-space-3: 12px;
+  --cc-space-4: 16px;
+  --cc-space-5: 24px;
+  --cc-space-6: 32px;
+  --cc-space-7: 48px;
+  --cc-space-8: 64px;
+  --cc-touch-min: 56px;
+  --cc-focus-ring-width: 4px;
+  --cc-focus-ring-offset: 4px;
+  --cc-tv-button-small: 64px;
+  --cc-safe-tv: 5%;
+  --cc-motion-press-duration: 80ms;
+  --cc-motion-press-ease: ease-out;
+  --cc-motion-ui-duration: 180ms;
+  --cc-motion-ui-ease: cubic-bezier(.34,1.56,.64,1);
+  --cc-motion-scene-duration: 400ms;
+  --cc-motion-scene-ease: ease-in-out;
+  --cc-motion-your-turn-duration: 600ms;
+  --cc-motion-celebrate-duration: 900ms;
+  --cc-motion-foul-duration: 500ms;
+}
+"
+`;
+
+exports[`toPhaserColor > generates every named colour for Phaser 1`] = `
+{
+  "color": {
+    "chalk": "0xFAFCFF",
+    "ink": "0x1E2A4A",
+    "signal": "0xEF4F5A",
+    "sky": "0x8FD3F4",
+    "sunny": "0xFFC83D",
+    "turf": "0x37B26C",
+  },
+  "players": {
+    "bubblegum": "0xF277B6",
+    "cherry": "0xEF4F5A",
+    "grape": "0x8C5BD6",
+    "ocean": "0x2F7DE1",
+    "sunny": "0xFFC83D",
+    "tangerine": "0xFF8A3D",
+    "teal": "0x1FB5B0",
+    "turf": "0x37B26C",
+  },
+  "tint": {
+    "ink20": "0xCED2DB",
+    "ink20OnSky": "0x78B1D2",
+    "ink45": "0x979EAE",
+    "ink70": "0x60697F",
+  },
+}
+`;
