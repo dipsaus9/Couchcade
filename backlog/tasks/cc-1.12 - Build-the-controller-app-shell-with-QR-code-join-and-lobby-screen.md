@@ -1,10 +1,10 @@
 ---
 id: CC-1.12
 title: Build the controller app shell with QR/code join and lobby screen
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-16 16:55'
+updated_date: '2026-09-16 16:57'
 labels:
   - story
 dependencies:
@@ -51,4 +51,12 @@ Branch: CC-1.12/controller-app-shell
 Verify: pnpm check && pnpm test
 
 Local smoke (2026-09-16): server dev server on :5183 plus the controller dev server on :5185 with a throwaway proxy config (CC-1.11 owns the real proxy), a scripted fake host and headless Chrome at 390x844. /?room=ktxw prefilled KTXW; Join disabled for a blank name and enabled for Sam; join returned a ticket, the socket connected and the lobby showed 'Sam | Player 1 | You're in, Sam | You're Cherry, the circle' with a Cherry fill; sessionStorage couchcade:session held code, playerId and rejoinToken; 1 wake lock request; reload rejoined the same seat through /rejoin; a wrong code showed the referee copy inline; landscape with a coarse pointer showed the rotate notice. Phone bundle: 43.8 KB gzip JS (budget 80 KB), 2.0 KB CSS.
+
+Review gate round 1: pass. All 4 criteria met, no scope violations. Advisory: the name input's maxlength counted UTF-16 units and could cut a valid name before validation; fixed by dropping maxlength so checkName and the too-long hint enforce 12 characters.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added apps/controller (@couchcade/controller), the Vue 3.5 phone app served at /. /?room=CODE fills in the code only when it is a valid room code. Join stays disabled until the name is 1 to 12 characters after normalising. Joining posts to /api/rooms/:code/join, keeps { code, playerId, rejoinToken } in sessionStorage under couchcade:session and connects through partysocket to /ws/CODE?ticket=...&v=1. Every reconnect gets a fresh ticket from /rejoin, a raw ping goes out every 25 s, and close codes 4003 to 4011 end the session. A pure reducer drives the join, connecting, lobby and waiting screens. The lobby shows the player's name, colour and shape, taken from their seat. API errors map to referee-voice copy. The layout is portrait with a rotate notice. The screen wake lock and portrait lock are requested with errors ignored. A TurnstileProvider hook is left for CC-2.2. Theme tokens are built into CSS at build time. Bundle: 43.8 KB gzip JS. 50 unit tests, plus a local headless-Chrome smoke against the server dev server.
+<!-- SECTION:FINAL_SUMMARY:END -->
