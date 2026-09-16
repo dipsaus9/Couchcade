@@ -92,6 +92,10 @@ export function backAction(from: string): RelayToHostMessage {
   return { t: "ui:action", from, d: { action: "back-to-menu" } };
 }
 
+export function playAgainAction(from: string): RelayToHostMessage {
+  return { t: "ui:action", from, d: { action: "play-again" } };
+}
+
 /** Virtual time: a clock and a scheduler that only move when a test advances them. */
 export function createVirtualTime(start = 0) {
   let now = start;

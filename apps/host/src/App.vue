@@ -5,6 +5,7 @@ import { localNow } from "./runtime/timing.ts";
 import LobbyScreen from "./screens/lobby/LobbyScreen.vue";
 import MenuScreen from "./screens/menu/MenuScreen.vue";
 import PasscodeScreen from "./screens/passcode/PasscodeScreen.vue";
+import ResultsScreen from "./screens/results/ResultsScreen.vue";
 import { useHostSession } from "./session/use-host-session.ts";
 
 const { screen, openRoom, endRoom } = useHostSession();
@@ -44,6 +45,11 @@ onBeforeUnmount(() => window.removeEventListener("resize", fit));
       :lobby="screen.lobby"
       :menu="screen.menu"
       :room-now="roomNow"
+    />
+    <ResultsScreen
+      v-else-if="screen.name === 'results'"
+      :lobby="screen.lobby"
+      :results="screen.results"
     />
     <PasscodeScreen
       v-else-if="screen.name === 'passcode'"

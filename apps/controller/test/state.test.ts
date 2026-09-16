@@ -1,4 +1,4 @@
-import type { PlayerInfo, RelayToPhoneMessage } from "@couchcade/protocol";
+import type { JsonValue, PlayerInfo, RelayToPhoneMessage } from "@couchcade/protocol";
 import { describe, expect, it } from "vitest";
 import { lookForSlot } from "../src/session/look.ts";
 import {
@@ -244,6 +244,29 @@ describe("lobby", () => {
       submitting: false,
       notice: { kind: "ended", reason: "kicked", code: "BEAN" },
     });
+  });
+});
+
+describe("results", () => {
+  const lobby = run(initialState(null, session), welcome());
+  const resultsView = (data: JsonValue) =>
+    message({ t: "controller:state", d: { gameId: null, view: { screen: "results", data } } });
+
+  it("shows the results screen for a valid results view", () => {
+    const view = inRoom(
+      reduce(lobby, resultsView({ title: "Quick Draw", vipName: "Sam", place: 2, of: 3 })),
+    );
+    expect(screenOf(view)).toBe("results");
+  });
+
+  it("waits instead, offline or while the TV is away", () => {
+    const view = inRoom(reduce(lobby, resultsView({ title: "Quick Draw", vipName: "Sam" })));
+    expect(screenOf({ ...view, online: false })).toBe("waiting");
+    expect(screenOf({ ...view, hostConnected: false })).toBe("waiting");
+  });
+
+  it("waits on a malformed results view", () => {
+    expect(screenOf(inRoom(reduce(lobby, resultsView({ vipName: "Sam" }))))).toBe("waiting");
   });
 });
 
