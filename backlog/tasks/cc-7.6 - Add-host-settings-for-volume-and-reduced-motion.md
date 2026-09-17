@@ -4,7 +4,7 @@ title: Add host settings for volume and reduced motion
 status: In Progress
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-17 21:43'
+updated_date: '2026-09-17 21:46'
 labels:
   - story
 dependencies:
@@ -12,6 +12,7 @@ dependencies:
   - CC-4.7
 references:
   - apps/host/src/settings/
+  - apps/host/test/settings/
   - apps/host/src/App.vue
   - apps/host/src/screens/lobby/LobbyScreen.vue
   - apps/host/src/session/use-host-session.ts
@@ -47,4 +48,6 @@ Build apps/host/src/settings/: settings-storage.ts (pure readSettings/writeSetti
 Verify: pnpm check && pnpm test
 
 Amended References (App.vue, LobbyScreen.vue, use-host-session.ts) and AC1 wording (added 'mute') per docs/architecture/audio.md conflict item 5 and the integration gap the doc's References list didn't cover, before implementing.
+
+Round 1 review (block, scope): added apps/host/test/settings/ to References explicitly, matching CC-7.4's own precedent of listing its test dir alongside its src dir.
 <!-- SECTION:NOTES:END -->
