@@ -100,7 +100,7 @@ describe("defineController", () => {
     const entry = { id: "minimal", component: () => Promise.reject(new Error("none")) };
     expect(defineController(entry)).toBe(entry);
     expectTypeOf(defineController(entry)).toEqualTypeOf<CouchcadeController>();
-    expectTypeOf<keyof CouchcadeController>().toEqualTypeOf<"id" | "component">();
+    expectTypeOf<keyof CouchcadeController>().toEqualTypeOf<"id" | "component" | "streams">();
   });
 });
 
