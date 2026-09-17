@@ -549,6 +549,9 @@ importers:
       '@couchcade/config':
         specifier: workspace:*
         version: link:../config
+      '@couchcade/utils':
+        specifier: workspace:*
+        version: link:../utils
       fontverter:
         specifier: 'catalog:'
         version: 2.0.0
@@ -761,6 +764,9 @@ importers:
       '@couchcade/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@couchcade/utils':
+        specifier: workspace:*
+        version: link:../../packages/utils
       '@types/node':
         specifier: 'catalog:'
         version: 24.13.4

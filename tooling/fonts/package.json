@@ -11,6 +11,7 @@
   },
   "devDependencies": {
     "@couchcade/config": "workspace:*",
+    "@couchcade/utils": "workspace:*",
     "@types/node": "catalog:",
     "@types/subset-font": "catalog:",
     "subset-font": "catalog:",

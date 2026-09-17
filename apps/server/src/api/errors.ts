@@ -7,7 +7,7 @@ export const apiErrorStatus = {
   "bad-request": 400,
   /** The upgrade isn't a `GET` with `Upgrade: websocket`. */
   "websocket-required": 400,
-  /** The player name breaks the name rules (CC-2.4 adds normalisation and the blocklists). */
+  /** The player name breaks the name rules: length, allowlist or the NL + EN blocklists. */
   "name-not-allowed": 400,
   /** `POST /api/rooms` without the right host passcode. */
   "wrong-passcode": 401,
