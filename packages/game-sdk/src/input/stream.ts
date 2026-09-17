@@ -173,8 +173,12 @@ export function createInputStream<TInput extends GameInput>(
   };
 }
 
-/** Structural equality for JSON values (session-flow.md rule 3). Key order doesn't matter. */
-function jsonEqual(a: JsonValue | undefined, b: JsonValue | undefined): boolean {
+/**
+ * Structural equality for JSON values (session-flow.md rule 3). Key order doesn't matter. Shared
+ * with `channel.ts`'s direct-path dedupe (realtime-link.md, "Rates": "a value equal to the last
+ * one sent isn't sent" applies on both paths).
+ */
+export function jsonEqual(a: JsonValue | undefined, b: JsonValue | undefined): boolean {
   if (a === b) return true;
   if (a === null || b === null || typeof a !== "object" || typeof b !== "object") return false;
   if (Array.isArray(a) || Array.isArray(b)) {
