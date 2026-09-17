@@ -3,6 +3,7 @@ import type {
   ControllerProps,
   CouchcadeController,
   GameInput,
+  InputChannel,
 } from "@couchcade/game-sdk/contract";
 import type { ControllerRegistry } from "@couchcade/game-sdk/registry";
 import type { Calibration } from "@couchcade/motion/calibration";
@@ -41,15 +42,21 @@ export type PhoneMotion = ControllerMotion<MotionAdapter, Calibration>;
 
 /**
  * The props a game's controller component gets (`ControllerProps` from the game contract).
- * `motion` is only there when the motion step ran for this game.
+ * `motion` is only there when the motion step ran for this game. `input` is only there once the
+ * link runtime has a channel for the running game (docs/architecture/realtime-link.md, CC-3.19).
  */
 export function controllerProps(
   state: GameState,
   send: InputSender,
   motion?: PhoneMotion,
+  input?: InputChannel<GameInput>,
 ): ControllerProps<JsonValue, GameInput, PhoneMotion> {
   const props = { screen: state.view.screen, data: state.view.data, player: state.you, send };
-  return motion === undefined ? props : { ...props, motion };
+  return {
+    ...props,
+    ...(motion === undefined ? {} : { motion }),
+    ...(input === undefined ? {} : { input }),
+  };
 }
 
 /**
@@ -73,7 +80,13 @@ export function controllerMotion(
 
 export type ControllerStatus =
   | { kind: "loading"; gameId: string }
-  | { kind: "ready"; gameId: string; component: Component }
+  | {
+      kind: "ready";
+      gameId: string;
+      component: Component;
+      /** The controller's declared stream rates, for `link.createChannel` (realtime-link.md). */
+      streams?: CouchcadeController["streams"];
+    }
   | { kind: "missing"; gameId: string };
 
 /**
@@ -91,19 +104,29 @@ export function useGameController(
     gameId,
     (id) => {
       status.value = { kind: "loading", gameId: id };
-      registry
-        .load(id)
-        .then((entry: CouchcadeController) => entry.component())
-        .then(
-          (component) => {
-            if (gameId() !== id) return;
-            status.value = { kind: "ready", gameId: id, component: markRaw(component) };
-          },
-          () => {
-            if (gameId() !== id) return;
-            status.value = { kind: "missing", gameId: id };
-          },
-        );
+      registry.load(id).then(
+        (entry: CouchcadeController) => {
+          entry.component().then(
+            (component) => {
+              if (gameId() !== id) return;
+              status.value = {
+                kind: "ready",
+                gameId: id,
+                component: markRaw(component),
+                streams: entry.streams,
+              };
+            },
+            () => {
+              if (gameId() !== id) return;
+              status.value = { kind: "missing", gameId: id };
+            },
+          );
+        },
+        () => {
+          if (gameId() !== id) return;
+          status.value = { kind: "missing", gameId: id };
+        },
+      );
     },
     { immediate: true },
   );
