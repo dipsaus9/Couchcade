@@ -1,10 +1,10 @@
 ---
 id: CC-7.7
 title: Fix the lobby loop cut and wire the remaining platform sound tokens
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-17 21:57'
-updated_date: '2026-09-17 22:16'
+updated_date: '2026-09-17 22:24'
 labels:
   - story
 dependencies:
@@ -59,4 +59,12 @@ Per-story Verify: pnpm check && pnpm test && pnpm check:style && pnpm check:deps
 Lobby loop recut evidence: re-downloaded the original 58.986s 'Adventure Begins Loop' from the Happy Chiptunes Collection zip (opengameart.org). Beat-grid fit (aubioonset onsets against a 16th-note grid, joint tempo+phase search maximizing sum(cos(2*pi*(t-phase)/T))) measured the real tempo at 97.494 BPM, not the doc's 130 BPM (docs/architecture/audio.md's 'Lobby loop' table is now known wrong -- flagged as an owner doc-correction follow-up, not edited here). Chose a 9-bar cut with a +-6ms sample-accurate search minimizing the sample-value/slope jump at the loop seam: cost 31.25 (0th percentile of 500 candidate points across the track, median ~7.85M) vs 19.0M for the original shipped cut. Re-encoding to lossy Vorbis (ffmpeg's native encoder, no libvorbis available here, same as CC-7.3 used -- Lavc63.1.101 vorbis) reintroduces some discontinuity at hard file edges, so the shipped file keeps ~0.53s of inert audio past endS and platform-sounds.ts now uses loop:{startS,endS} (0.030204s / 22.178821s) instead of loop:true, so Web Audio's own loopStart/loopEnd loop only the clean span -- post-encode seam jump measured at 41-of-32768 (~0.12% of full scale) vs 4303 in the original file. Full writeup in apps/host/CREDITS.md. Size: lobby-loop.ogg 252.3 KB (was 214.2 KB), platform total ~340.5 KB, both within budget (350 KB / 500 KB).
 
 Token wiring evidence: press on laptop button clicks via a global document click listener (apps/host/src/audio/button-press.ts, isButtonClick duck-typed on closest() rather than instanceof Element since there's no DOM in the plain-Node test env), unit tested. press on the menu countdown tick and the VIP card pick, and ui on the VIP card pick (existing), both in MenuScreen.vue -- untested at the unit level like the rest of that file's audio calls (no .vue component tests in this app). scene on every phase change via a new App.vue watch(() => screen.value.name, applyPhaseScene) sibling to the existing phase-music watch (apps/host/src/audio/phase-scene.ts), unit tested. ui on a player actually joining the lobby (not the player:joined replay burst after a TV reconnect/refresh) via isNewLobbyJoin in use-host-session.ts, unit tested.
+
+Reviewer (sonnet) round 1: pass. Advisory-only finding: the 9-bar/22.15s cut sits ~0.25s above AC1's 'about 19.5 to 21.9s' guide range, since that range was derived from the story description's pre-measurement ~98.7 BPM estimate and the rigorous measurement came in at 97.494 BPM -- not a defect, no action taken.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Recut apps/host/public/audio/lobby-loop.ogg at the track's real, measured tempo (97.494 BPM via a beat-grid fit against aubio onsets, not the doc's stale 130 BPM), choosing a 9-bar loop with sample-accurate loop points found by a discontinuity-minimizing search (post-encode seam jump 41/32768, down from 4303 in the original file); platform-sounds.ts now uses loop:{startS,endS} instead of loop:true so Web Audio's own gapless loop keeps the lossy Vorbis encoder's edge artifacts away from the audible seam. Full measurement writeup in apps/host/CREDITS.md; docs/architecture/audio.md's now-known-wrong 130 BPM shortlist entry is flagged as an owner doc-correction follow-up, not edited (it's owner-approved). Wired the platform token table's remaining gaps from CC-7.4: press on laptop button clicks (a host-only global .cc-button click listener, apps/host/src/audio/button-press.ts, since CcButton is shared with the silent phone controller) and on the menu countdown tick and VIP card pick (MenuScreen.vue); scene on every phase change (App.vue, a sibling to the existing phase-music watch); ui on a player genuinely joining the lobby, not the player:joined replay burst a TV reconnect/refresh triggers (use-host-session.ts's isNewLobbyJoin). Reviewer (sonnet) passed round 1, one advisory-only note (the 9-bar cut lands ~1% above the story's own pre-measurement duration estimate -- expected, not a defect). Epic CC-7 left open: CC-7.6 is Done on its own unmerged branch (PR open, not merged per this run's instructions) but still shows To Do from main, so the epic isn't actually complete from main's perspective yet -- close it once both CC-7.6 and CC-7.7 are merged.
+<!-- SECTION:FINAL_SUMMARY:END -->
