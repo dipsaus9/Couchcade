@@ -30,6 +30,7 @@ describe("requestJoin", () => {
     [409, "room-full", "room-full"],
     [423, "room-locked", "room-locked"],
     [429, "rate-limited", "rate-limited"],
+    [403, "turnstile-failed", "turnstile"],
     [403, "turnstile-unavailable", "turnstile"],
     [403, "forbidden-origin", "unavailable"],
     [400, "bad-request", "unavailable"],

@@ -1,6 +1,6 @@
 /**
  * The bot check the join request carries (docs/architecture/security.md, "Where Turnstile runs").
- * CC-2.2 renders the invisible widget and passes a real provider to `createPhoneSession`.
+ * App.vue passes the invisible widget from src/security/turnstile.ts to `createPhoneSession`.
  */
 export interface TurnstileProvider {
   /** A fresh single-use token, requested when the player taps Join. */
@@ -9,7 +9,7 @@ export interface TurnstileProvider {
   reset(): void;
 }
 
-/** Until CC-2.2 lands the API doesn't check Turnstile, so the phone sends an empty token. */
+/** Sends an empty token, which the API refuses with 403. For code that never calls the API. */
 export const noTurnstile: TurnstileProvider = {
   token: async () => "",
   reset: () => {},

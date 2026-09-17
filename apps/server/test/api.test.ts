@@ -9,6 +9,8 @@ import { describe, expect, it, vi } from "vitest";
 import { apiErrorCodes, apiErrorStatus } from "../src/api/index.ts";
 import { maxPhones } from "../src/api/join.ts";
 import { passcodeMatches } from "../src/api/passcode.ts";
+import { smokeHeader } from "../src/api/turnstile.ts";
+import { maxTokenLength } from "../src/security/turnstile.ts";
 import { signRejoinToken, signTicket } from "../src/security/tickets.ts";
 import defaultWorker, { createWorker, roomStub, signedTickets } from "../src/worker.ts";
 import {
@@ -23,6 +25,7 @@ import {
   upgradeRequest,
   watchRooms,
 } from "./helpers.ts";
+import { siteverifyTokens } from "./siteverify.ts";
 
 const passcode = env.HOST_PASSCODE ?? "";
 const secret = env.TICKET_SIGNING_SECRET;
@@ -105,7 +108,7 @@ describe("POST /api/rooms", () => {
     ["invalid JSON", "{"],
     ["a JSON array", "[]"],
     ["a passcode that isn't text", { passcode: 1234, turnstile }],
-    ["a body over 1 KB", { passcode, turnstile, padding: "x".repeat(1024) }],
+    ["a body over 4 KB", { passcode, turnstile, padding: "x".repeat(4096) }],
   ])("answers 400 for %s without calling a room", async (_case, body) => {
     const response = await call(post("/api/rooms", body));
     expect(response).toEqual({ status: 400, body: { error: "bad-request" }, rooms: [] });
@@ -217,6 +220,151 @@ describe("POST /api/rooms/:code/join", () => {
     await joinPhone(code, null);
     expect(await join()).toMatchObject({ status: 409, body: { error: "room-full" } });
     host.close();
+  });
+});
+describe("Turnstile", () => {
+  // Cloudflare's test secret that refuses every token, and a missing secret.
+  const refusing = { ...env, TURNSTILE_SECRET_KEY: "2x0000000000000000000000000000000AA" };
+  const unset = { ...env, TURNSTILE_SECRET_KEY: undefined };
+  const failed = { error: "turnstile-failed" };
+
+  it("sends the dummy token XXXX.DUMMY.TOKEN.XXXX to Siteverify once per create and join", async () => {
+    siteverifyTokens.splice(0);
+    const { code } = await liveRoom();
+    expect((await call(post(`/api/rooms/${code}/join`, { name: "Pat", turnstile }))).status).toBe(
+      200,
+    );
+    expect(siteverifyTokens).toEqual([turnstile, turnstile]);
+  });
+
+  it.each([
+    ["a missing token", { passcode }],
+    ["an empty token", { passcode, turnstile: "" }],
+    [
+      "a token longer than Cloudflare's 2,048 characters",
+      { passcode, turnstile: "x".repeat(2049) },
+    ],
+  ])("answers 403 to room creation with %s, without calling a room", async (_case, body) => {
+    const response = await call(post("/api/rooms", body));
+    expect(response).toEqual({ status: 403, body: failed, rooms: [] });
+  });
+
+  it("answers 403 to an invalid token before the passcode is checked", async () => {
+    for (const body of [
+      { passcode, turnstile },
+      { passcode: "wrong", turnstile },
+    ]) {
+      const response = await call(post("/api/rooms", body), defaultWorker, refusing);
+      expect(response).toEqual({ status: 403, body: failed, rooms: [] });
+    }
+  });
+
+  it("fits a token of the longest length Cloudflare issues in the body", async () => {
+    const long = "x".repeat(maxTokenLength);
+    expect((await call(post("/api/rooms", { passcode, turnstile: long }))).status).toBe(201);
+  });
+
+  it("fails closed with 403 turnstile-unavailable when no secret is set", async () => {
+    const created = await call(post("/api/rooms", { passcode, turnstile }), defaultWorker, unset);
+    expect(created).toEqual({ status: 403, body: { error: "turnstile-unavailable" }, rooms: [] });
+  });
+
+  it.each([
+    ["a missing token", { name: "Pat" }],
+    ["an empty token", { name: "Pat", turnstile: "" }],
+  ])("answers 403 to a join with %s, without calling a room", async (_case, body) => {
+    const response = await call(post(`/api/rooms/${freshCode()}/join`, body));
+    expect(response).toEqual({ status: 403, body: failed, rooms: [] });
+  });
+
+  it("answers 403 to a join with an invalid token or no secret, without calling a room", async () => {
+    const join = post(`/api/rooms/${freshCode()}/join`, { name: "Pat", turnstile });
+    expect(await call(join.clone(), defaultWorker, refusing)).toEqual({
+      status: 403,
+      body: failed,
+      rooms: [],
+    });
+    expect(await call(join, defaultWorker, unset)).toEqual({
+      status: 403,
+      body: { error: "turnstile-unavailable" },
+      rooms: [],
+    });
+  });
+
+  it("checks the name before Turnstile, so a rejected name doesn't spend the token", async () => {
+    siteverifyTokens.splice(0);
+    const response = await call(post(`/api/rooms/${freshCode()}/join`, { name: "  ", turnstile }));
+    expect(response.status).toBe(400);
+    expect(siteverifyTokens).toEqual([]);
+  });
+});
+
+describe("smoke token", () => {
+  const smokeToken = env.SMOKE_TOKEN ?? "";
+  // Every Turnstile token fails here, so only the smoke token can get a room created.
+  const refusing = { ...env, TURNSTILE_SECRET_KEY: "2x0000000000000000000000000000000AA" };
+  const smoke = (body: unknown, token: string, headers: HeadersInit = {}) =>
+    post("/api/rooms", body, { [smokeHeader]: token, ...headers });
+
+  it("skips only Turnstile on room creation when x-cc-smoke matches SMOKE_TOKEN", async () => {
+    siteverifyTokens.splice(0);
+    const response = await call(smoke({ passcode }, smokeToken), defaultWorker, refusing);
+    expect(response.status).toBe(201);
+    expect(createRoomResponseSchema.parse(response.body).code).toBe(response.rooms[0]);
+    expect(siteverifyTokens).toEqual([]);
+  });
+
+  it("still checks the passcode and Origin", async () => {
+    const wrong = await call(smoke({ passcode: "wrong" }, smokeToken), defaultWorker, refusing);
+    expect(wrong).toEqual({ status: 401, body: { error: "wrong-passcode" }, rooms: [] });
+    const foreign = await call(
+      smoke({ passcode }, smokeToken, { Origin: "https://evil.test" }),
+      defaultWorker,
+      refusing,
+    );
+    expect(foreign).toEqual({ status: 403, body: { error: "forbidden-origin" }, rooms: [] });
+  });
+
+  it.each([
+    ["a wrong smoke token", `${env.SMOKE_TOKEN}x`],
+    ["an empty smoke token", ""],
+  ])("falls back to the Turnstile check for %s", async (_case, token) => {
+    const response = await call(smoke({ passcode, turnstile }, token), defaultWorker, refusing);
+    expect(response).toEqual({ status: 403, body: { error: "turnstile-failed" }, rooms: [] });
+    // With a Turnstile token that passes, the request goes through like any other.
+    expect((await call(smoke({ passcode, turnstile }, token))).status).toBe(201);
+  });
+
+  it("never matches when SMOKE_TOKEN isn't set", async () => {
+    const unset = { ...refusing, SMOKE_TOKEN: undefined };
+    for (const token of ["", smokeToken]) {
+      const response = await call(smoke({ passcode }, token), defaultWorker, unset);
+      expect(response).toEqual({ status: 403, body: { error: "turnstile-failed" }, rooms: [] });
+    }
+  });
+
+  it("compares the smoke token in constant time", async () => {
+    const compare = vi.spyOn(crypto.subtle, "timingSafeEqual");
+    try {
+      await call(smoke({ passcode: "wrong" }, "a-guess"), defaultWorker, refusing);
+      // The smoke token compare, then no passcode compare because Turnstile refused first.
+      expect(compare).toHaveBeenCalledTimes(1);
+      const [a, b] = compare.mock.calls[0] ?? [];
+      expect((a as ArrayBuffer).byteLength).toBe(32);
+      expect((b as ArrayBuffer).byteLength).toBe(32);
+    } finally {
+      compare.mockRestore();
+    }
+  });
+
+  it("doesn't skip Turnstile on a join", async () => {
+    const { code } = await liveRoom();
+    const response = await call(
+      post(`/api/rooms/${code}/join`, { name: "Pat", turnstile }, { [smokeHeader]: smokeToken }),
+      defaultWorker,
+      refusing,
+    );
+    expect(response).toEqual({ status: 403, body: { error: "turnstile-failed" }, rooms: [] });
   });
 });
 

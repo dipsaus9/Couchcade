@@ -8,11 +8,14 @@ import {
 } from "@couchcade/protocol";
 
 /**
- * Cloudflare's documented Turnstile dummy token. Today the API doesn't check Turnstile yet. Once
- * CC-2.2 adds the check, a test secret accepts this token and a production secret doesn't
+ * Cloudflare's documented Turnstile dummy token. A test secret accepts it and a production secret
+ * doesn't, so on the live site the smoke token is what gets the room created
  * (docs/architecture/security.md, "Where Turnstile runs").
  */
 export const turnstileDummyToken = "XXXX.DUMMY.TOKEN.XXXX";
+
+/** The header `POST /api/rooms` reads the smoke token from (security.md, decision 19). */
+export const smokeHeader = "x-cc-smoke";
 
 /** The part of a WebSocket the smoke test uses. The global `WebSocket` in Node 24 fits. */
 export interface SmokeSocket {
@@ -28,6 +31,8 @@ export interface SmokeOptions {
   baseUrl: string;
   /** The host passcode the site was deployed with. */
   passcode: string;
+  /** The SMOKE_TOKEN Worker secret. It lets room creation skip only the Turnstile check. */
+  smokeToken: string;
   /** How long each step may take. */
   timeoutMs?: number;
   fetch?: typeof fetch;
@@ -56,6 +61,7 @@ const defaultOpenSocket = (url: string, headers: Record<string, string>): SmokeS
 export async function runSmoke(options: SmokeOptions): Promise<void> {
   const {
     passcode,
+    smokeToken,
     timeoutMs = 15_000,
     fetch: fetchFn = fetch,
     openSocket = defaultOpenSocket,
@@ -77,14 +83,13 @@ export async function runSmoke(options: SmokeOptions): Promise<void> {
     new URL("/api/rooms", site),
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", [smokeHeader]: smokeToken },
       body: JSON.stringify({ passcode, turnstile: turnstileDummyToken }),
     },
     timeoutMs,
   );
   if (created.status !== 201) {
-    const hint =
-      created.status === 401 ? " (SMOKE_HOST_PASSCODE doesn't match the HOST_PASSCODE secret)" : "";
+    const hint = createHints[created.status] ?? "";
     throw new SmokeError(
       `POST /api/rooms returned ${created.status} ${await created.text()}${hint}`,
     );
@@ -113,6 +118,12 @@ export async function runSmoke(options: SmokeOptions): Promise<void> {
     socket.close();
   }
 }
+
+/** What a failed room creation most likely means. */
+const createHints: Record<number, string> = {
+  401: " (SMOKE_HOST_PASSCODE doesn't match the HOST_PASSCODE secret)",
+  403: " (SMOKE_TOKEN doesn't match the SMOKE_TOKEN Worker secret, so Turnstile refused the request)",
+};
 
 async function request(
   fetchFn: typeof fetch,

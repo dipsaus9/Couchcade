@@ -24,6 +24,10 @@ declare global {
       HOST_PASSCODE?: string;
       /** Signs tickets and rejoin tokens. Unset or under 32 characters refuses every token. */
       TICKET_SIGNING_SECRET?: string;
+      /** Checks Turnstile tokens with Siteverify. Unset refuses every create and join with 403. */
+      TURNSTILE_SECRET_KEY?: string;
+      /** Lets the deploy smoke test skip Turnstile on room creation. Unset never matches. */
+      SMOKE_TOKEN?: string;
     }
   }
 }

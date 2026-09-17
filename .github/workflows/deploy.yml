@@ -73,10 +73,52 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
 
+      # Turnstile runs on every create and join (docs/architecture/security.md, "Where Turnstile
+      # runs"). Without the site key the apps would ship Cloudflare's test key and every create and
+      # join would fail. Without the smoke token the smoke test can't create a room. Stop first.
+      - name: check the Turnstile settings
+        env:
+          TURNSTILE_SITE_KEY: ${{ vars.TURNSTILE_SITE_KEY }}
+          HAS_SMOKE_TOKEN: ${{ secrets.SMOKE_TOKEN != '' }}
+        run: |
+          if [ -z "$TURNSTILE_SITE_KEY" ]; then
+            echo "::error::Set the TURNSTILE_SITE_KEY Actions variable to the Turnstile widget's site key."
+            exit 1
+          fi
+          if [ "$HAS_SMOKE_TOKEN" != "true" ]; then
+            echo "::error::Set the SMOKE_TOKEN Actions secret to the same value as the Worker secret."
+            exit 1
+          fi
+
       - run: pnpm install --frozen-lockfile
 
-      # Builds the host and controller, then assembles them into apps/server/dist/public.
+      # Builds the host and controller, then assembles them into apps/server/dist/public. Both apps
+      # read the public Turnstile site key at build time.
       - run: pnpm build
+        env:
+          VITE_TURNSTILE_SITE_KEY: ${{ vars.TURNSTILE_SITE_KEY }}
+
+      # Lists the Worker's secret names (never values), so a deploy never goes out before the
+      # Turnstile secret and the smoke token are set on the Worker.
+      - id: worker-secrets
+        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/server
+          packageManager: pnpm
+          command: secret list --format json
+
+      - name: check the Worker secrets
+        env:
+          SECRETS: ${{ steps.worker-secrets.outputs.command-output }}
+        run: |
+          for name in TURNSTILE_SECRET_KEY SMOKE_TOKEN; do
+            if ! printf '%s' "$SECRETS" | grep -q "\"$name\""; then
+              echo "::error::Set $name as a Worker secret with wrangler secret put $name."
+              exit 1
+            fi
+          done
 
       # Uses the wrangler version from the lockfile, because no wranglerVersion is given.
       - uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
@@ -87,9 +129,11 @@ jobs:
           packageManager: pnpm
           command: deploy
 
-      # Creates a room with the passcode and opens its socket. Any failure fails the workflow.
+      # Creates a room with the passcode and the smoke token, which skips only Turnstile, and opens
+      # its socket. Any failure fails the workflow.
       - name: smoke test
         run: pnpm --filter @couchcade/smoke run smoke
         env:
           SMOKE_URL: https://couchcade.dipsaus9.workers.dev
           SMOKE_HOST_PASSCODE: ${{ secrets.SMOKE_HOST_PASSCODE }}
+          SMOKE_TOKEN: ${{ secrets.SMOKE_TOKEN }}

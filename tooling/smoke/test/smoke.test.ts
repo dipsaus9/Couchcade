@@ -4,6 +4,7 @@ import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 import {
   runSmoke,
+  smokeHeader,
   type SmokeOptions,
   type SmokeSocket,
   turnstileDummyToken,
@@ -70,17 +71,24 @@ interface Site {
 
 /** Smoke options wired to a fake site, plus a record of what the smoke test did. */
 function fakeSite({ pages = 200, create, socket }: Site = {}) {
-  const requests: Array<{ method: string; path: string; body?: string }> = [];
+  const requests: Array<{
+    method: string;
+    path: string;
+    headers: Headers;
+    body?: string;
+  }> = [];
   const sockets: FakeRoomSocket[] = [];
   const options: SmokeOptions = {
     baseUrl: site,
     passcode: "four random words here",
+    smokeToken: "the-smoke-token",
     timeoutMs: 200,
     fetch: async (input, init) => {
       const url = new URL(String(input));
       requests.push({
         method: init?.method ?? "GET",
         path: url.pathname,
+        headers: new Headers(init?.headers),
         body: init?.body as string,
       });
       if (url.pathname === "/api/rooms") {
@@ -123,6 +131,8 @@ describe("runSmoke", () => {
       passcode: "four random words here",
       turnstile: turnstileDummyToken,
     });
+    expect(requests[2]?.headers.get(smokeHeader)).toBe("the-smoke-token");
+    expect(smokeHeader).toBe("x-cc-smoke");
     expect(sockets).toHaveLength(1);
     expect(sockets[0]?.url).toBe(`wss://couchcade.test/ws/ABCD?ticket=${ticket}&v=1`);
     expect(sockets[0]?.headers).toEqual({ Origin: site });
@@ -148,6 +158,11 @@ describe("runSmoke", () => {
     });
     await expect(runSmoke(options)).rejects.toThrow(/401.*SMOKE_HOST_PASSCODE/);
     expect(sockets).toHaveLength(0);
+  });
+
+  it("fails with a hint when the smoke token doesn't match", async () => {
+    const { options } = fakeSite({ create: { status: 403, body: { error: "turnstile-failed" } } });
+    await expect(runSmoke(options)).rejects.toThrow(/403.*SMOKE_TOKEN/);
   });
 
   it("fails when the create response has the wrong shape", async () => {
@@ -197,10 +212,20 @@ describe("smoke entry point", () => {
     expect(output).toContain("SMOKE_HOST_PASSCODE isn't set");
   });
 
+  it("exits 1 when the smoke token isn't set", async () => {
+    const { exitCode, output } = await smokeCli({
+      SMOKE_URL: site,
+      SMOKE_HOST_PASSCODE: "anything",
+    });
+    expect(exitCode).toBe(1);
+    expect(output).toContain("SMOKE_TOKEN isn't set");
+  });
+
   it("exits 1 when the site can't be reached", async () => {
     const { exitCode, output } = await smokeCli({
       SMOKE_URL: "http://127.0.0.1:9",
       SMOKE_HOST_PASSCODE: "anything",
+      SMOKE_TOKEN: "anything",
     });
     expect(exitCode).toBe(1);
     expect(output).toContain("Smoke test failed: GET / failed");
