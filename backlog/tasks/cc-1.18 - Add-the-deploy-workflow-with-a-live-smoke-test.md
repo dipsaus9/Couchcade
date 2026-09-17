@@ -1,13 +1,12 @@
 ---
 id: CC-1.18
 title: Add the deploy workflow with a live smoke test
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-16 20:51'
+updated_date: '2026-09-17 08:43'
 labels:
   - story
-  - needs-info
 dependencies:
   - CC-1.6
   - CC-1.10
@@ -37,7 +36,7 @@ Branch: CC-1.18/deploy-workflow
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 .github/workflows/deploy.yml runs on push to main after CI succeeds and deploys with cloudflare/wrangler-action
+- [x] #1 .github/workflows/deploy.yml runs on push to main after CI succeeds and deploys with cloudflare/wrangler-action
 - [x] #2 tooling/smoke/ creates a room with the passcode through the API and opens a WebSocket
 - [x] #3 A failing smoke test fails the workflow
 <!-- AC:END -->
@@ -61,10 +60,12 @@ Evidence: smoke passed against pnpm dev and against wrangler dev --local on the 
 Open for CC-2.2: in production Turnstile will reject the dummy token, so the smoke can't create a room after CC-2.2. security.md defines no bypass, none added. Recommended: CC-2.2 amends security.md with a SMOKE_TOKEN Worker secret whose constant-time match on an x-cc-smoke header skips only Turnstile on POST /api/rooms.
 Review: story-reviewer verdict pass (round 1), all 3 criteria met, no scope violations, no findings.
 AC 1 stays open until the first live Deploy run; the label needs-info stays until the owner confirms the secrets and first deploy.
+
+Owner completed setup 2026-09-17: Worker secrets HOST_PASSCODE and TICKET_SIGNING_SECRET (secret_text), GitHub secrets CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, SMOKE_HOST_PASSCODE. First manual deploy by owner. Deploy run 35200076778 (re-run) deployed main b6671d6 and the live smoke test passed: GET /, GET /host/, POST /api/rooms created room WHGJ, /ws welcome, room:end closed it.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Added .github/workflows/deploy.yml (workflow_run on CI success for pushes to main; skips with a notice while CLOUDFLARE_API_TOKEN/CLOUDFLARE_ACCOUNT_ID are unset or when the commit is no longer main's tip; builds, deploys apps/server with cloudflare/wrangler-action v4.0.0 pinned by SHA, then runs the smoke test against https://couchcade.dipsaus9.workers.dev with SMOKE_HOST_PASSCODE). Added tooling/smoke (@couchcade/smoke): loads / and /host/, creates a room with the passcode, opens the host socket with Origin, waits for room:welcome, ends the room (4004), exits 1 on any failure. apps/server now builds dist/public from the controller and host dists and serves it as static assets with only /api/* and /ws/* running the Worker. Fixed a non-handler export in worker.ts that made workerd refuse the bundled Worker. Awaiting the owner's secrets and first deploy.
+Every merge to main now deploys apps/server (static host + controller assets, API and relay) to https://couchcade.dipsaus9.workers.dev via .github/workflows/deploy.yml with cloudflare/wrangler-action, then tooling/smoke creates a real room with the passcode and opens a WebSocket; a failing smoke test fails the workflow. The workflow skips cleanly while Cloudflare secrets are missing. Verified live on 2026-09-17 (run 35200076778).
 <!-- SECTION:FINAL_SUMMARY:END -->
