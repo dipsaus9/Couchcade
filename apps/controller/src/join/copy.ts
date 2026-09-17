@@ -40,5 +40,8 @@ export const codeHint: Record<CodeProblem | "ok" | "from-url", string> = {
 export const nameHint: Record<NameProblem | "ok", string> = {
   empty: "1 to 12 letters",
   "too-long": "Names are 12 letters at most",
+  character: "Letters, numbers and ' - . _ only",
+  "no-letter": "Add a letter or a number",
+  blocked: joinFailureCopy["name-not-allowed"],
   ok: "Your name on the TV",
 };
