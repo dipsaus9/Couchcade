@@ -64,6 +64,7 @@ describe("defineGame", () => {
       | "realtime"
       | "needsMotion"
       | "scene"
+      | "hidden"
       | "inputSchema"
       | "init"
       | "onPlayerInput"
@@ -119,6 +120,7 @@ describe("checkGameDefinition", () => {
     [{ players: { min: 2, max: 9 } }, "1 <= min <= max <= 8"],
     [{ players: { min: 1.5, max: 4 } }, "1 <= min <= max <= 8"],
     [{ realtime: "yes" }, "realtime is not a boolean"],
+    [{ hidden: "yes" }, "hidden is not a boolean"],
     [{ scene: "" }, "scene is empty"],
     [{ inputSchema: {} }, "inputSchema is not a zod schema"],
     [{ outcome: undefined }, "outcome is not a function"],

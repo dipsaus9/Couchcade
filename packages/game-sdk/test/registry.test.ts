@@ -77,6 +77,31 @@ describe("createRegistry", () => {
     );
   });
 
+  it("leaves out a hidden game, so the menu never lists it and nothing can start it", () => {
+    const unfinished = { ...pickANumber, hidden: true };
+    const registry = createRegistry({
+      "../../games/draw-race/src/index.ts": drawRace,
+      "../../games/pick-a-number/src/index.ts": unfinished,
+    });
+    expect(registry.games.map((game) => game.id)).toEqual(["draw-race"]);
+    expect(registry.has("pick-a-number")).toBe(false);
+    expect(registry.get("pick-a-number")).toBeUndefined();
+    const listed = createRegistry({
+      "../../games/pick-a-number/src/index.ts": { ...pickANumber, hidden: false },
+    });
+    expect(listed.has("pick-a-number")).toBe(true);
+  });
+
+  it("still checks a hidden game", () => {
+    const broken = { ...drawRace, hidden: true, init: undefined };
+    expect(() => createRegistry({ "../../games/draw-race/src/index.ts": broken })).toThrow(
+      "init is not a function",
+    );
+    expect(() =>
+      createRegistry({ "../../games/quick-draw/src/index.ts": { ...drawRace, hidden: true } }),
+    ).toThrow("but its folder is quick-draw");
+  });
+
   it("rejects a title over 16 characters, so it fits a menu card", () => {
     const long = { ...pickANumber, title: "A title too long!" };
     expect(() => createRegistry({ "../../games/pick-a-number/src/index.ts": long })).toThrow(

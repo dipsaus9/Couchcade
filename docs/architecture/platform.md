@@ -555,6 +555,7 @@ export interface CouchcadeGame<
   realtime: boolean;                   // true: onTick runs and inputs stream through the batching helper
   needsMotion: boolean;                // true: the motion permission step runs before the game
   scene: ScenePaletteId;               // "desert", "alley", ...
+  hidden?: boolean;                    // true: the registry checks the game but leaves it off the menu (unfinished)
   inputSchema: ZodMiniType<TInput>;    // every input is validated before onPlayerInput
 
   init(players: readonly Player[], seed: number): TState;
@@ -643,6 +644,7 @@ export const registry = createControllerRegistry(
 ```
 
 - `createRegistry` checks that ids are unique and match the folder name, and sorts games by title.
+- A game that isn't playable end to end yet sets `hidden: true`. `createRegistry` still checks it, but leaves it out of `games`, `has` and `get`, so the menu never lists it and nothing can start it. The story that registers the game (its bot-match E2E test) removes the flag.
 - The phone never loads game code up front. The VIP's game list arrives in the `menu` view from the host. That keeps 14 games out of the phone's initial 80 KB.
 - `index.ts` only imports `shared/` and `defineGame`. Its `hostScene` loader is a dynamic import, so Phaser never reaches a phone. The phone loads `src/controller/index.ts` (`defineController`) instead, so Vue controllers never reach the TV bundle and rules or physics never reach the phone. The owner chose this on 16 September 2026 (session-flow doc, conflict 1).
 - Apps don't list games in `package.json`. The glob finds them, and each game's own dependencies resolve from its folder.
