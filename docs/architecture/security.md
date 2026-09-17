@@ -56,6 +56,8 @@ Approving this doc approves these. Rows 15 to 18 were open choices that the owne
 | 16 | 20 join attempts per IP per minute (owner, 2026-09-16) | Raised from 10, because every phone at a party shares the home Wi-Fi address. Turnstile, not the rate limit, stops bots. |
 | 17 | No extra challenge after wrong codes (owner, 2026-09-16) | The README's "interactive challenge after 3 wrong codes" is dropped. Codes only work while the TV is connected and each guess needs Turnstile, so guessing is already impractical. Revisit only if the logs show guessing. |
 | 18 | At most 16 phones per room (owner, 2026-09-16) | 8 players and 8 audience. The 17th join gets 409 `room-full`, which shows the "Room is full" screen. Every extra socket costs keep-alive and clock requests and gets its own flood bucket. |
+| 19 | The deploy smoke test skips only Turnstile with a smoke token (owner, 2026-09-17) | A `SMOKE_TOKEN` Worker secret (32 random bytes) and the same value as a GitHub secret. `POST /api/rooms` with a matching `x-cc-smoke` header, compared in constant time, skips only the Turnstile check; Origin, rate limits and the passcode still apply. Only room creation accepts it. Without it the live smoke test could no longer prove a room can be created. |
+| 20 | Room codes never spell a rude word (owner, 2026-09-17) | `roomCode()` redraws when a code is on a small NL + EN blocklist of 4-letter words. |
 
 ---
 
@@ -80,7 +82,7 @@ These are the parts no story can do for you.
 | The daily free quota | 100,000 Durable Object requests and 100,000 Worker requests a day | The site stops until 00:00 UTC. No charge. |
 | The evening itself | A room the host controls, a TV friends are looking at | A stranger or rude name on the TV, a player pushed out of a game |
 | The site's code | Every guest runs our JavaScript on their phone | Malicious code served to guests. This is the one serious outcome. |
-| Secrets | `HOST_PASSCODE`, `TICKET_SIGNING_SECRET`, `TURNSTILE_SECRET_KEY`, the Cloudflare deploy token | Rooms created by strangers, forged tickets, a malicious deploy |
+| Secrets | `HOST_PASSCODE`, `TICKET_SIGNING_SECRET`, `TURNSTILE_SECRET_KEY`, `SMOKE_TOKEN`, the Cloudflare deploy token | Rooms created by strangers, forged tickets, a malicious deploy |
 | Player data | A chosen name, a Pip, an IP address in memory | Very little. Nothing is kept after a room closes. |
 
 ### Attackers
@@ -127,7 +129,7 @@ Hosting now needs a passcode, so the question was whether room creation still ne
 
 | Place | Turnstile? | Why |
 |---|---|---|
-| `POST /api/rooms` (host submits the passcode) | Yes, action `create` | Makes passcode guessing and room spam expensive for bots |
+| `POST /api/rooms` (host submits the passcode) | Yes, action `create` | Makes passcode guessing and room spam expensive for bots. The deploy smoke test skips it with the `x-cc-smoke` smoke token (decision 19) |
 | `POST /api/rooms/:code/join` (phone taps Join) | Yes, action `join` | Makes code guessing expensive. Each wrong code would otherwise cost a Durable Object request. |
 | `POST /api/rooms/:code/rejoin` | No | The rejoin token already proves an earlier pass. Rejoins happen after every deploy and screen lock. |
 | `GET /ws/:code` | No | The 60-second ticket proves a pass seconds earlier |
