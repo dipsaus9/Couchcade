@@ -160,10 +160,11 @@ describe("Target Range TV scene", () => {
       expect(scene.cameras.main.zoom).toBe(zoom);
       expect(scene.viewport).toMatchObject({ x: 0, y: 0, width: world.width * zoom });
 
-      // The world really drew: sky, grass, the gold centre of the target and the first Pip's jersey.
+      // The world really drew from its sprites: sky, grass, the gold centre of the target face and the
+      // first Pip's jersey.
       const start = scene.hostData?.getState() as TargetRangeState;
       await expectPixel(stage, 200 * zoom, 48 * zoom, art.sky);
-      await expectPixel(stage, 240 * zoom, 200 * zoom, art.grass);
+      await expectPixel(stage, 440 * zoom, 130 * zoom, art.grass);
       await expectPixel(stage, start.target.x * zoom, start.target.y * zoom, art.bands[4]);
       const [slot] = pipSlots(4);
       const player = scene.hostData?.players[0];
@@ -407,7 +408,7 @@ describe("Target Range TV scene", () => {
         const shapes = range.arrowShapeBoxes;
         const stubs = range.stubs
           .filter((stub) => stub.visible)
-          .map((stub) => stubBox(stub.x + 2, stub.y + 2));
+          .map((stub) => stubBox(stub.x + 4, stub.y + 4));
         shapes.forEach((shape, index) => {
           for (const other of shapes.slice(index + 1)) {
             if (overlaps(shape, other)) clashes.push(`${where}: two arrow shapes overlap`);

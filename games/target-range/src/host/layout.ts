@@ -48,26 +48,27 @@ export function bowPoint(slot: PipSlot, raised: boolean): Point {
   return { x: slot.x + 9 * slot.facing, y: slot.feetY - (raised ? 15 : 9) };
 }
 
-/** Straw around the target face, in world px. */
-export const bossMarginPx = 4;
-/** The stand's legs below the straw boss. */
-export const legPx = 12;
+/**
+ * The straw boss on its wooden stand (assets/sprites/target-stand.png): its size, and the pixel of
+ * the sprite the target face's centre pixel covers. The boss is the round part at the top, the
+ * legs reach the sprite's bottom row.
+ */
+export const stand = { width: 80, height: 96, faceX: 40, faceY: 36, bossHeight: 73 } as const;
 
-/** How far the wind flag's pole stands from the target face's edge. */
-const flagGapPx = 16;
-/** The flag pole's height above the ground. */
-export const poleHeightPx = 30;
+/** A wind flag frame (assets/sprites/wind-flag-*.png): the pole's left column, bottom row and height. */
+export const flagFrame = { size: 16, poleX: 2, poleBottom: 14, poleTop: 1 } as const;
+
+/** The stand's top-left pixel for a target centred on `target`. */
+export function standAt(target: Point): Point {
+  return { x: target.x - stand.faceX, y: target.y - stand.faceY };
+}
 
 /**
- * The flag stands on the ground next to the target, on the side facing the middle of the range,
- * so it never leaves the world. Returns the foot of the pole.
+ * The wind flag stands on top of the straw boss, as on a real range, so everyone reads the wind
+ * where they look anyway. Returns the pole's bottom pixel (its left column), one row into the straw.
  */
-export function flagFoot(target: Point, radius: number): Point {
-  const side = target.x > world.width / 2 ? -1 : 1;
-  return {
-    x: Math.round(target.x + side * (radius + bossMarginPx + flagGapPx)),
-    y: Math.round(target.y + radius + bossMarginPx + legPx),
-  };
+export function flagFoot(target: Point): Point {
+  return { x: target.x - 1, y: standAt(target).y + 1 };
 }
 
 /** The TV safe area's left and right inset in world px (96 overlay px). */
@@ -79,19 +80,19 @@ const calloutY = 100;
 
 /**
  * Where BULLSEYE! is centred: over the wider stretch of range beside the target, so it covers as
- * little of the face and its arrows as it can while everyone looks for their arrow.
+ * little of the target and its arrows as it can while everyone looks for their arrow.
  */
-export function calloutAt(target: Point, radius: number): Point {
-  const faceLeft = target.x - radius - bossMarginPx;
-  const faceRight = target.x + radius + bossMarginPx;
-  const leftRoom = faceLeft - safeInsetPx;
-  const rightRoom = world.width - safeInsetPx - faceRight;
+export function calloutAt(target: Point): Point {
+  const standLeft = standAt(target).x;
+  const standRight = standLeft + stand.width;
+  const leftRoom = standLeft - safeInsetPx;
+  const rightRoom = world.width - safeInsetPx - standRight;
   const min = safeInsetPx + calloutHalfWidthPx;
   const max = world.width - safeInsetPx - calloutHalfWidthPx;
   const x =
     leftRoom >= rightRoom
-      ? Math.max(min, Math.round((safeInsetPx + faceLeft) / 2))
-      : Math.min(max, Math.round((faceRight + world.width - safeInsetPx) / 2));
+      ? Math.max(min, Math.round((safeInsetPx + standLeft) / 2))
+      : Math.min(max, Math.round((standRight + world.width - safeInsetPx) / 2));
   return { x, y: calloutY };
 }
 

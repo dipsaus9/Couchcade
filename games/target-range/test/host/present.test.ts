@@ -4,16 +4,16 @@ import { AIM_PLAYBACK_DELAY_MS, aimAt } from "@couchcade/game-sdk/input";
 import { SHAPE_SIZE } from "@couchcade/stage/draw";
 import { world } from "@couchcade/theme";
 import {
-  bossMarginPx,
   calloutAt,
   crosshairShapeBox,
   flagFoot,
-  legPx,
+  flagFrame,
   panelTopY,
   pipFeetY,
   pipSlots,
-  poleHeightPx,
   scoreboardBottomY,
+  stand,
+  standAt,
 } from "../../src/host/layout.ts";
 import { panelText, present, targetSlideMs, windText } from "../../src/host/present.ts";
 import type { Presentation } from "../../src/host/present.ts";
@@ -69,13 +69,15 @@ describe("layout", () => {
       // Inside the TV safe area (24 world px) and clear of the target's widest spot.
       expect(slot.x - 8).toBeGreaterThanOrEqual(24);
       expect(slot.x + 8).toBeLessThanOrEqual(world.width - 24);
-      expect(slot.x + 8 < targetMinX - 40 || slot.x - 8 > targetMaxX + 40).toBe(true);
+      expect(slot.x + 8 < targetMinX - stand.faceX || slot.x - 8 > targetMaxX + stand.faceX).toBe(
+        true,
+      );
     }
     // The shape marker under the feet ends above the bottom panels.
     expect(pipFeetY + SHAPE_SIZE).toBeLessThanOrEqual(panelTopY);
   });
 
-  it("keeps every target face between y = 60 and 210 and its stand and flag clear of the overlays", () => {
+  it("keeps every target face between y = 60 and 210 and its boss and flag clear of the overlays", () => {
     for (const round of rounds) {
       for (const [x, y] of [
         [targetMinX, targetMinY],
@@ -85,12 +87,16 @@ describe("layout", () => {
       ] as const) {
         expect(y - round.radius).toBeGreaterThanOrEqual(60);
         expect(y + round.radius).toBeLessThanOrEqual(210);
-        expect(y + round.radius + bossMarginPx + legPx).toBeLessThanOrEqual(panelTopY);
-        const foot = flagFoot({ x, y }, round.radius);
-        expect(foot.y - poleHeightPx).toBeGreaterThan(scoreboardBottomY);
-        expect(foot.x).toBeGreaterThan(24);
-        expect(foot.x).toBeLessThan(world.width - 24);
-        const callout = calloutAt({ x, y }, round.radius);
+        // The straw boss stays above the bottom panels; only the stand's legs may reach behind them.
+        const at = standAt({ x, y });
+        expect(at.y + stand.bossHeight).toBeLessThanOrEqual(panelTopY);
+        expect(at.x).toBeGreaterThanOrEqual(24);
+        expect(at.x + stand.width).toBeLessThanOrEqual(world.width - 24);
+        // The flag stands in the straw on top of the boss, below the scoreboard.
+        const foot = flagFoot({ x, y });
+        expect(foot.y).toBeGreaterThan(at.y);
+        expect(foot.y - flagFrame.poleBottom).toBeGreaterThanOrEqual(scoreboardBottomY);
+        const callout = calloutAt({ x, y });
         expect(callout.x - 100).toBeGreaterThanOrEqual(24);
         expect(callout.x + 100).toBeLessThanOrEqual(world.width - 24);
       }

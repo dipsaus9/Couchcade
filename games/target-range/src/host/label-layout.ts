@@ -30,7 +30,10 @@ function overlapArea(a: Box, b: Box): number {
   return width > 0 && height > 0 ? width * height : 0;
 }
 
-/** A stuck arrow's stub: 3×3 with a 1 px Ink outline, centred on its landing pixel. */
+/**
+ * The box a stuck arrow's stub keeps clear, centred on its landing pixel. The stub sprite's 4×4
+ * square (world.ts) covers the landing pixel and the pixels up and left of it, inside this box.
+ */
 export const stubSize = 5;
 
 export function stubBox(x: number, y: number): Box {
