@@ -1,3 +1,4 @@
+import { pipParts } from "@couchcade/utils/pips";
 import * as z from "zod/mini";
 
 /** Letters used by room codes and player ids: A to Z without I and O. */
@@ -32,10 +33,15 @@ export const roleSchema = z.enum(roles);
 export type Role = z.infer<typeof roleSchema>;
 
 /**
- * Options per Pip part (HOUSE_STYLE "Pips"). A profile stores the index of each option.
- * CC-6.1 refines the parts and CC-6.2 adds the ranges to `@couchcade/utils`.
+ * Options per Pip part (HOUSE_STYLE "Pips", docs/architecture/pips.md). A profile stores the
+ * index of each option. `@couchcade/utils`'s `pipParts` is the source of truth for the counts
+ * (CC-6.2); this is a derived, backward-compatible view with the shape earlier code expects.
  */
-export const pipPartCounts = { skin: 6, hair: 8, hairColour: 6 } as const;
+export const pipPartCounts = {
+  skin: pipParts.skin,
+  hair: pipParts.hair.length,
+  hairColour: pipParts.hairColour,
+} as const;
 
 const pipPart = (count: number) => z.int().check(z.gte(0), z.lt(count));
 
