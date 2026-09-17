@@ -1,10 +1,17 @@
-import { createRoomClock } from "@couchcade/game-sdk/clock";
+import { createRoomClock, type StoredDisplayLag } from "@couchcade/game-sdk/clock";
 import type { CouchcadeGame } from "@couchcade/game-sdk/contract";
 import { createRegistry } from "@couchcade/game-sdk/registry";
 import type { HostToRelayMessage, RelayToHostMessage } from "@couchcade/protocol";
 import { describe, expect, it } from "vitest";
 import { countdownMs } from "../../src/screens/menu/menu.ts";
-import { createHostRuntime } from "../../src/runtime/host-runtime.ts";
+import { createHostRuntime, type DisplayLagStore } from "../../src/runtime/host-runtime.ts";
+import {
+  beatMs,
+  flashMs,
+  practiceFlashes,
+  settleMs,
+  totalFlashes,
+} from "../../src/screens/calibration/calibration.ts";
 import type { GameStage } from "../../src/runtime/stage.ts";
 import {
   createVirtualTime,
@@ -18,15 +25,29 @@ import {
   type EchoState,
 } from "./fixtures.ts";
 
-function setup({ games = [echoGame()] as CouchcadeGame[], sceneFails = false } = {}) {
+function setup({
+  games = [echoGame()] as CouchcadeGame[],
+  sceneFails = false,
+  storedLag = null as StoredDisplayLag | null,
+} = {}) {
   const time = createVirtualTime(1_000_000);
   const sent: HostToRelayMessage[] = [];
   const warnings: string[] = [];
   const stageLog: string[] = [];
+  const sceneLag: number[] = [];
+  let stored = storedLag;
+  const displayLag: DisplayLagStore = {
+    ms: () => stored?.ms ?? 0,
+    read: () => stored,
+    save: (ms) => {
+      stored = { ms, measuredAt: 42 };
+    },
+  };
   let changes = 0;
   const stage: GameStage = {
     start: (game, data) => {
       stageLog.push(`start ${game.id} ${data.players.length}`);
+      sceneLag.push(data.displayLagMs);
       return sceneFails ? Promise.reject(new Error("no scene")) : Promise.resolve();
     },
     stop: (game) => stageLog.push(`stop ${game.id}`),
@@ -45,6 +66,7 @@ function setup({ games = [echoGame()] as CouchcadeGame[], sceneFails = false } =
     createSeed: () => 7,
     warn: (message) => warnings.push(message),
     onChange: () => (changes += 1),
+    displayLag,
   });
   const lobby = lobbyWith(3);
   const [vip, second] = lobby.players.map((player) => player.id) as [string, string];
@@ -62,6 +84,8 @@ function setup({ games = [echoGame()] as CouchcadeGame[], sceneFails = false } =
     sent,
     warnings,
     stageLog,
+    sceneLag,
+    stored: () => stored,
     runtime,
     lobby,
     vip,
@@ -530,5 +554,141 @@ describe("createHostRuntime", () => {
     expect(runtime.running).toBeNull();
     time.advance(1000);
     expect(time.pending).toBe(0);
+  });
+});
+
+const skipAction = (from: string): RelayToHostMessage => ({
+  t: "ui:action",
+  from,
+  d: { action: "skip-calibration" },
+});
+
+const tapMessage = (from: string, at: number): RelayToHostMessage => ({
+  t: "calibration:tap",
+  from,
+  d: { at },
+});
+
+describe("TV lag calibration", () => {
+  /** Opens the check from the TV lobby once the host knows its players. */
+  function inCalibration(options: Parameters<typeof setup>[0] = {}) {
+    const rig = setup(options);
+    rig.handle({ t: "player:joined", d: { player: rig.lobby.players[2]! } });
+    rig.runtime.checkTvLag();
+    return rig;
+  }
+
+  /** Draws the flashes at 60 Hz and taps along for every seated player, `lagMs` after each. */
+  function tapAlong(rig: ReturnType<typeof inCalibration>, lagMs: number) {
+    const { runtime, handle, lobby, time } = rig;
+    const startsAt = runtime.calibration!.startsAt;
+    const drawn: number[] = [];
+    for (let at = time.now(); at <= startsAt + totalFlashes * beatMs; at += 1000 / 60) {
+      const frame = runtime.calibrationFrame(Math.round(at));
+      if (frame?.lit && drawn[frame.index] === undefined) drawn[frame.index] = Math.round(at);
+    }
+    for (let index = practiceFlashes; index < totalFlashes; index++) {
+      for (const player of lobby.players) handle(tapMessage(player.id, drawn[index]! + lagMs));
+    }
+    return startsAt + (totalFlashes - 1) * beatMs + flashMs + settleMs;
+  }
+
+  it("starts from the TV lobby: phase calibration and the tap button on every seated phone", () => {
+    const { runtime, ofType, vip, second, lobby, changes, time } = inCalibration();
+    time.advance(667);
+    expect(runtime.phase).toBe("calibration");
+    expect(runtime.calibration?.status).toBe("running");
+    expect(changes()).toBeGreaterThan(0);
+    expect(ofType("room:phase")).toEqual([{ t: "room:phase", d: { phase: "calibration" } }]);
+    expect(ofType("controller:state").at(-1)?.d).toEqual({
+      gameId: null,
+      views: [
+        { to: [vip], view: { screen: "calibration", data: { vip: true, active: true } } },
+        {
+          to: [second, lobby.players[2]!.id],
+          view: { screen: "calibration", data: { vip: false, active: true } },
+        },
+      ],
+    });
+  });
+
+  it("stores the median offset, goes back to the lobby and games get it as displayLagMs", async () => {
+    const rig = inCalibration();
+    const { runtime, time, ofType, stored, handle, vip, sceneLag } = rig;
+    const endsAt = tapAlong(rig, 120);
+    expect(runtime.calibration?.measurement.lagMs).toBe(120);
+    // The VIP's menu buttons do nothing during the check.
+    handle(startAction(vip));
+    expect(runtime.phase).toBe("calibration");
+
+    time.advance(endsAt - time.now());
+    expect(stored()).toEqual({ ms: 120, measuredAt: 42 });
+    expect(runtime.phase).toBe("lobby");
+    expect(runtime.calibration).toBeNull();
+    expect(runtime.displayLag).toEqual({ ms: 120, measuredAt: 42 });
+    expect(ofType("room:phase").map((message) => message.d.phase)).toEqual([
+      "calibration",
+      "lobby",
+    ]);
+    time.advance(1000);
+    expect(ofType("controller:state").at(-1)?.d.views[0]?.view.screen).toBe("lobby");
+
+    rig.play();
+    await settle();
+    expect(sceneLag).toEqual([120]);
+  });
+
+  it("passes 0 to games on a TV that was never calibrated", async () => {
+    const { play, sceneLag, runtime } = setup();
+    expect(runtime.displayLag).toBeNull();
+    play();
+    await settle();
+    expect(sceneLag).toEqual([0]);
+  });
+
+  it("skips on the VIP's skip-calibration and on the TV's Skip, keeping the old value", () => {
+    const old = { ms: 80, measuredAt: 1 };
+    const rig = inCalibration({ storedLag: old });
+    rig.handle(skipAction(rig.second));
+    expect(rig.runtime.phase).toBe("calibration");
+    rig.handle(skipAction(rig.vip));
+    expect(rig.runtime.phase).toBe("lobby");
+    rig.time.advance(20_000);
+    expect(rig.stored()).toBe(old);
+    expect(rig.time.pending).toBe(0);
+
+    const tv = inCalibration({ storedLag: old });
+    tapAlong(tv, 200);
+    tv.runtime.skipCalibration();
+    tv.time.advance(20_000);
+    expect(tv.runtime.phase).toBe("lobby");
+    expect(tv.stored()).toBe(old);
+    expect(tv.ofType("room:phase").map((message) => message.d.phase)).toEqual([
+      "calibration",
+      "lobby",
+    ]);
+  });
+
+  it("offers Try again when nobody got 3 taps in, and runs the flashes again", () => {
+    const { runtime, time, stored, ofType } = inCalibration();
+    time.advance(10_000);
+    expect(runtime.phase).toBe("calibration");
+    expect(runtime.calibration?.status).toBe("retry");
+    expect(stored()).toBeNull();
+    time.advance(1000);
+    expect(ofType("controller:state").at(-1)?.d.views[0]?.view.data).toEqual({
+      vip: true,
+      active: false,
+    });
+    runtime.retryCalibration();
+    expect(runtime.calibration?.status).toBe("running");
+  });
+
+  it("only starts from the lobby", () => {
+    const { runtime, handle, vip, ofType } = setup();
+    handle(startAction(vip));
+    runtime.checkTvLag();
+    expect(runtime.phase).toBe("menu");
+    expect(ofType("room:phase").map((message) => message.d.phase)).toEqual(["menu"]);
   });
 });

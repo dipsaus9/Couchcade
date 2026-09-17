@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { StoredDisplayLag } from "@couchcade/game-sdk/clock";
 import { seatCount } from "@couchcade/protocol";
 import { computed } from "vue";
 import type { ConnectionStatus } from "../../net/relay-socket.ts";
@@ -7,8 +8,14 @@ import { audience, seatedPlayers, seats, vip, type LobbyState } from "./lobby-st
 import SeatCard from "./SeatCard.vue";
 
 // The TV lobby: players on the left, how to join on the right (docs/design/platform-screens.md).
-const props = defineProps<{ lobby: LobbyState; connection: ConnectionStatus; origin: string }>();
-defineEmits<{ end: [] }>();
+const props = defineProps<{
+  lobby: LobbyState;
+  connection: ConnectionStatus;
+  origin: string;
+  /** The stored TV lag, or null when this laptop never checked it. */
+  displayLag: StoredDisplayLag | null;
+}>();
+defineEmits<{ end: []; checkTvLag: [] }>();
 
 const seatList = computed(() => seats(props.lobby));
 const playerCount = computed(() => seatedPlayers(props.lobby).length);
@@ -26,6 +33,15 @@ const hint = computed(() =>
       <p v-if="connection !== 'open'" class="status" role="status">
         {{ connection === "connecting" ? "Connecting…" : "Reconnecting…" }}
       </p>
+      <p v-if="displayLag" class="body">TV lag {{ displayLag.ms }} ms</p>
+      <button
+        class="button"
+        type="button"
+        :disabled="connection !== 'open'"
+        @click="$emit('checkTvLag')"
+      >
+        Check TV lag
+      </button>
       <button class="button" type="button" @click="$emit('end')">End room</button>
     </header>
     <main class="main">
@@ -83,6 +99,12 @@ const hint = computed(() =>
   border-radius: var(--cc-radius-pill);
   box-shadow: var(--cc-depth-rest);
   cursor: pointer;
+}
+.button:disabled {
+  color: var(--cc-ink-45);
+  border-color: var(--cc-ink-20);
+  box-shadow: none;
+  cursor: not-allowed;
 }
 .button:focus-visible {
   outline: var(--cc-focus-ring-width) solid var(--cc-sunny);
