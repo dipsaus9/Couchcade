@@ -14,6 +14,7 @@
     "budgets": "pnpm --filter ./tooling/budgets --if-present run budgets",
     "create-game": "pnpm --filter ./tooling/create-game --if-present run create-game",
     "assets:recolour": "pnpm --filter ./tooling/assets --if-present run assets:recolour",
+    "fonts:subset": "pnpm --filter ./tooling/fonts --if-present run fonts:subset",
     "trace:record": "pnpm --filter @couchcade/controller --if-present run trace:record",
     "format": "oxfmt",
     "lint": "oxlint"
