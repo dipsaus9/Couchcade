@@ -27,7 +27,6 @@ export function lineLabel(position: number): string {
 
 /** Copy from the approved "Audience" artboard (docs/design/platform-screens.md, "Waiting"). */
 export const audienceCopy = {
-  tag: "Audience",
   title: "Watching",
   body: "All 8 player spots are taken. You get the next free spot between games.",
   hint: "Keep this page open to stay in line.",
