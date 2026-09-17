@@ -30,7 +30,10 @@ const playerId = computed(() =>
 
 <template>
   <section class="screen">
-    <CcPlayerChip class="chip" :player="playerId" :name="you.name" />
+    <div class="chip-row">
+      <CcPlayerChip :player="playerId" :name="you.name" />
+      <span class="tag">{{ look ? look.seatLabel : "Audience" }}</span>
+    </div>
 
     <div class="status" role="status">
       <template v-if="look">
@@ -65,8 +68,20 @@ const playerId = computed(() =>
   gap: var(--cc-space-6);
 }
 
-.chip {
+.chip-row {
+  display: flex;
+  align-items: center;
+  gap: var(--cc-space-3);
   align-self: flex-start;
+}
+
+.tag {
+  padding: var(--cc-space-1) var(--cc-space-3);
+  background: var(--cc-chalk);
+  border: var(--cc-outline-phone) solid var(--cc-ink);
+  border-radius: var(--cc-radius-tag);
+  font-size: var(--cc-text-small-phone);
+  font-weight: var(--cc-text-title-weight);
 }
 
 .status {

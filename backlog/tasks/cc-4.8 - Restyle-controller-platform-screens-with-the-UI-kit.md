@@ -4,7 +4,7 @@ title: Restyle controller platform screens with the UI kit
 status: Done
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-17 20:24'
+updated_date: '2026-09-17 20:36'
 labels:
   - story
 dependencies:
@@ -47,6 +47,8 @@ Audit every screen under apps/controller/src/screens/ against docs/design/platfo
 Verify: pnpm check && pnpm test
 
 Reviewer (dipsaus-ai:story-reviewer, model sonnet): verdict pass, round 1. Both acceptance criteria met, no scope violations, no findings. Verified pnpm check:style clean and diff confined to apps/controller/src/screens/.
+
+CI caught a regression: e2e platform/rejoin.spec.ts asserted the lobby chip shows 'Player 2' as exact text, which the CcPlayerChip-only rewrite dropped (CcPlayerChip has no slot for a seat-label tag). Restored the seat-label/Audience tag as a small hand-rolled radius-tag element next to CcPlayerChip (no kit Tag component exists yet). Verified locally: rejoin.spec.ts, smoke.spec.ts and moderation.spec.ts all pass on chromium; apps/server/test/rate-limits.test.ts's earlier CI failure was an unrelated pre-existing flake (wall-clock-minute-boundary timing, hook timeout) that passed on a plain re-run.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
