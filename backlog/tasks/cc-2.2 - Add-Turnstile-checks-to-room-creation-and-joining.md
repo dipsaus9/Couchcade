@@ -1,10 +1,10 @@
 ---
 id: CC-2.2
 title: Add Turnstile checks to room creation and joining
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-17 10:25'
+updated_date: '2026-09-17 16:20'
 labels:
   - story
 dependencies:
@@ -83,4 +83,12 @@ Delivery notes (2026-09-17):
 - Local E2E (CI=1 pnpm e2e): 14 passed on Chromium and WebKit with the real Turnstile script and test keys.
 
 Review gate (dipsaus-ai:story-reviewer, round 1): pass. All 5 criteria met, no scope violations, no findings. Status left In Progress: merging turns Turnstile on for every deploy, so the owner sets up the widget, TURNSTILE_SECRET_KEY, SMOKE_TOKEN and the TURNSTILE_SITE_KEY variable first.
+
+Owner setup completed 2026-09-17: Turnstile widget (Invisible, couchcade.dipsaus9.workers.dev), Worker secrets TURNSTILE_SECRET_KEY and SMOKE_TOKEN, GitHub secret SMOKE_TOKEN and Actions variable TURNSTILE_SITE_KEY. Owner approved the 1 KB -> 4 KB API body limit on 2026-09-17. Deploy run 35245008631 (main 6dc060c) deployed with Turnstile on and the live smoke test passed (room GJJH created via the smoke token, WebSocket welcome, room closed).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Room creation and joining now require a Cloudflare Turnstile token checked by the Worker with Siteverify (fail closed, action/hostname checked for real keys), both apps run an invisible widget on submit, and the deploy smoke test skips only Turnstile with a constant-time SMOKE_TOKEN header. Verified live on 2026-09-17.
+<!-- SECTION:FINAL_SUMMARY:END -->
