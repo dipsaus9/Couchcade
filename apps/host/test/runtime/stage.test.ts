@@ -1,9 +1,12 @@
+import { audio } from "@couchcade/audio";
+import type { CouchcadeGame, HostSceneData } from "@couchcade/game-sdk/contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fontWaitMs, loadStageFonts } from "../../src/runtime/stage.ts";
+import { attachStage, fontWaitMs, loadStageFonts, phaserStage } from "../../src/runtime/stage.ts";
 
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 
 describe("loadStageFonts", () => {
@@ -27,5 +30,39 @@ describe("loadStageFonts", () => {
     const waiting = loadStageFonts();
     await vi.advanceTimersByTimeAsync(fontWaitMs);
     await expect(waiting).resolves.toBeUndefined();
+  });
+});
+
+describe("phaserStage.start", () => {
+  it("fades the lobby loop out right before adding the game's scene (audio.md 'What plays when')", async () => {
+    function FakeScene(): void {}
+    const add = vi.fn<(id: string, scene: unknown, autoStart: boolean, data: unknown) => void>();
+    const fakeGame = {
+      scene: {
+        add,
+        getScene: vi.fn<(id: string) => unknown>(),
+        remove: vi.fn<(id: string) => void>(),
+      },
+    };
+    attachStage(fakeGame as unknown as Parameters<typeof attachStage>[0]);
+
+    const game = {
+      id: "echo",
+      hostScene: () => Promise.resolve(FakeScene as unknown as new () => never),
+    } as unknown as CouchcadeGame;
+    const data: HostSceneData<unknown> = {
+      getState: () => undefined,
+      players: [],
+      displayLagMs: 0,
+      reducedMotion: false,
+    };
+
+    const music = vi.spyOn(audio, "music").mockImplementation(() => {});
+    await phaserStage.start(game, data);
+
+    expect(music).toHaveBeenCalledWith(null);
+    expect(add).toHaveBeenCalledWith("echo", FakeScene, true, data);
+    // The music faded before the scene was handed to Phaser, not after.
+    expect(music.mock.invocationCallOrder[0]!).toBeLessThan(add.mock.invocationCallOrder[0]!);
   });
 });

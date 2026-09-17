@@ -16,6 +16,7 @@
     "test": "playwright install chromium-headless-shell && vitest run"
   },
   "dependencies": {
+    "@couchcade/protocol": "workspace:*",
     "@couchcade/theme": "workspace:*",
     "nipplejs": "catalog:"
   },
