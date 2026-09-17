@@ -14,8 +14,7 @@
     "backlog/**",
     "**/dist/**",
     "**/.wrangler/**",
-    "**/node_modules/**",
-    "tooling/create-game/template/**"
+    "**/node_modules/**"
   ],
   "rules": {
     "typescript/consistent-type-imports": "error",
