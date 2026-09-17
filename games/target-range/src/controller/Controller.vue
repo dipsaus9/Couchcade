@@ -11,6 +11,7 @@ import { createInputStream } from "@couchcade/game-sdk/input";
 import type { Player } from "@couchcade/game-sdk/contract";
 import type { PointerPoint } from "@couchcade/motion/fallbacks";
 import { CcBigAction } from "@couchcade/ui";
+import { haptic } from "@couchcade/ui/haptics";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import type { TargetRangeInput } from "../shared/input.ts";
 import type { TargetRangeScreen, TargetRangeView } from "../shared/view.ts";
@@ -18,7 +19,6 @@ import AimPad from "./AimPad.vue";
 import { createShotAim, type TargetRangeMotion } from "./aim.ts";
 import { useClockSynced } from "./clock-sync.ts";
 import { powerOf, shoots } from "./draw.ts";
-import { playCue } from "./haptics.ts";
 import { present, type DrawPhase } from "./present.ts";
 
 const props = defineProps<{
@@ -89,7 +89,7 @@ watch(
   view,
   (current) => {
     const key = `${props.screen}:${props.data.volley}:${current.cue ?? ""}`;
-    if (current.cue !== undefined && key !== lastCueKey) playCue(current.cue);
+    if (current.cue !== undefined && key !== lastCueKey) haptic(current.cue);
     lastCueKey = key;
   },
   { immediate: true },
@@ -100,7 +100,7 @@ function onPress(event: Event): void {
   pointer = { id: event.pointerId, startY: event.clientY };
   draw.value = "drawing";
   power.value = 0;
-  playCue("press");
+  haptic("press");
   aim.startDraw(event.timeStamp);
 }
 
@@ -117,7 +117,7 @@ function onEnd(event: PointerEvent): void {
   const volley = props.data.volley;
   if (event.type === "pointerup" && shoots(released)) {
     draw.value = "shot";
-    playCue("press");
+    haptic("press");
     aim.shoot(volley, released, event.timeStamp);
     return;
   }

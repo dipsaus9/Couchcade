@@ -9,10 +9,10 @@
  * (same doc), because players are watching the TV, not their thumb.
  */
 import { CcBigAction } from "@couchcade/ui";
+import { haptic } from "@couchcade/ui/haptics";
 import { computed, ref, watch } from "vue";
 import type { Player } from "@couchcade/game-sdk/contract";
 import { useClockSynced } from "./clock-sync.ts";
-import { playCue } from "./haptics.ts";
 import { present } from "./present.ts";
 import type { QuickDrawInput } from "../shared/input.ts";
 import type { QuickDrawScreen, QuickDrawView } from "../shared/view.ts";
@@ -51,7 +51,7 @@ watch(
   view,
   (current) => {
     const key = `${props.screen}:${props.data.round}:${current.cue ?? ""}`;
-    if (current.cue !== undefined && key !== lastCueKey) playCue(current.cue);
+    if (current.cue !== undefined && key !== lastCueKey) haptic(current.cue);
     lastCueKey = key;
   },
   { immediate: true },
@@ -60,7 +60,7 @@ watch(
 function onPointerdown(event: PointerEvent): void {
   if (view.value.state !== "dont-tap") return;
   tapped.value = true;
-  playCue("press");
+  haptic("press");
   props.send({ type: "draw", payload: { round: props.data.round } }, event.timeStamp);
 }
 </script>
