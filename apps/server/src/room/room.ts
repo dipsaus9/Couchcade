@@ -13,6 +13,7 @@ import {
   type RelayToPhoneMessage,
 } from "@couchcade/protocol";
 import { Server, type Connection, type ConnectionContext, type WSMessage } from "partyserver";
+import { fullBucket, takeToken } from "./flood.ts";
 import { readIdentity } from "./identity.ts";
 import {
   activityResolutionMs,
@@ -59,8 +60,9 @@ export interface RoomStatus {
  *   Per-socket data lives in socket state, room data in SQLite.
  * - Deadlines use one Durable Object alarm: the room's close deadline and every reserved seat's
  *   2-minute window. Nothing in this folder waits on a timer.
- * - No storage write per message. `onMessage` only checks size, parses, checks the role and
- *   forwards.
+ * - No storage write per message. `onMessage` only takes a token from the socket's flood bucket
+ *   (socket state, flood.ts), checks size, parses, checks the role and forwards. A flooding socket
+ *   costs one write, when it is revoked.
  */
 export class Room extends Server {
   static override options = { hibernate: true };
@@ -130,8 +132,19 @@ export class Room extends Server {
   }
 
   override async onMessage(connection: Socket, message: WSMessage): Promise<void> {
-    const state = connection.state as SocketState | null;
-    // CC-2.5: the flood bucket counts the frame here, before any check can drop it.
+    // Frames still queued behind a flood close are ignored, so the violation is handled once.
+    if (connection.readyState !== WebSocket.READY_STATE_OPEN) return;
+    const stored = connection.state as SocketState | null;
+    if (!stored) return;
+    // Every frame counts, before any check can drop it (docs/architecture/security.md).
+    const now = Date.now();
+    const flood = takeToken(stored.flood, now);
+    if (!flood) {
+      this.#revoke(connection, stored, now);
+      return;
+    }
+    const state = { ...stored, flood };
+    connection.setState(state);
     if (isHostState(state)) {
       const result = decode(hostToRelaySchema, message);
       if (result.ok && canSend("host", result.message.t)) {
@@ -189,8 +202,12 @@ export class Room extends Server {
 
   #connectHost(connection: Socket, meta: RoomMeta): void {
     const now = Date.now();
+    if (meta.hostRevoked) {
+      connection.close(closeCodes.flooding, "Flooding");
+      return;
+    }
     const previous = this.#firstHost(connection.id);
-    connection.setState({ role: "host", lastActiveAt: now });
+    connection.setState({ role: "host", lastActiveAt: now, flood: fullBucket(now) });
     if (previous) previous.close(closeCodes.replaced, "Replaced by a newer connection");
 
     this.#send(connection, {
@@ -216,7 +233,11 @@ export class Room extends Server {
     const previous = this.#phoneById(id, connection.id);
     const record = this.#storage.readPlayer(id);
 
-    // CC-2.5 (revoked, 4008) and CC-2.6 (kicked, 4003) refuse a returning player here, first.
+    // A revoked player is refused first. CC-2.6 (kicked, 4003) adds its check here.
+    if (record?.revoked) {
+      connection.close(closeCodes.flooding, "Flooding");
+      return;
+    }
     const arrival = arrivalOf(record, now);
     if (arrival === "expired") {
       connection.close(closeCodes.seatExpired, "Seat expired");
@@ -245,6 +266,7 @@ export class Room extends Server {
       profile: record?.profile ?? defaultProfile,
       joinedAt: record?.joinedAt ?? now,
       lastActiveAt: now,
+      flood: fullBucket(now),
     };
     connection.setState(state);
     if (previous) previous.close(closeCodes.replaced, "Replaced by a newer connection");
@@ -327,6 +349,21 @@ export class Room extends Server {
         connection.close(1000, "Left the room");
         return;
     }
+  }
+
+  /**
+   * A socket emptied its flood bucket: revoke its rejoin token and close it with 4008. A player's
+   * seat is freed and the host gets `player:left { reason: "kicked" }`, because platform.md has no
+   * separate flooding reason. A revoked host leaves the room host-away until it closes.
+   */
+  #revoke(connection: Socket, state: SocketState, now: number): void {
+    if (isHostState(state)) {
+      this.#storage.revokeHost();
+    } else {
+      this.#storage.revokePlayer(state.id, now);
+      this.#sendToHost({ t: "player:left", d: { id: state.id, reason: "kicked" } });
+    }
+    connection.close(closeCodes.flooding, "Flooding");
   }
 
   /** Refreshes the socket's last activity, at most once per `activityResolutionMs`. */
