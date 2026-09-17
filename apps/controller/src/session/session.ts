@@ -4,7 +4,7 @@ import { shallowRef, type ShallowRef } from "vue";
 import { requestJoin, type FetchFn } from "../join/api.ts";
 import { normaliseName, roomCodeFromSearch, type JoinDraft } from "../join/form.ts";
 import { noTurnstile, type TurnstileProvider } from "../join/turnstile.ts";
-import { keepScreenAwake, lockPortrait } from "../device/screen.ts";
+import { keepScreenAwake, lockPortrait, type ScreenWakeLock } from "../device/screen.ts";
 import { watchReconnect, type ReconnectWatch } from "../runtime/reconnect.ts";
 import { openRoomSocket, type RoomSocket } from "./socket.ts";
 import { initialState, reduce, type PhoneEvent, type PhoneState } from "./state.ts";
@@ -31,6 +31,11 @@ export interface PhoneSession {
   join(draft: JoinDraft): Promise<void>;
   /** Sends a message to the room. Dropped while the phone has no socket. */
   send(message: PhoneToRelayMessage): void;
+  /**
+   * Asks for the screen wake lock again unless it is held. Call it inside a tap, such as the motion
+   * step's "Tap to enable motion" or "Tap to resume".
+   */
+  keepAwake(): void;
   dispose(): void;
 }
 
@@ -48,14 +53,14 @@ export function createPhoneSession({
   const state = shallowRef(initialState(roomCodeFromSearch(search), loadSession(storage)));
   let socket: RoomSocket | null = null;
   let reconnect: ReconnectWatch | null = null;
-  let releaseWakeLock: (() => void) | null = null;
+  let wakeLock: ScreenWakeLock | null = null;
 
   const dispatch = (event: PhoneEvent): void => {
     state.value = reduce(state.value, event);
   };
 
   function enterRoom(session: StoredSession, ticket?: string): void {
-    releaseWakeLock ??= keepScreenAwake();
+    wakeLock ??= keepScreenAwake();
     // A phone that comes back to the page reconnects at once, with a fresh socket that skips the
     // backoff and rejoins with the stored token.
     reconnect ??= watchReconnect({
@@ -105,8 +110,8 @@ export function createPhoneSession({
     stopReconnecting();
     socket?.close();
     socket = null;
-    releaseWakeLock?.();
-    releaseWakeLock = null;
+    wakeLock?.release();
+    wakeLock = null;
     clearSession(storage);
   }
 
@@ -114,7 +119,7 @@ export function createPhoneSession({
     if (state.value.status !== "join" || state.value.submitting) return;
     dispatch({ type: "join-submitted", draft });
     // Both need the tap that is happening right now on some phones.
-    releaseWakeLock ??= keepScreenAwake();
+    wakeLock ??= keepScreenAwake();
     lockPortrait();
 
     const token = await turnstile.token().catch(() => null);
@@ -128,8 +133,8 @@ export function createPhoneSession({
           );
     if (!result.ok) {
       if (result.failure === "turnstile") turnstile.reset();
-      releaseWakeLock?.();
-      releaseWakeLock = null;
+      wakeLock?.release();
+      wakeLock = null;
       dispatch({ type: "join-failed", failure: result.failure });
       return;
     }
@@ -148,13 +153,14 @@ export function createPhoneSession({
     state,
     join,
     send,
+    keepAwake: () => wakeLock?.renew(),
     dispose: () => {
       clock.disconnect();
       stopReconnecting();
       socket?.close();
       socket = null;
-      releaseWakeLock?.();
-      releaseWakeLock = null;
+      wakeLock?.release();
+      wakeLock = null;
     },
   };
 }

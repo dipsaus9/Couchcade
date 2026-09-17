@@ -113,6 +113,9 @@ importers:
       '@couchcade/game-sdk':
         specifier: workspace:*
         version: link:../../packages/game-sdk
+      '@couchcade/motion':
+        specifier: workspace:*
+        version: link:../../packages/motion
       '@couchcade/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol

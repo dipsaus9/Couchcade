@@ -7,6 +7,7 @@ import {
 } from "@couchcade/protocol";
 import type { JoinFailure } from "../join/api.ts";
 import type { JoinDraft } from "../join/form.ts";
+import { parseMotionPermissionView } from "../motion/view.ts";
 import { parseCalibrationView } from "../screens/calibration/calibration-view.ts";
 import { parseMenuView } from "../screens/menu/menu-view.ts";
 import { parseResultsView } from "../screens/results/results-view.ts";
@@ -65,6 +66,7 @@ export type PhoneScreen =
   | "menu"
   | "results"
   | "calibration"
+  | "motion-permission"
   | "waiting";
 
 /**
@@ -176,6 +178,15 @@ export function screenOf(state: PhoneState): PhoneScreen {
     parseCalibrationView(view.data)
   ) {
     return "calibration";
+  }
+  // The motion step asks for sensors and tells the TV, so it needs both too.
+  if (
+    view.screen === "motion-permission" &&
+    state.online &&
+    state.hostConnected &&
+    parseMotionPermissionView(view.data)
+  ) {
+    return "motion-permission";
   }
   return "waiting";
 }

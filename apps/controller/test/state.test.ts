@@ -288,6 +288,29 @@ describe("calibration", () => {
   });
 });
 
+describe("motion permission", () => {
+  const lobby = run(initialState(null, session), welcome());
+  const motionView = (data: JsonValue) =>
+    message({
+      t: "controller:state",
+      d: { gameId: null, view: { screen: "motion-permission", data } },
+    });
+
+  it("shows the motion step before a motion game", () => {
+    const view = inRoom(reduce(lobby, motionView({ gameId: "swing", title: "Swing", step: 1 })));
+    expect(screenOf(view)).toBe("motion-permission");
+  });
+
+  it("waits instead, offline, while the TV is away or on a malformed view", () => {
+    const view = inRoom(reduce(lobby, motionView({ gameId: "swing", title: "Swing", step: 1 })));
+    expect(screenOf({ ...view, online: false })).toBe("waiting");
+    expect(screenOf({ ...view, hostConnected: false })).toBe("waiting");
+    expect(screenOf(inRoom(reduce(lobby, motionView({ title: "Swing", step: 1 }))))).toBe(
+      "waiting",
+    );
+  });
+});
+
 describe("endReasonForClose", () => {
   it("ends the session on the relay's own close codes", () => {
     expect(endReasonForClose(4003)).toBe("kicked");

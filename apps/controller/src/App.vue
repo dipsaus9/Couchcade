@@ -1,6 +1,11 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount } from "vue";
+import { computed, onBeforeUnmount, watch } from "vue";
 import RotateNotice from "./components/RotateNotice.vue";
+import { motionAdapter } from "./motion/adapter.ts";
+import MotionResume from "./motion/MotionResume.vue";
+import MotionStepScreen from "./motion/MotionStepScreen.vue";
+import { enterMotionFullscreen, exitMotionFullscreen, phonePlatform } from "./motion/platform.ts";
+import { createMotionSession } from "./motion/session.ts";
 import GameController from "./runtime/GameController.vue";
 import { showsGameController } from "./runtime/controller.ts";
 import { parseCalibrationView } from "./screens/calibration/calibration-view.ts";
@@ -35,7 +40,33 @@ const calibrationView = computed(() =>
     : null,
 );
 
-onBeforeUnmount(() => session.dispose());
+// The motion step before a motion game, and "Tap to resume" during one (motion.md, "Permission,
+// calibration and resume flow"). The adapter is created at start, so an E2E test's fake is there
+// before the first tap.
+const platform = phonePlatform();
+const motion = createMotionSession({
+  adapter: motionAdapter,
+  send: session.send,
+  keepAwake: session.keepAwake,
+  enterFullscreen: () => enterMotionFullscreen(platform),
+  exitFullscreen: () => exitMotionFullscreen(),
+  needsGyroscope: true,
+});
+motionAdapter();
+watch(state, (next) => motion.follow(next), { immediate: true });
+const motionGame = motion.state;
+const motionStep = computed(() => (screen.value === "motion-permission" ? motionGame.value : null));
+const resuming = computed(() => {
+  const game = motionGame.value;
+  return (
+    game !== null && game.paused && (motionStep.value !== null || showsGameController(state.value))
+  );
+});
+
+onBeforeUnmount(() => {
+  motion.dispose();
+  session.dispose();
+});
 </script>
 
 <template>
@@ -60,6 +91,14 @@ onBeforeUnmount(() => session.dispose());
     <MenuScreen v-else-if="menuView" :view="menuView" @send="session.send" />
     <ResultsScreen v-else-if="resultsView" :view="resultsView" @send="session.send" />
     <CalibrationScreen v-else-if="calibrationView" :view="calibrationView" @send="session.send" />
+    <MotionStepScreen
+      v-else-if="motionStep"
+      :game="motionStep"
+      :platform="platform"
+      @enable="motion.enable"
+      @use-touch="motion.useTouch"
+      @acknowledge="motion.acknowledge"
+    />
     <GameController
       v-else-if="showsGameController(state)"
       :state="state"
@@ -67,7 +106,13 @@ onBeforeUnmount(() => session.dispose());
     />
     <WaitingScreen v-else v-bind="waitingCopy(state)" />
   </main>
-  <RotateNotice />
+  <MotionResume
+    v-if="resuming && state.status === 'room'"
+    :name="state.you.name"
+    @resume="motion.resume"
+  />
+  <!-- Motion works whichever way the page turns, so a motion game never shows the rotate panel. -->
+  <RotateNotice v-if="motionGame === null" />
 </template>
 
 <style>
