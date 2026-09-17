@@ -1,10 +1,10 @@
 ---
 id: CC-4.8
 title: Restyle controller platform screens with the UI kit
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-17 20:18'
+updated_date: '2026-09-17 20:24'
 labels:
   - story
 dependencies:
@@ -45,4 +45,12 @@ Audit every screen under apps/controller/src/screens/ against docs/design/platfo
 
 <!-- SECTION:NOTES:BEGIN -->
 Verify: pnpm check && pnpm test
+
+Reviewer (dipsaus-ai:story-reviewer, model sonnet): verdict pass, round 1. Both acceptance criteria met, no scope violations, no findings. Verified pnpm check:style clean and diff confined to apps/controller/src/screens/.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Join, lobby and audience now draw their panel, primary button and player chip through @couchcade/ui (CcPanel, CcButton, CcPlayerChip) instead of hand-rolled markup, matching docs/design/platform-screens.md and HOUSE_STYLE.md. Menu, results, calibration, kicked, room-full and waiting already used the kit or need no component (plain status text), so they were audited and left unchanged. pnpm check:style, pnpm check, pnpm test and pnpm build all pass. Reviewed by dipsaus-ai:story-reviewer (sonnet): pass, round 1, no scope violations.
+<!-- SECTION:FINAL_SUMMARY:END -->
