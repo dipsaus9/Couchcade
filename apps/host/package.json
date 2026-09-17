@@ -11,6 +11,7 @@
     "build": "vite build"
   },
   "dependencies": {
+    "@couchcade/audio": "workspace:*",
     "@couchcade/game-sdk": "workspace:*",
     "@couchcade/protocol": "workspace:*",
     "@couchcade/theme": "workspace:*",

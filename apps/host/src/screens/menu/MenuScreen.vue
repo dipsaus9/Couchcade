@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { audio } from "@couchcade/audio";
 import { seatCount } from "@couchcade/protocol";
 import { players as playerStyles } from "@couchcade/theme";
 import { CcPanel, CcPlayerShape } from "@couchcade/ui";
@@ -29,6 +30,12 @@ const picked = computed(() => props.menu.countdown?.gameId ?? null);
 const pickedTitle = computed(
   () => props.menu.games.find((game) => game.id === picked.value)?.title ?? null,
 );
+
+// A card getting the Sunny focus ring is the `ui` token's platform moment (audio.md "Sound tokens
+// and sound banks"). Replays if the VIP picks a different game before the countdown ends.
+watch(picked, (next, previous) => {
+  if (next !== null && next !== previous) audio.play("ui");
+});
 
 // The countdown number, redrawn a few times a second while it runs.
 const seconds = ref<number | null>(null);

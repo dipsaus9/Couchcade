@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { CcButton, CcPanel } from "@couchcade/ui";
 import { ref } from "vue";
+import { unlockBeforeOpenRoom } from "../../audio/unlock.ts";
 
 // The host passcode screen. Not in the approved platform-screens canvas (docs/design/
 // platform-screens.md, "Not in this canvas" -- CC-1.11); follows the same panel/button patterns.
@@ -14,15 +15,20 @@ const passcode = ref("");
 const busy = ref(false);
 const error = ref<string | null>(null);
 
-async function submit(): Promise<void> {
-  if (busy.value || passcode.value === "") return;
-  busy.value = true;
-  error.value = null;
-  const typed = passcode.value;
-  // The passcode stays in memory only until the request finishes (security.md, "Host passcode").
-  passcode.value = "";
-  error.value = await props.openRoom(typed);
-  busy.value = false;
+// Opens the browser's autoplay lock (audio.md "Unlocking audio" rule 1) as the very first thing
+// submit does, before the busy guard and before the request -- even a passcode that turns out
+// wrong still unlocks audio.
+function submit(): Promise<void> {
+  return unlockBeforeOpenRoom(async () => {
+    if (busy.value || passcode.value === "") return;
+    busy.value = true;
+    error.value = null;
+    const typed = passcode.value;
+    // The passcode stays in memory only until the request finishes (security.md, "Host passcode").
+    passcode.value = "";
+    error.value = await props.openRoom(typed);
+    busy.value = false;
+  });
 }
 
 // CcPanel's `as="form"` renders a native <form>, but the strict template checker only knows the

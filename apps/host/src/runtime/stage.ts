@@ -1,3 +1,4 @@
+import { audio } from "@couchcade/audio";
 import type { CouchcadeGame, HostSceneData } from "@couchcade/game-sdk/contract";
 import { font, typeScale } from "@couchcade/theme";
 import type { Game } from "phaser";
@@ -52,6 +53,10 @@ export function loadStageFonts(): Promise<void> {
 export const phaserStage: GameStage = {
   async start(game, data) {
     const [SceneClass, stage] = await Promise.all([game.hostScene(), booted, loadStageFonts()]);
+    // The lobby loop fades out right as the game's own scene starts (docs/architecture/audio.md
+    // "What plays when", `playing`). The game's own sound wiring brings its own loop in, or leaves
+    // silence, per its spec.
+    audio.music(null);
     stage.scene.add(game.id, SceneClass, true, data as unknown as object);
   },
   stop(game) {
