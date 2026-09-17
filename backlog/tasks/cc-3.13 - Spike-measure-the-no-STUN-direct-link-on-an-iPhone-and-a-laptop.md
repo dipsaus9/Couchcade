@@ -4,7 +4,7 @@ title: 'Spike: measure the no-STUN direct link on an iPhone and a laptop'
 status: In Progress
 assignee: []
 created_date: '2026-09-17 17:49'
-updated_date: '2026-09-17 20:26'
+updated_date: '2026-09-17 20:30'
 labels:
   - story
   - owner-playtest
@@ -50,3 +50,9 @@ Verify: pnpm check, pnpm test, pnpm build; the page connects two local browser t
 
 Built spikes/realtime-link/ (standalone workspace, own lockfile, like CC-1.3/CC-1.4): vite.config.ts serves /tv and /phone and hosts a tiny in-memory offer/answer mailbox; both pages open negotiated cc-stream (unordered, maxRetransmits 0) and cc-events (reliable) channels with iceServers: []. Verified locally with two headless-Chrome tabs (browser-test.mjs): SDP negotiation, ICE, data channels and the pos/pong round trip all work end to end; one full run produced a real (non-owner) sample summary: Connected: yes, Time to connect: 802ms, Offer full=566B compact=153B, Answer full=564B compact=152B, Candidate pair local=host remote=host, RTT @30/s p50=1ms p90=1ms sent=51 lost=0, RTT @60/s p50=1ms p90=1ms sent=120 lost=0 (same-machine loopback, so these numbers are not the owner's Wi-Fi result -- they only prove the harness works). AC1 and AC2 are met by the harness itself and are checked off. AC3 (iPhone results across Wi-Fi/4G/Private Relay/Low Power Mode, plus Android if available) and AC4 (go/no-go decision) need the owner's own ~20-minute run per README.md's steps and docs/architecture/realtime-link.md's 'The spike, step by step for the owner' -- left unchecked, and the story stays In Progress (not Done) until the owner runs it and the decision is signed off. One environment note found while verifying: on this dev machine, two headless-Chrome tabs on the same laptop failed to connect via mDNS host candidates (ICE stuck at 'new') until mDNS was disabled for the test browser -- looks like a macOS Local Network permission / multicast quirk specific to a fresh headless profile, not a harness bug (SDP negotiation completed correctly: ufrag/pwd/fingerprint present, iceGatheringState reached complete, signalingState stable). Documented as a same-machine testing snag in the README; flagged in case the owner's laptop browser ever needs the same macOS Local Network permission granted for a real run.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Built the throwaway no-STUN direct-link spike harness in spikes/realtime-link/: a /tv page and a /phone page that negotiate a WebRTC link with iceServers: [] over a local Vite dev-server signalling mailbox, using the same cc-stream/cc-events channel shapes as the approved design (docs/architecture/realtime-link.md). The phone page runs 30s at 30 msg/s then 30s at 60/s and produces a copyable summary with connect success/time, the selected candidate-pair type, round trip p50/p90, loss per 100, and full vs compact description sizes. Verified end to end locally with two headless-Chrome tabs (browser-test.mjs): negotiation, ICE, both data channels and the round trip all work. AC1 and AC2 are met and checked off. No go/no-go decision yet: AC3 (the iPhone/4G/Private-Relay/Low-Power-Mode/Android result matrix) and AC4 (the decision itself) need the owner's own ~20-minute run per README.md, which this worker did not and should not run. Story stays In Progress pending that run and sign-off.
+<!-- SECTION:FINAL_SUMMARY:END -->
