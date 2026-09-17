@@ -1,3 +1,4 @@
+import { audio } from "@couchcade/audio";
 import { color, motion } from "@couchcade/theme";
 import { GameObjects, Math as PhaserMath } from "phaser";
 import type { Cameras, Scene, Time, Tweens } from "phaser";
@@ -40,7 +41,8 @@ export interface CalloutOptions {
 /**
  * An in-game callout such as DRAW!, STRIKE! or FOUL!: uppercase Pixelify Sans in Sunny with an
  * Ink stroke and a hard Ink shadow, rotated −4°. `play()` pops it in with the `celebrate`
- * motion; with reduced motion it fades in instead.
+ * motion; with reduced motion it fades in instead. The music ducks from `play()` until the callout
+ * starts to leave (HOUSE_STYLE "Music ducks by 50% during callouts").
  */
 export class Callout extends GameObjects.Text {
   readonly reducedMotion: boolean;
@@ -48,6 +50,7 @@ export class Callout extends GameObjects.Text {
   readonly #holdMs: number | undefined;
   #entrance: Tweens.Tween | null = null;
   #timer: Time.TimerEvent | null = null;
+  #releaseDuck: (() => void) | null = null;
 
   constructor(scene: Scene, text: string, options: CalloutOptions = {}) {
     super(
@@ -78,6 +81,7 @@ export class Callout extends GameObjects.Text {
     this.once(GameObjects.Events.DESTROY, () => {
       this.#timer?.remove();
       this.#entrance?.remove();
+      this.#unduck();
     });
   }
 
@@ -86,9 +90,10 @@ export class Callout extends GameObjects.Text {
     return this.reducedMotion ? motion.ui.ms : motion.celebrate.ms;
   }
 
-  /** Starts the entrance and, with `holdMs`, schedules the exit. */
+  /** Starts the entrance and, with `holdMs`, schedules the exit. Ducks the music until the exit. */
   play(): this {
     this.#entrance?.remove();
+    this.#releaseDuck ??= audio.duck();
     const { tweens, cameras } = this.scene;
     if (this.reducedMotion) {
       this.setScale(1).setAlpha(0);
@@ -122,6 +127,7 @@ export class Callout extends GameObjects.Text {
   /** Fades out (and shrinks, without reduced motion) over the `ui` duration, then destroys. */
   dismiss(): void {
     if (!this.scene) return;
+    this.#unduck();
     this.#timer?.remove();
     this.#entrance?.remove();
     this.scene.tweens.add({
@@ -132,6 +138,11 @@ export class Callout extends GameObjects.Text {
       ease: "Linear",
       onComplete: () => this.destroy(),
     });
+  }
+
+  #unduck(): void {
+    this.#releaseDuck?.();
+    this.#releaseDuck = null;
   }
 }
 

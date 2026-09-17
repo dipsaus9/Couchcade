@@ -29,7 +29,9 @@ describe("runBudgets against the real repo", () => {
     const hostPlatform = results.find((r) => r.name === "Host platform JS");
     expect(hostPlatform).toBeDefined();
     // Platform JS (index + boot + Phaser) measured well under the 450 KB budget; a per-game scene
-    // chunk leaking in would push this close to or over it.
-    expect(hostPlatform!.measuredBytes).toBeLessThan(430 * 1024);
+    // chunk (Target Range's is 14 KB) leaking in would push this close to or over it. Raised from
+    // 430 KB for @couchcade/audio, which callouts import to duck the music (docs/architecture/audio.md
+    // estimates 3 KB): this test measured 427.9 KB before it and 430.3 KB after.
+    expect(hostPlatform!.measuredBytes).toBeLessThan(440 * 1024);
   });
 });
