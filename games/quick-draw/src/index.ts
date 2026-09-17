@@ -19,7 +19,7 @@ import {
 export default defineGame({
   id: "quick-draw",
   title: "Quick Draw",
-  players: { min: 2, max: 8 },
+  players: { min: 1, max: 8 },
   realtime: true,
   needsMotion: false,
   scene: "desert",

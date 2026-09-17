@@ -500,6 +500,26 @@ describe("Quick Draw TV scene", () => {
     expect(problems).toEqual([]);
   });
 
+  it("plays a solo practice match with one Pip to the best and average", async () => {
+    const run = await startScene(1, 3, mixedBots);
+    const seen = new Set<string>();
+    let state = run.frame();
+    for (let i = 0; i < 60 * 60 * 2 && state.phase !== "over"; i++) {
+      for (const text of visibleTexts(run.scene)) seen.add(`${state.phase}:${text}`);
+      state = run.frame();
+    }
+    expect(state.phase).toBe("over");
+    expect(state.players.map((player) => player.points)).toEqual([3]);
+    const scoreboard = run.scene.overlay.list.find((child) => child instanceof Scoreboard);
+    expect((scoreboard as Scoreboard).chips.map((chip) => chip.name)).toEqual(["Player 1"]);
+    expect(seen).toContain("result:BANG!");
+    expect(seen).toContain("result:0.243");
+    expect(seen).toContain("result:New best: 0.243");
+    expect(seen).toContain("result:0.243, best 0.243");
+    expect(seen).toContain("result:Best 0.243 · average 0.243");
+    expect(problems).toEqual([]);
+  });
+
   it("starts without a room code panel when the host gives no room code", async () => {
     const run = await startScene(2, 1, mixedBots, { room: false });
     run.frame();

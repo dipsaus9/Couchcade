@@ -1,10 +1,10 @@
 ---
 id: CC-1
 title: 'Epic: Platform foundations and playable skeleton'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-16 12:23'
-updated_date: '2026-09-16 12:23'
+updated_date: '2026-09-17 17:41'
 labels:
   - epic
 dependencies: []
@@ -27,7 +27,13 @@ Rejected alternatives (research 2026-09-16):
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The platform architecture doc (CC-1.1) is approved by the owner
-- [ ] #2 On the live workers.dev site the owner can create a room with the host passcode and two phones can join by QR code or room code
-- [ ] #3 CI (check, test, build, E2E) is green on main and merges to main deploy automatically
+- [x] #1 The platform architecture doc (CC-1.1) is approved by the owner
+- [x] #2 On the live workers.dev site the owner can create a room with the host passcode and two phones can join by QR code or room code
+- [x] #3 CI (check, test, build, E2E) is green on main and merges to main deploy automatically
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Owner, 2026-09-17: confirmed two phones joined the same room on the live workers.dev site. Platform doc approved earlier; CI green and merges deploy automatically (deploy + live smoke on every main merge).
+<!-- SECTION:NOTES:END -->

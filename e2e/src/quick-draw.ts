@@ -60,3 +60,22 @@ export async function playRound(host: Page, fast: Page, slow: Page, round: numbe
   };
   await Promise.all([tapAfter(fast, reactionMs.fast), tapAfter(slow, reactionMs.slow)]);
 }
+
+/** Solo practice: waits for DRAW! on the TV, then taps the one phone after `delayMs`. */
+export async function playSoloRound(
+  host: Page,
+  phone: Page,
+  round: number,
+  delayMs = reactionMs.fast,
+): Promise<void> {
+  await host.waitForFunction(
+    (expected) => {
+      const state = window.__quickDrawState?.();
+      return state?.round === expected && state.phase === "draw";
+    },
+    round,
+    { polling: "raf", timeout: 20_000 },
+  );
+  await phone.waitForTimeout(delayMs);
+  await phone.getByRole("button", { name: "Wait for DRAW" }).tap();
+}

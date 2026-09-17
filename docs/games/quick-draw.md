@@ -20,6 +20,7 @@ Status: approved by the owner on 2026-09-16 (CC-10.1), including the fake-out de
 - [Rules and scoring](#rules-and-scoring)
 - [Round flow and timings](#round-flow-and-timings)
 - [Fake-outs](#fake-outs)
+- [Solo practice](#solo-practice)
 - [Phone controller](#phone-controller)
 - [Input message schema](#input-message-schema)
 - [TV scene](#tv-scene)
@@ -36,7 +37,7 @@ Status: approved by the owner on 2026-09-16 (CC-10.1), including the fake-out de
 | | |
 |---|---|
 | Pitch | A western standoff with toy popguns. The TV shouts DRAW! at a random moment, and the fastest tap wins the round. |
-| Players | 2 to 8. Everyone draws at the same time, so nobody sits out a round. |
+| Players | 2 to 8. Everyone draws at the same time, so nobody sits out a round. One player alone gets [solo practice](#solo-practice). |
 | Phone | One big action. It turns red for "Wait for DRAW" and the player taps it without looking. No motion sensors. |
 | TV | A 480×270 desert street with the players' Pips facing off, a scoreboard and the DRAW! callout. |
 | Round | About 10 seconds: get ready, a random wait, DRAW!, result. |
@@ -78,7 +79,7 @@ Research on fair timing:
 
 ## Rules and scoring
 
-1. **Players.** 2 to 8 seated players (`players: { min: 2, max: 8 }`). The game gets them at `init` and nobody joins mid-match.
+1. **Players.** 2 to 8 seated players. The game gets them at `init` and nobody joins mid-match. With 1 seated player the game runs as [solo practice](#solo-practice), so the game declares `players: { min: 1, max: 8 }`.
 2. **Round.** Every round has one DRAW!. Each player gets one tap per round. Only the first `pointerdown` counts.
 3. **Reaction time.** `reactionMs = round(atMs - drawAtMs)`, in game time. The TV's display lag is not subtracted in this version. See [Fairness](#fairness).
 4. **Tap result.** Every player ends the round with exactly one result:
@@ -155,6 +156,29 @@ Owner decision 3, inspired by 1-2-Switch's "Fake Draw". Only the word DRAW! coun
 **Audio.** Three new sounds: the fake sting, the crow caw and the ting (see the [asset shortlist](#cc0-asset-shortlist)). Each has its own visual. Only the real DRAW sting plays with DRAW!, so players listening instead of watching can be fooled too.
 
 **Budget.** Fakes send nothing. They're animations and sounds on the TV only. Each phone still sends at most 1 tap per round. The phone learns about a foul in the round's result view, so fakes add no `controller:state` messages. See the [budget check](#budget-check).
+
+## Solo practice
+
+Owner decision 2026-09-17: when only 1 player is seated, Quick Draw runs as solo practice. You play against your own best reaction time, with no opponent. There's no bot.
+
+The rules above apply unchanged, with one player:
+
+1. **Same rounds.** Same round flow and timings, fakes from round 2, and the same foul, valid and slow results.
+2. **Points.** With nobody to beat, every valid tap is the fastest and scores 1 point. A foul or a slow tap costs only the round.
+3. **Match end.** After the round in which you reach 3 points, or after round 9. The match also ends when your seat expires (rule 9: fewer than 2 players left).
+4. **Your best.** Each valid time is compared with your best time before that round. The first valid time is always a new best. An equal time isn't a new best.
+5. **Average.** The average of all your valid times this match, rounded to whole milliseconds. `snapshot` saves `[totalMs, validTaps]` as `practice`, so the average survives a TV refresh.
+6. **Placements.** `outcome` places you 1st with your points as the score, like a match.
+
+What changes on screen, only in solo practice:
+
+| Where | Valid time, new best | Valid time, not a new best | Foul, fooled or slow | Last round of the match |
+|---|---|---|---|---|
+| TV bottom panel (`result`) | "New best: 0.243" | "0.301, best 0.243" | "No time this round" | "Best 0.243 · average 0.271" |
+| Phone status line (`qd-result`) | "New best!" | "Your best is 0.243 s" | As in a match | As in the other columns |
+| Phone hint | "0.243 s · 2 points" | "0.301 s · 2 points" | As in a match | "Best 0.243 s · average 0.271 s" |
+
+The last round shows the best and average only when you had at least one valid time. The `qd-result` view gains `practice: { newBest, bestMs, averageMs, final }`, still well under 1 KB. Matches with 2 or more players have no `practice` data in their state, view or snapshot. The TV shows one Pip in the left slot, the scoreboard with one chip, and the usual tags, BANG! flag and callouts.
 
 ---
 
