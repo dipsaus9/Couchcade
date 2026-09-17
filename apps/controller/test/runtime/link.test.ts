@@ -415,6 +415,47 @@ describe("AC6: the dev readout never carries an address", () => {
   });
 });
 
+describe("retrying on the relay path", () => {
+  it("does not retry on every follow() call, only on a real trigger or the backoff timer", async () => {
+    const rig = createRig();
+    rig.link.follow(seatedWelcomed);
+    await rig.virtual.advance(0);
+    expect(rig.sent).toHaveLength(1); // the first offer
+
+    await rig.virtual.advance(5_000); // connectTimeoutMs: no answer ever arrives
+    expect(rig.link.state).toBe("relay");
+
+    // Ordinary room traffic keeps calling follow() with the same active state; none of it is a
+    // trigger, so it must not cancel the state machine's own backoff and re-offer early.
+    rig.link.follow(seatedWelcomed);
+    rig.link.follow(seatedWelcomed);
+    await rig.virtual.advance(1_000);
+    expect(rig.sent).toHaveLength(1);
+
+    await rig.virtual.advance(9_000); // the 10 s backoff timer retries on its own
+    expect(rig.sent.length).toBeGreaterThan(1);
+  });
+
+  it("retries at once when a new game starts", async () => {
+    const rig = createRig();
+    rig.link.follow(seatedWelcomed);
+    await rig.virtual.advance(5_000); // times out to relay, no answer ever arrives
+    expect(rig.link.state).toBe("relay");
+    expect(rig.sent).toHaveLength(1);
+
+    const gameStarted: PhoneState = reduce(seatedWelcomed, {
+      type: "message",
+      message: {
+        t: "controller:state",
+        d: { gameId: "tap-race", view: { screen: "tap", data: null } },
+      },
+    });
+    rig.link.follow(gameStarted);
+    await rig.virtual.advance(0);
+    expect(rig.sent).toHaveLength(2); // retried at once, without waiting for the 10 s backoff
+  });
+});
+
 describe("ignoring a stale answer", () => {
   it("ignores an rtc:answer whose attempt id doesn't match the current one", async () => {
     const rig = createRig();

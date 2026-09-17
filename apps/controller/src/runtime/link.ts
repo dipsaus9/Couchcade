@@ -244,6 +244,9 @@ export function createControllerLink(options: ControllerLinkOptions): Controller
 
   let sessionActive = false;
   let pageVisible = isPageVisible();
+  /** The last game id `follow` saw, to detect "a new game starts" (Connection lifecycle's third
+   * named retry trigger, alongside the page becoming visible and the socket or TV coming back). */
+  let lastGameId: string | null = null;
   let peerAttempt: PeerAttempt | null = null;
   let pingCancel: (() => void) | null = null;
   let pingSeq = 0;
@@ -409,15 +412,24 @@ export function createControllerLink(options: ControllerLinkOptions): Controller
     );
   }
 
-  function recomputeUp(): void {
+  // Whether the last `recomputeUp` found the link wanted up, so `retry()` fires only on a real
+  // trigger (page visible again, the socket or the TV coming back, a new game starting -- the
+  // Connection lifecycle's named retry triggers), not on every later `follow()` while still on
+  // the relay path. Without this edge check, ordinary room traffic would call `retry()` on every
+  // dispatch, cancelling the state machine's own backoff timer each time and burning the hourly
+  // attempt budget on nothing (Connection lifecycle, "Retry limits").
+  let wasUp = false;
+
+  function recomputeUp(trigger = false): void {
     const wantsUp = pageVisible && linkAllowed() && sessionActive;
     if (!wantsUp) {
       machine.stop();
     } else if (machine.state === "off") {
       machine.start();
-    } else if (machine.state === "relay") {
+    } else if (machine.state === "relay" && (!wasUp || trigger)) {
       machine.retry();
     }
+    wasUp = wantsUp;
     notifyPathChange();
   }
 
@@ -519,7 +531,10 @@ export function createControllerLink(options: ControllerLinkOptions): Controller
 
     follow(state) {
       sessionActive = seatedAndHostConnected(state);
-      recomputeUp();
+      const gameId = state.status === "room" ? state.gameId : null;
+      const newGameStarted = gameId !== null && gameId !== lastGameId;
+      lastGameId = gameId;
+      recomputeUp(newGameStarted);
     },
 
     receiveAnswer(payload) {
