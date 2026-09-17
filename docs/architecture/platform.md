@@ -539,11 +539,17 @@ export interface HostSceneData<TState> {
   joinUrl?: string;      // the URL a phone opens to join, such as https://couchcade.workers.dev/?room=BEAN
 }
 
-export interface ControllerProps<TView, TInput extends GameInput> {
+// What the phone's motion step settled on (CC-11.3). Generic: game-sdk may not import @couchcade/motion.
+export type ControllerMotion<TAdapter = unknown, TCalibration = unknown> =
+  | { mode: "motion"; adapter: TAdapter; calibration: TCalibration } // granted and calibrated
+  | { mode: "touch" };                                               // chose touch, denied, no gyroscope, or stopped mid-game
+
+export interface ControllerProps<TView, TInput extends GameInput, TMotion = ControllerMotion> {
   screen: string;
   data: TView;
   player: Player;
   send(input: TInput, eventTimeStamp?: number): void; // stamps `at` in room time
+  motion?: TMotion;      // only for a needsMotion game whose motion step ran on this phone
 }
 
 export interface CouchcadeGame<
@@ -610,6 +616,7 @@ Rules for game code:
 2. With a `gameId`, the phone lazy-loads that game's controller entry `src/controller/index.ts`, then its `component()`, and passes `ControllerProps`. The phone never loads the game's `src/index.ts`, so rules and physics stay on the host.
 3. Every input goes through one `send` helper. It stamps `at` with `toHostTime(event.timeStamp)`, encodes and sends. Real-time games wrap it in the batching helper (CC-3.6).
 4. An unknown `gameId` shows "That game isn't on this phone yet. Reload the page." in the referee voice.
+5. A game with `needsMotion` also gets `motion`, the result of the phone's motion step (CC-5.10) for that game: `{ mode: "motion", adapter, calibration }` once the phone calibrated, `{ mode: "touch" }` otherwise. `apps/controller/src/runtime/controller.ts` (`controllerMotion`) builds it from the motion session, typed `ControllerMotion<MotionAdapter, Calibration>`. When the phone switches to touch mid-game (motion.md flow rule 7) the prop changes, and the controller swaps its motion detector for the touch fallback. `motion` is absent when no motion step ran for the running game, such as after a reload mid-game, and a motion game then plays with touch. The controller builds one pose tracker from `calibration` and starts its own listener on `adapter`. It never asks for permission: only the motion step and "Tap to resume" do (CC-11.3).
 
 ### TV rendering (CC-4.11)
 

@@ -51,12 +51,32 @@ export interface HostSceneData<TState> {
   joinUrl?: string;
 }
 
-export interface ControllerProps<TView, TInput extends GameInput> {
+/**
+ * What the phone's motion step (CC-5.10) settled on for the running game, handed to its controller.
+ *
+ * - `motion`: permission granted and the phone calibrated. The controller feeds `adapter` samples
+ *   through one pose tracker built from `calibration`.
+ * - `touch`: the player chose touch, the browser said no, the phone has no gyroscope, or motion
+ *   stopped mid-game. The runtime switches the value when that happens, so a controller follows it.
+ *
+ * The types are generic because game-sdk (core) may not import `@couchcade/motion` (kit). A
+ * controller names them: `ControllerMotion<MotionAdapter, Calibration>`.
+ */
+export type ControllerMotion<TAdapter = unknown, TCalibration = unknown> =
+  | { mode: "motion"; adapter: TAdapter; calibration: TCalibration }
+  | { mode: "touch" };
+
+export interface ControllerProps<TView, TInput extends GameInput, TMotion = ControllerMotion> {
   screen: string;
   data: TView;
   player: Player;
   /** Stamps `at` in room time. */
   send(input: TInput, eventTimeStamp?: number): void;
+  /**
+   * Set for a game with `needsMotion` once the motion step ran on this phone, absent otherwise.
+   * A motion game treats absent as `touch`, such as after a reload mid-game.
+   */
+  motion?: TMotion;
 }
 
 export interface CouchcadeGame<

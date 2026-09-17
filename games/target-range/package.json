@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@couchcade/game-sdk": "workspace:*",
+    "@couchcade/motion": "workspace:*",
     "@couchcade/protocol": "workspace:*",
     "@couchcade/stage": "workspace:*",
     "@couchcade/theme": "workspace:*",
@@ -22,7 +23,10 @@
   },
   "devDependencies": {
     "@couchcade/config": "workspace:*",
+    "@vitejs/plugin-vue": "catalog:",
+    "@vue/test-utils": "catalog:",
     "fast-check": "catalog:",
+    "jsdom": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:",
