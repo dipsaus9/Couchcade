@@ -1,10 +1,10 @@
 ---
 id: CC-3.15
 title: Relay WebRTC signalling messages through the room
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-17 17:50'
-updated_date: '2026-09-17 20:56'
+updated_date: '2026-09-17 20:57'
 labels:
   - story
 dependencies:
@@ -56,3 +56,9 @@ Dependency changed from CC-3.14 to CC-3.12 (orchestrator decision, 2026-09-17): 
 
 Amended References to add apps/controller/src/session/state.ts: adding rtc:answer to RelayToPhoneMessage made its onMessage switch non-exhaustive (vue-tsc build failure). Added a one-line no-op case (real handling is CC-3.19's link runtime, out of this story's scope). Checked apps/host's two RelayToHostMessage switches (lobby-state.ts, host-runtime.ts): both already have default/break fallthroughs, so rtc:offer needed no change there.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added the WebRTC signalling relay for the direct phone-to-TV link (docs/architecture/realtime-link.md, Signalling). @couchcade/protocol now exports rtc:offer/rtc:answer schemas (a compact LinkDescription with up to 6 host candidates), standalone link:ping/link:pong schemas that never touch the relay, and optional n/e/more fields on input.d, with fixtures that round-trip and encode under 1 KB. The room (apps/server/src/room/rtc.ts, room.ts) forwards rtc:offer from a seated player to the host with from set -- audience, host and oversized offers are dropped by the existing role/schema/size checks, no new code needed for that -- and answers rtc:answer only to the connected phone named in to, with to stripped; an unknown or disconnected target is dropped. A storage-write spy in the new apps/server/test/rtc.test.ts proves the relay makes no storage write for either message. headers.test.ts gained a trip-wire asserting the CSP never sets webrtc 'block' (it already doesn't). pnpm check, test, build and check:deps are all green. One line of necessary glue outside the story's References: apps/controller/src/session/state.ts's exhaustive message switch needed a no-op case for the new rtc:answer variant (real handling is CC-3.19's job); apps/host's two message switches already had default/break fallthroughs and needed no change. Epic CC-3 stays open: most of its stories (CC-3.16 onward) are still in flight or to do.
+<!-- SECTION:FINAL_SUMMARY:END -->
