@@ -2,20 +2,20 @@
 
 Pips are the players' avatars. This spec turns the approved Pip parts sheet from the platform screens canvas into rules the CC-6 stories can build from: the parts, the profile a phone sends, how a phone remembers it, and how a Pip is drawn as an Interface Pip and as a World Pip.
 
-**For the owner.** Read [Decisions at a glance](#decisions-at-a-glance) and [Open questions for the owner](#open-questions-for-the-owner), then look at the parts sheet. That takes about 10 minutes.
+**For the owner.** Read [Decisions at a glance](#decisions-at-a-glance) and [Owner decisions](#owner-decisions-2026-09-17), then look at the parts sheet. That takes about 10 minutes.
 
-**Parts sheet:** [Pip Parts Sheet](https://claude.ai/artifact/EhifwbxiX6GNRUFzJ9CUYa). It shows every part in both forms, eight example Pips and both answers to open question 1.
+**Parts sheet:** [Pip Parts Sheet](https://claude.ai/artifact/EhifwbxiX6GNRUFzJ9CUYa). It shows every part in both forms, eight example Pips and the World Pip chest options the owner chose between.
 
 **For agents.** Everything after the owner sections is binding for CC-6.2 to CC-6.6, next to [platform.md](platform.md), [security.md](security.md), [session-flow.md](session-flow.md), [HOUSE_STYLE.md](../HOUSE_STYLE.md) and [platform-screens.md](../design/platform-screens.md). Where they disagree, stop and flag it. [Found while writing this spec](#found-while-writing-this-spec) lists the known ones.
 
-Status: draft for owner approval (CC-6.1).
+Status: approved by the owner on 17 September 2026 (CC-6.1), with the two [owner decisions](#owner-decisions-2026-09-17).
 
 ---
 
 ## Contents
 
 - [Decisions at a glance](#decisions-at-a-glance)
-- [Open questions for the owner](#open-questions-for-the-owner)
+- [Owner decisions (2026-09-17)](#owner-decisions-2026-09-17)
 - [Words used in this spec](#words-used-in-this-spec)
 - [Parts](#parts)
 - [Profile data model](#profile-data-model)
@@ -33,7 +33,7 @@ Status: draft for owner approval (CC-6.1).
 
 ## Decisions at a glance
 
-Approving this doc approves these.
+Approving this doc approves these. Rows 13 and 14 are [owner decisions](#owner-decisions-2026-09-17) from 17 September 2026.
 
 | # | Decision | In plain words |
 |---|---|---|
@@ -49,32 +49,15 @@ Approving this doc approves these.
 | 10 | Both kits draw from the same part data | The vector part geometry lives in `@couchcade/theme`, so the Vue Pip (`ui`) and the Phaser scoreboard heads (`stage`) can't drift apart. |
 | 11 | The TV never shows a sad Pip | Neutral by default, happy for winners, surprised for a miss. Sad exists only for a player's own phone. |
 | 12 | Pip colours don't count against a game's 16 colours | Player colours, skin tones and hair colours are platform colours, drawn by `stage` at runtime. |
+| 13 | World Pips show the shape at their feet | A 2×2 Chalk chest mark, and the 9×9 seat shape under the feet (owner, 2026-09-17). |
+| 14 | The random Pip button is "Shuffle" | "Surprise me" stays the VIP's random game (owner, 2026-09-17). |
 
-## Open questions for the owner
+## Owner decisions (2026-09-17)
 
-Two product choices need you. Each has a recommendation.
+The owner approved this spec on 17 September 2026 and made two product choices.
 
-### 1. The seat shape on a World Pip's chest
-
-You decided that every jersey shows the player's shape in Chalk. On a World Pip the jersey is 12×9 pixels. The parts sheet draws both options.
-
-| Option | What it looks like | Trade-off |
-|---|---|---|
-| **A. Chest mark, shape at the feet** (recommended) | A 2×2 Chalk mark on the chest, as on the approved canvas. The player's shape stands under the Pip at 9×9 pixels. | All 8 shapes stay tellable apart. Quick Draw has done this since CC-10.8 and was live-playtested with it. The chest itself doesn't carry the shape. |
-| B. 5×5 shape on the chest | The shape drawn in Chalk on the chest | Follows the decision literally, but at 5×5 the circle and hexagon are identical and the star and heart blur, so the shape stops working as a cue. |
-
-**Recommendation: A.** The shape does its job, which is telling players apart without colour, and the Interface Pip keeps the full chest emblem.
-
-### 2. The name of the "random Pip" button
-
-The canvas lobby puts a quiet **Surprise me** button under the Pip customiser. session-flow.md already uses **Surprise me** for the VIP's random game. The house style says an action keeps one name everywhere, and the VIP sees both.
-
-| Option | Pip button | VIP game button |
-|---|---|---|
-| **A. Rename the Pip button** (recommended) | Shuffle | Surprise me |
-| B. Rename the game button | Surprise me | Random game |
-
-**Recommendation: A.** "Shuffle" is short, says what happens and fits the referee voice. The game button is already built (CC-3.2).
+1. **The seat shape on a World Pip.** A World Pip's jersey is 12×9 pixels, too small for a clean shape (at 5×5 the circle and hexagon look the same). A World Pip wears a 2×2 Chalk mark on the chest, and the player's shape stands under its feet at 9×9 pixels, as Quick Draw already does. Interface Pips keep the full shape on the chest. Rejected: a 5×5 shape on the chest.
+2. **The random Pip button is called "Shuffle".** "Surprise me" stays the VIP's random game button (session-flow.md), so each action keeps one name. Rejected: renaming the game button to "Random game".
 
 ---
 
@@ -337,7 +320,7 @@ A World Pip is a 16×24 grid, built at runtime from the profile and seat by `bui
 |---|---|
 | Hair behind | Long: columns 2, 3, 12, 13 on rows 5 to 15. Ponytail: columns 1 and 2 on rows 4 to 11 (the back of the head). Bun: columns 6 to 9 on rows 1 and 2. |
 | Jersey | Rows 14 to 22. Row 14 spans columns 4 to 11, row 15 columns 3 to 12, rows 16 to 22 columns 2 to 13. Player colour. |
-| Chest | Option A: Chalk at (7,17), (8,17), (7,18), (8,18). Option B: a 5×5 Chalk shape at columns 6 to 10, rows 16 to 20. See [open question 1](#1-the-seat-shape-on-a-world-pips-chest). |
+| Chest | Chalk at (7,17), (8,17), (7,18), (8,18) ([owner decision 1](#owner-decisions-2026-09-17)). |
 | Head | Every pixel with `(x − 7.5)² + (y − 8)² ≤ 5.6²`, skin tone |
 | Hair on top | Head pixels on rows up to: buzz 3, short 4, bun 4, long 4, ponytail 4, cap 5, curls 5 (curls also fill the ring out to radius 6.7 on rows up to 6), bald none. Short adds a fringe on row 5 from column 9. Cap adds a brim on row 6 from column 3 to 14. |
 | Face | See below |
@@ -360,7 +343,7 @@ Surprised World Pips keep 1px eyes. The Interface Pip's bigger dots don't fit at
 ### In a scene
 
 1. **Anchor.** A Pip standing at world position `(x, feetY)` has its top-left pixel at `(x − 8, feetY − 24)`. Depth sorts by `feetY`.
-2. **Shape marker** (option A). `drawPlayerShape` draws the 9×9 seat shape with its top-left at `(x − 5, feetY)`, just under the feet, one depth step behind the Pip.
+2. **Shape marker** (owner decision 1). `drawPlayerShape` draws the 9×9 seat shape with its top-left at `(x − 5, feetY)`, just under the feet, one depth step behind the Pip.
 3. **Scale.** World Pips live in the 480×270 world and get the world's integer scale: ×4 at 1080p (64×96 on screen), ×8 at 4K.
 4. **Animation.** Games move Pips smoothly and swap the face at 8 to 12 fps (blink, expression). Poses and props, such as Quick Draw's popgun and Target Range's bow, belong to the game.
 5. **Textures.** `stage` paints each look once into a canvas texture keyed `pip:world:<skin>-<hair>-<hairColour>-<slot>-<expression>-<eyes>` and reuses it. Textures are made when a game starts or a player joins, never in the update loop. At most 8 players × 5 faces = 40 textures of 16×24 pixels.
@@ -389,7 +372,7 @@ Rules:
 
 ## Accessibility
 
-1. **Colour is never the only cue.** The Interface Pip jersey carries the seat shape. World Pips carry the shape as decided in [open question 1](#1-the-seat-shape-on-a-world-pips-chest). Names sit next to Pips in every chip and card.
+1. **Colour is never the only cue.** The Interface Pip jersey carries the seat shape. World Pips stand on their 9×9 seat shape ([owner decision 1](#owner-decisions-2026-09-17)). Names sit next to Pips in every chip and card.
 2. **Screen readers.** `CcPip` takes a `label` ("Noor's Pip") when it stands alone and is hidden when the name is next to it. Customiser options are radio groups with the labels from [Parts](#parts): "Short", "Tone 3", "Caramel".
 3. **Selection is not colour only.** A selected customiser tile gets the Sky fill and `aria-checked`, and the preview Pip changes at once.
 4. **Touch targets.** Customiser tiles and tabs are at least 56px.
@@ -423,7 +406,7 @@ Approving the doc approves the proposed fixes. Each names who makes it.
 3. **CC-6.3 criterion 1** names the component `<Pip>`. The UI kit prefixes every component with `Cc`, so it is `CcPip`. CC-6.3's References also need `packages/theme/src/pips/` for the shared geometry.
 4. **Part counts live in protocol.** CC-1.8 put `pipPartCounts` in `@couchcade/protocol` because utils had no Pip module yet. CC-6.2 adds `pipParts` to utils and switches protocol to import it, so its References need `packages/protocol/src/shared/`.
 5. **Placeholder World Pips.** Quick Draw has a game-local `games/quick-draw/src/host/world-pip.ts`: short hair for everyone, and a sad face that falls back to the neutral smile. Target Range's TV scene (CC-11.4, in progress) copies it, as target-range.md allows until CC-6.4 lands. A **new story** after CC-6.4 swaps every game-local copy for `buildWorldPip` and deletes them. Its References are the `src/host/` folders of the games that have a copy by then.
-6. **"Surprise me" means two things.** See [open question 2](#2-the-name-of-the-random-pip-button).
+6. **"Surprise me" meant two things.** The canvas used it for the random Pip too. Settled by [owner decision 2](#owner-decisions-2026-09-17): the Pip button is "Shuffle".
 7. **The canvas World Pip's ponytail** hangs on the right, which is the front once World Pips face right. This spec moves it to the back.
 
 ---
