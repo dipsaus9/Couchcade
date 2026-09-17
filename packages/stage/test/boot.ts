@@ -78,9 +78,8 @@ export function pixel(game: Game, x: number, y: number): Promise<number> {
   });
 }
 
-/** How many pixels in `rect` have exactly the colour `colour`, read back after the next frame. */
-export function countColour(game: Game, rect: Rect, colour: Hex): Promise<number> {
-  const target = toPhaserColor(colour);
+/** The RGBA pixels of a canvas area, read back after the next frame. */
+export function readArea(game: Game, rect: Rect): Promise<Uint8ClampedArray> {
   return new Promise((resolve) => {
     game.renderer.snapshotArea(rect.x, rect.y, rect.width, rect.height, (snapshot) => {
       const image = snapshot as HTMLImageElement;
@@ -91,18 +90,24 @@ export function countColour(game: Game, rect: Rect, colour: Hex): Promise<number
         const context = canvas.getContext("2d", { willReadFrequently: true });
         if (!context) throw new Error("No 2D context");
         context.drawImage(image, 0, 0);
-        const { data } = context.getImageData(0, 0, rect.width, rect.height);
-        let count = 0;
-        for (let i = 0; i < data.length; i += 4) {
-          const value = ((data[i] ?? 0) << 16) | ((data[i + 1] ?? 0) << 8) | (data[i + 2] ?? 0);
-          if (value === target) count += 1;
-        }
-        resolve(count);
+        resolve(context.getImageData(0, 0, rect.width, rect.height).data);
       };
       if (image.complete) read();
       else image.addEventListener("load", read, { once: true });
     });
   });
+}
+
+/** How many pixels in `rect` have exactly the colour `colour`, read back after the next frame. */
+export async function countColour(game: Game, rect: Rect, colour: Hex): Promise<number> {
+  const target = toPhaserColor(colour);
+  const data = await readArea(game, rect);
+  let count = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    const value = ((data[i] ?? 0) << 16) | ((data[i + 1] ?? 0) << 8) | (data[i + 2] ?? 0);
+    if (value === target) count += 1;
+  }
+  return count;
 }
 
 /** The first colour as a readable hex, so a failing pixel check shows what it found. */

@@ -12,7 +12,7 @@ import {
 import type { QuickDrawInput } from "./input.ts";
 import { startStandoff } from "./standoff.ts";
 import { activePlayers, findPlayer } from "./state.ts";
-import type { QuickDrawState, TapResult } from "./state.ts";
+import type { Practice, QuickDrawPlayer, QuickDrawState, TapResult } from "./state.ts";
 
 /**
  * Judges a tap at game time `atMs`. It only compares against DRAW!, so a fake can never turn a
@@ -81,6 +81,7 @@ export function resolveRound(state: QuickDrawState): QuickDrawState {
     phase: "result",
     phaseAtMs: state.nowMs,
     winners,
+    ...(state.practice ? { practice: practiceAfter(state.practice, players) } : {}),
     players: players.map((player) => {
       if (player.left || player.result?.kind !== "valid") return player;
       const ms = player.result.ms as number;
@@ -90,6 +91,21 @@ export function resolveRound(state: QuickDrawState): QuickDrawState {
         bestMs: player.bestMs === null ? ms : Math.min(player.bestMs, ms),
       };
     }),
+  };
+}
+
+/**
+ * Solo practice after a round: a valid reaction adds to the average and is a new best when it
+ * beats the best before it (the first one always is). `players` still has the old `bestMs`.
+ */
+function practiceAfter(practice: Practice, players: readonly QuickDrawPlayer[]): Practice {
+  const player = players.find((candidate) => !candidate.left);
+  const ms = player?.result?.kind === "valid" ? player.result.ms : null;
+  if (player === undefined || ms === null) return { ...practice, newBest: false };
+  return {
+    totalMs: practice.totalMs + ms,
+    validTaps: practice.validTaps + 1,
+    newBest: player.bestMs === null || ms < player.bestMs,
   };
 }
 
@@ -123,7 +139,8 @@ export function onTick(state: QuickDrawState, dtMs: number): QuickDrawState {
 
 /**
  * A seat expired. The player keeps their points but can't score again, and the round no longer
- * waits for them. With fewer than 2 players left the match ends at once.
+ * waits for them. With fewer than 2 players left the match ends at once, so solo practice ends
+ * when its player leaves.
  */
 export function onPlayerLeft(state: QuickDrawState, player: Player): QuickDrawState {
   if (state.phase === "over") return state;

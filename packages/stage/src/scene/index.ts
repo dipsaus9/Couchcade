@@ -149,8 +149,7 @@ export class StageScene<TState = unknown> extends Scene {
 
   /**
    * Runs before every render: the world camera skips the overlay layer, the overlay camera skips
-   * everything else, and overlay text renders its glyphs at the overlay camera's zoom, so a 4K
-   * canvas gets 4K text instead of 1080p text scaled up.
+   * everything else, and overlay text is drawn 1:1 on the canvas (see `sharpenText`).
    */
   #assignCameras(): void {
     const overlayCamera = this.#overlayCamera;
@@ -165,17 +164,103 @@ export class StageScene<TState = unknown> extends Scene {
       }
     }
     if (!overlay) return;
-    const resolution = Math.max(1, overlayCamera.zoom);
-    const visit = (children: readonly GameObjects.GameObject[]) => {
+    const visit = (children: readonly GameObjects.GameObject[], upright: boolean) => {
       for (const child of children) {
         child.cameraFilter &= ~overlayCamera.id;
-        if (child instanceof GameObjects.Text && child.style.resolution !== resolution) {
-          child.setResolution(resolution);
+        if (child instanceof GameObjects.Text) {
+          sharpenText(child, overlayCamera.zoom, upright && isUpright(child));
         } else if (child instanceof GameObjects.Container) {
-          visit(child.list);
+          visit(child.list, upright && isUpright(child));
         }
       }
     };
-    visit(overlay.list);
+    visit(overlay.list, true);
   }
+}
+
+/** Not rotated, scaled or flipped, so a text's texture can map 1:1 onto canvas pixels. */
+function isUpright(object: GameObjects.Text | GameObjects.Container): boolean {
+  return object.rotation === 0 && object.scaleX === 1 && object.scaleY === 1;
+}
+
+/** What `sharpenText` last did to a text: the padding it added and the size it left. */
+interface Sharpened {
+  text: string;
+  zoom: number;
+  width: number;
+  height: number;
+  right: number;
+  bottom: number;
+}
+
+const sharpened = new WeakMap<GameObjects.Text, Sharpened>();
+
+/**
+ * Makes overlay text sharp at any overlay zoom (docs/architecture/platform.md, "TV rendering"):
+ *
+ * - Its glyphs rasterise at exactly the overlay zoom, below ×1 too. On a 1920×970 canvas (a 1080p
+ *   TV in a browser window) the overlay is ×0.75, and 1080p glyphs shrunk by nearest-neighbour
+ *   sampling would lose and double strokes.
+ * - Upright text snaps to whole canvas pixels. Phaser only rounds an unscaled object under an
+ *   unzoomed camera, so at ×0.75 or ×1.5 text would otherwise land between pixels.
+ * - Its texture is a whole number of canvas pixels wide and high, so a snapped text is never
+ *   stretched by a pixel: the right and bottom padding grow by less than one canvas pixel.
+ *
+ * Rotated or scaling text, such as a callout, keeps Phaser's default rounding. Runs every frame,
+ * and only re-renders a text when its content, size or the zoom changed.
+ */
+export function sharpenText(text: GameObjects.Text, zoom: number, upright: boolean): void {
+  text.setVertexRoundMode(upright ? "full" : "safeAuto");
+  const { padding, style } = text;
+  const last = sharpened.get(text);
+  if (
+    last?.zoom === zoom &&
+    last.text === text.text &&
+    last.width === text.width &&
+    last.height === text.height &&
+    style.resolution === zoom
+  ) {
+    return;
+  }
+  if (style.fixedWidth !== 0 || style.fixedHeight !== 0) {
+    text.setResolution(zoom);
+    return;
+  }
+  // Measured the way Phaser's updateText does, so the sums below match its own to the bit.
+  const lines =
+    style.wordWrapWidth || style.wordWrapCallback
+      ? text.getWrappedText()
+      : text.text.split(text.splitRegExp as RegExp);
+  const content = GameObjects.GetTextSize(text, style.getTextMetrics(), lines);
+  const left = padding.left ?? 0;
+  const top = padding.top ?? 0;
+  const right = (padding.right ?? 0) - (last?.right ?? 0);
+  const bottom = (padding.bottom ?? 0) - (last?.bottom ?? 0);
+  const extraRight = topUp(content.width, left, right, zoom);
+  const extraBottom = topUp(content.height, top, bottom, zoom);
+  style.resolution = zoom;
+  text.setPadding({ left, top, right: right + extraRight, bottom: bottom + extraBottom });
+  sharpened.set(text, {
+    text: text.text,
+    zoom,
+    width: text.width,
+    height: text.height,
+    right: extraRight,
+    bottom: extraBottom,
+  });
+}
+
+/**
+ * The extra end padding that makes one side of a text a whole number of canvas pixels, summed the
+ * way Phaser sizes the text canvas: `(content + start + end) × zoom`. The size must not end a hair
+ * under the whole number (the canvas would drop a pixel) or over it (snapping could add one).
+ */
+function topUp(content: number, start: number, end: number, zoom: number): number {
+  const size = (extra: number) => (content + start + (end + extra)) * zoom;
+  const pixels = Math.ceil(size(0) - 1e-6);
+  let extra = pixels / zoom - (content + start + end);
+  for (let step = 0; step < 16 && size(extra) !== pixels; step++) {
+    extra += (size(extra) < pixels ? 1 : -1) * 1e-13;
+  }
+  return size(extra) < pixels ? extra + 1e-9 : extra;
 }
