@@ -4,7 +4,7 @@ title: Add Pip profile defaults and a seeded random generator
 status: In Progress
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-17 16:30'
+updated_date: '2026-09-17 16:33'
 labels:
   - story
 dependencies:
@@ -16,6 +16,8 @@ references:
   - packages/protocol/src/shared/
   - packages/utils/test/pips.test.ts
   - packages/protocol/test/shared.test.ts
+  - packages/utils/src/index.ts
+  - packages/protocol/package.json
 parent_task_id: CC-6
 type: feature
 ordinal: 82000
@@ -48,4 +50,6 @@ Branch: CC-6.2/pip-generator
 Verify: pnpm check && pnpm test
 
 Implemented: packages/utils/src/pips/ (pipParts counts+hairstyle ids, PipProfile type, randomPip(seed) via createRng, uniform over all 288 looks). packages/protocol/src/shared/index.ts now imports pipParts from @couchcade/utils/pips and derives pipPartCounts + pipProfileSchema bounds from it instead of a hand-copied 6/8/6 (protocol's PipProfile type/zod schema unchanged in shape). Added @couchcade/utils + fast-check deps to packages/protocol/package.json. References amended (packages/protocol/src/shared/, packages/utils/test/pips.test.ts, packages/protocol/test/shared.test.ts added; original packages/utils/src/pips/ kept) because the follow-up in pips.md 'Found while writing this spec' item 4 required touching protocol's shared schema too. Scope note for reviewer: packages/game-sdk/testing/players.ts imports pipPartCounts from @couchcade/protocol and was intentionally left untouched -- protocol keeps re-exporting pipPartCounts (now derived from utils) for exactly that backward compatibility, so no other package needed touching. pnpm-lock.yaml and the fast-check catalog dependency are implied bookkeeping, not a declared Reference.
+
+Review round 1 (story-reviewer, sonnet): block on scope grounds only -- both acceptance criteria met, but packages/protocol/package.json and packages/utils/src/index.ts were changed without being declared References (strict prefix match). Advisory: pipPartCounts re-export left in protocol to avoid touching game-sdk/testing/players.ts judged a reasonable, spec-compliant interpretation, no fix required. Fix: amended References to add packages/utils/src/index.ts and packages/protocol/package.json (re-passing all existing refs).
 <!-- SECTION:NOTES:END -->
