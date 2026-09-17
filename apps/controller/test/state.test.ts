@@ -337,6 +337,7 @@ describe("endReasonForClose", () => {
     expect(endReasonForClose(4008)).toBe("flooding");
     expect(endReasonForClose(4009)).toBe("replaced");
     expect(endReasonForClose(4011)).toBe("seat-expired");
+    expect(endReasonForClose(4012)).toBe("room-full");
   });
 
   it("reconnects after a normal close, a deploy or network loss", () => {
