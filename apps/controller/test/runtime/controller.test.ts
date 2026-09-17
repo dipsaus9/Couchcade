@@ -1,10 +1,14 @@
 import { readFileSync } from "node:fs";
 import { createControllerRegistry } from "@couchcade/game-sdk/registry";
+import { calibrateRest, type Calibration } from "@couchcade/motion/calibration";
+import { createFakeAdapter, synthetic, traceSamples } from "@couchcade/motion/sensors";
 import type { ControllerView, PlayerInfo, RelayToPhoneMessage } from "@couchcade/protocol";
 import { describe, expect, it, vi } from "vitest";
 import { createSSRApp, h, nextTick, ref } from "vue";
 import { renderToString } from "vue/server-renderer";
+import type { MotionGame } from "../../src/motion/session.ts";
 import {
+  controllerMotion,
   controllerProps,
   showsGameController,
   useGameController,
@@ -158,5 +162,65 @@ describe("copy", () => {
     expect(`${missingGameCopy.title} ${missingGameCopy.body}`).toBe(
       "That game isn't on this phone yet. Reload the page.",
     );
+  });
+});
+
+describe("controllerMotion", () => {
+  const adapter = createFakeAdapter();
+  const calibration = calibrateRest(
+    traceSamples(synthetic.still({ durationMs: 1500, gravity: [0, 0, 9.81] })),
+  ) as Calibration;
+  const game = (patch: Partial<MotionGame> = {}): MotionGame => ({
+    step: 1,
+    gameId: "tap-race",
+    title: "Tap race",
+    flow: { kind: "ready" },
+    calibration,
+    capability: "full",
+    playing: true,
+    paused: false,
+    ...patch,
+  });
+
+  it("hands a calibrated phone's adapter and calibration to the running game", () => {
+    expect(controllerMotion(game(), "tap-race", () => adapter)).toEqual({
+      mode: "motion",
+      adapter,
+      calibration,
+    });
+    // A sleeping phone keeps motion: "Tap to resume" restarts the same adapter.
+    expect(controllerMotion(game({ paused: true }), "tap-race", () => adapter)?.mode).toBe(
+      "motion",
+    );
+  });
+
+  it("is touch for every other outcome of the motion step", () => {
+    const touch = { mode: "touch" };
+    for (const reason of ["denied", "unsupported"] as const) {
+      const flow = { kind: "touch", reason, acknowledged: true } as const;
+      expect(
+        controllerMotion(game({ flow, calibration: null }), "tap-race", () => adapter),
+      ).toEqual(touch);
+    }
+    for (const flow of [{ kind: "ask" }, { kind: "starting" }] as const) {
+      expect(
+        controllerMotion(game({ flow, calibration: null }), "tap-race", () => adapter),
+      ).toEqual(touch);
+    }
+  });
+
+  it("is absent without a motion step for this game", () => {
+    expect(controllerMotion(null, "tap-race", () => adapter)).toBeUndefined();
+    expect(controllerMotion(game({ gameId: "other" }), "tap-race", () => adapter)).toBeUndefined();
+  });
+
+  it("is passed to the controller component only when there is one", () => {
+    const state = gameState("tap-race") as GameState;
+    const send = createInputSender({ sendMessage: () => {}, canSend: () => true });
+    expect(controllerProps(state, send)).not.toHaveProperty("motion");
+    expect(controllerProps(state, send, { mode: "touch" })).toMatchObject({
+      screen: "tap",
+      motion: { mode: "touch" },
+    });
   });
 });
