@@ -5,7 +5,7 @@
     "kind": "platform",
     "gzip": true,
     "limit": "80 KB",
-    "note": "docs/architecture/platform.md, Performance budgets > Phone controller > Initial JS (gzip)."
+    "note": "README.md, Performance budgets > Phone controller > Initial JS (gzip)."
   },
   {
     "name": "Controller per-game chunk",
@@ -13,7 +13,7 @@
     "kind": "per-game",
     "gzip": true,
     "limit": "25 KB",
-    "note": "docs/architecture/platform.md, Performance budgets > Phone controller > Per-game controller chunk (gzip). Checked once per games/*/src/controller entry the controller build actually emits, discovered from the build output, not a maintained list."
+    "note": "README.md, Performance budgets > Phone controller > Per-game controller chunk (gzip). Checked once per games/*/src/controller entry the controller build actually emits, discovered from the build output, not a maintained list."
   },
   {
     "name": "Controller fonts",
@@ -21,7 +21,7 @@
     "kind": "fonts",
     "gzip": false,
     "limit": "40 KB",
-    "note": "docs/architecture/platform.md, Performance budgets > Phone controller > Fonts (2 subsetted WOFF2 files). WOFF2 is already compressed, so this is the raw file size, not gzip."
+    "note": "README.md, Performance budgets > Phone controller > Fonts (2 subsetted WOFF2 files). WOFF2 is already compressed, so this is the raw file size, not gzip."
   },
   {
     "name": "Host platform JS",
@@ -29,7 +29,7 @@
     "kind": "platform",
     "gzip": true,
     "limit": "450 KB",
-    "note": "docs/architecture/platform.md, Performance budgets > Host > Platform JS (gzip, incl. Phaser). Excludes each game's own host/ scene chunk, which is loaded per game, not on platform boot."
+    "note": "README.md, Performance budgets > Host > Platform JS (gzip, incl. Phaser). Excludes each game's own host/ scene chunk, which is loaded per game, not on platform boot."
   },
   {
     "name": "Host Phaser chunk",

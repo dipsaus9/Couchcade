@@ -5,7 +5,7 @@ export interface CheckResult {
   measuredBytes: number;
   limitBytes: number;
   pass: boolean;
-  /** Set on checks whose budget isn't from docs/architecture/platform.md verbatim. */
+  /** Set on checks whose budget isn't from README.md's Performance budgets section verbatim. */
   note?: string;
 }
 
