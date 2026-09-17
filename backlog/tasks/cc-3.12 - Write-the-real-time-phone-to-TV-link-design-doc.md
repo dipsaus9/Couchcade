@@ -4,7 +4,7 @@ title: Write the real-time phone-to-TV link design doc
 status: Done
 assignee: []
 created_date: '2026-09-17 17:23'
-updated_date: '2026-09-17 19:58'
+updated_date: '2026-09-17 20:02'
 labels:
   - story
   - owner-gate
@@ -51,6 +51,8 @@ Review gate (dipsaus-ai:story-reviewer, haiku, round 1): pass. AC1 met, no scope
 Owner answers 2026-09-17, recorded in the doc under "Owner answers (2026-09-17)": (1) no STUN server at all (iceServers: []) and no TURN, so the link only uses local candidates and nothing about it leaves the house; adding STUN or TURN later needs a new owner decision. (2) The link carries input only; phone screens stay on the relay and screens-over-link is a noted follow-up idea. (3) Target Range aims at 6 world px per degree both ways, touch pad 1.5 world px per CSS px both ways, aim sent with 3 decimals. (4) Rollout as recommended: behind a switch until the spike, the E2E tests and the owner replay, then on by default with ?link=0 as the escape hatch; streams at 30 per second, 60 when a game asks.
 Approved by owner: 2026-09-17
 Implementation stories created 2026-09-17: CC-3.13 (spike), CC-3.14 (doc amendments), CC-3.15 (signalling through the room), CC-3.16 (link core), CC-3.17 (stream playback), CC-3.18 (InputChannel), CC-3.19 (controller link runtime), CC-3.20 (host links), CC-3.21 (aim sender), CC-11.9 (Target Range aim), CC-3.22 (E2E), CC-3.23 (link clock samples), CC-3.24 (owner replay and switch-on). CC-5.7 amended to depend on CC-3.18 and use input.stream. Collision check: every reported overlap is between stories that already carry a dependency edge (CC-3.17 before CC-3.18, CC-3.19 before CC-3.23 and CC-3.24, CC-3.20 before CC-3.24, CC-11.7 before CC-3.24).
+
+Review gate (dipsaus-ai:story-reviewer, haiku, round 2, after the owner answers and the story creation): pass. Both criteria met, no scope violations. One advisory: the doc status line writes the date as "17 September 2026" instead of ISO; kept, because every other doc in docs/architecture uses that form.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
