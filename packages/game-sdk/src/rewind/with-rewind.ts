@@ -231,6 +231,7 @@ export function withRewind<TInput extends GameInput, TState>(
 
     onPlayerLeft(state, player) {
       if (!rules.onPlayerLeft) return state;
+      // onPlayerLeft gets no dtMs; the step is fixed, so it is always tickMs.
       const { now } = settle(state, tickMs, state.history.length);
       return { ...state, now: rules.onPlayerLeft(now, player), history: [], dirtyFrom: null };
     },
