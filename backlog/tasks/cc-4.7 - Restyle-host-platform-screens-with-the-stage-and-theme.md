@@ -4,7 +4,7 @@ title: Restyle host platform screens with the stage and theme
 status: Done
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-17 19:57'
+updated_date: '2026-09-17 20:05'
 labels:
   - story
 dependencies:
@@ -91,6 +91,10 @@ Verify: pnpm check && pnpm test
 Restyled every screen under apps/host/src/screens/ to consistently use @couchcade/ui (CcButton, CcPanel, CcPlayerShape) plus theme tokens, replacing hand-rolled duplicate button/panel/shape markup: LobbyScreen, JoinPanel, SeatCard (Kick already used CcButton), MenuScreen, ResultsScreen, CalibrationScreen, PasscodeScreen. lobby/PlayerShape.vue is kept, narrowed to the one case CcPlayerShape's public API can't cover: the lobby's empty-seat shape preview in Sky instead of the player's colour (design doc: "Empty slots show the shape the next player will get"). Fixed a stroke-weight bug along the way: the old local shape component scaled its outline with icon size; CcPlayerShape (and the updated PlayerShape.vue) hold a fixed 4px TV outline per HOUSE_STYLE regardless of size, which is a direct crispness win at 1080p. pnpm check, pnpm test (all 24 workspace projects), pnpm build and pnpm check:style all pass. pnpm check:deps also passes (no import-boundary changes).
 
 Verified visually: built a temporary (untracked, not committed, deleted before push) fixture harness that mounted each restyled screen with the design doc's example content (players Sam/Noor/Jesse/Lotte/Daan, audience Mees, room code BEAN) and screenshotted every one at native 1920x1080 with fonts loaded, for the TV-crispness review (CC-4.11 concern). Screenshot review caught two real bugs before push, both fixed and re-verified: (1) SeatCard.vue's empty-seat shape lost its Sky fill when split from the occupied-seat CcPlayerShape path (rendered solid black); (2) ResultsScreen.vue's CcPanel tab ("Points") was clipped by overflow-y:auto living on the same element as the tab -- moved the scroll to an inner .rows wrapper. Follow-up (not fixed, out of this story's scope: it's a grid vertical-alignment question, not a theme-tokens/shared-components one): the game menu's .grid leaves a large empty gap between the game cards and the footer when there's only one row of cards, because align-content:start is set on a flex:1 grid that still stretches to fill the column -- pre-existing behaviour, unchanged by this restyle.
+
+Reviewer (dipsaus-ai:story-reviewer, model sonnet, round 1): verdict pass. AC1 met -- verified CcPlayerShape's public API (packages/ui/src/components/CcPlayerShape.vue + index.ts) has no colour-override, confirming PlayerShape.vue's narrowing is real, not just claimed; all removed local CSS matches what CcPanel/CcButton/CcPlayerShape now supply; remaining bespoke elements (.tag, .dot, .card, .chip, .row, .tile) have no ui-kit equivalent and stay theme-token-driven. AC2 met -- ran pnpm check:style independently, clean. No scope violations, no findings. PR: https://github.com/dipsaus9/Couchcade/pull/117 (draft).
+
+CI on PR #117: all checks green (budgets, check, build, check:deps, check:style, test, e2e).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
