@@ -4,7 +4,7 @@ title: Add the InputChannel to the game contract
 status: In Progress
 assignee: []
 created_date: '2026-09-17 17:50'
-updated_date: '2026-09-17 21:48'
+updated_date: '2026-09-17 21:52'
 labels:
   - story
 dependencies:
@@ -16,6 +16,7 @@ references:
   - packages/game-sdk/src/input/stream.ts
   - packages/game-sdk/src/input/index.ts
   - packages/game-sdk/test/input/channel.test.ts
+  - packages/game-sdk/test/contract.test.ts
 parent_task_id: CC-3
 priority: high
 type: feature
@@ -99,4 +100,13 @@ sendDirectEvent, sendRelayStream, sendRelayEvent) are an original design not spe
 doc's sketch (which only fixes the public InputChannel shape); CC-3.19's browser wiring is the
 next story that will supply real hooks (e.g. adapting the fake-link-shaped cc-stream/cc-events
 channels) matching these signatures.
+
+Reviewer round 1 (sonnet): verdict block. All 6 acceptance criteria judged met (AC1/AC5's
+input?/link? optionality noted as advisory only, not blocking, per the disclosed rationale). The
+sole blocking finding: packages/game-sdk/test/contract.test.ts was touched (one line, the
+CouchcadeController exhaustive-keys expectTypeOf assertion) but wasn't in the declared References.
+Reviewer's own recommended fix: add it to References (lower-friction than splitting into a
+separate story for a one-line, mechanically-forced consistency update). Done: References amended
+via `backlog task edit CC-3.18 --ref ...` to include packages/game-sdk/test/contract.test.ts.
+Re-review requested.
 <!-- SECTION:NOTES:END -->
