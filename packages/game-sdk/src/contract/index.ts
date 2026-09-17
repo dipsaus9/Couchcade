@@ -49,6 +49,17 @@ export interface HostSceneData<TState> {
   roomCode?: string;
   /** The URL a phone opens to join this room, such as `https://couchcade.workers.dev/?room=BEAN`. */
   joinUrl?: string;
+  /**
+   * Per in-game player: which path their real-time input takes and how far behind to draw their
+   * streams (docs/architecture/realtime-link.md, "Game SDK API sketch"). `rttMs` is the link's
+   * round trip, `null` on the relay path or before the first measurement. The host runtime always
+   * passes it once the link lands (CC-3.20); tests and tools may leave it out until then.
+   */
+  link?(playerId: string): {
+    path: "direct" | "relay";
+    rttMs: number | null;
+    playbackDelayMs: number;
+  };
 }
 
 /**
@@ -66,12 +77,44 @@ export type ControllerMotion<TAdapter = unknown, TCalibration = unknown> =
   | { mode: "motion"; adapter: TAdapter; calibration: TCalibration }
   | { mode: "touch" };
 
+/**
+ * Which path a controller's real-time input takes right now, from `@couchcade/game-sdk/input`'s
+ * `createInputChannel` (docs/architecture/realtime-link.md, "Connection lifecycle"). For dev
+ * readouts and tests only; a game never branches on it.
+ */
+export type InputChannelPath = "direct" | "relay" | "off";
+
+/**
+ * One input channel per controller (owner decision 10, "One capability for every game"): games
+ * call `stream` and `fire` without knowing whether the direct WebRTC link or the relay path
+ * carries the message (docs/architecture/realtime-link.md, "Game SDK API sketch"). Built by
+ * `createInputChannel` in `@couchcade/game-sdk/input`.
+ */
+export interface InputChannel<TInput extends GameInput> {
+  /** A continuous value, one sample. Direct: sent at the stream's rate. Relay: packed, 4 per second. */
+  stream(input: TInput, eventTimeStamp?: number): void;
+  /** A discrete event. Direct: reliable channel at once. Relay: the input stream's fire rules. */
+  fire(input: TInput, eventTimeStamp?: number): void;
+  /** The newest value given to `stream` for this type, or null. */
+  last<K extends TInput["type"]>(type: K): Extract<TInput, { type: K }> | null;
+  /** Drops pending values (volley closed, TV away). */
+  clear(): void;
+  /** For dev readouts and tests. Games never branch on it. */
+  readonly path: InputChannelPath;
+}
+
 export interface ControllerProps<TView, TInput extends GameInput, TMotion = ControllerMotion> {
   screen: string;
   data: TView;
   player: Player;
-  /** Stamps `at` in room time. */
+  /** Stamps `at` in room time. Turn-based and one-off input. Unchanged. */
   send(input: TInput, eventTimeStamp?: number): void;
+  /**
+   * Real-time input over the link when direct, the relay path otherwise
+   * (docs/architecture/realtime-link.md). The controller runtime always passes it once the link
+   * lands (CC-3.19); tests and tools may leave it out until then.
+   */
+  input?: InputChannel<TInput>;
   /**
    * Set for a game with `needsMotion` once the motion step ran on this phone, absent otherwise.
    * A motion game treats absent as `touch`, such as after a reload mid-game.
@@ -138,6 +181,11 @@ export interface CouchcadeController {
   id: string;
   /** `() => import("./Controller.vue").then((m) => m.default)` */
   component: () => Promise<Component>;
+  /**
+   * Input types sent with `input.stream`, and the rate each goes out at on the direct link.
+   * Default 30 per second; 60 when a game needs it (docs/architecture/realtime-link.md, "Rates").
+   */
+  streams?: Readonly<Record<string, { hz?: 30 | 60 }>>;
 }
 
 /** Declares a game. Returns the definition unchanged; it exists for type inference. */
