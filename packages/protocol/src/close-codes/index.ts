@@ -10,6 +10,8 @@ export const closeCodes = {
   replaced: 4009,
   /** Rejoined more than 2 minutes after disconnecting. Show the join screen with the code filled in. */
   seatExpired: 4011,
+  /** The room already holds 16 phones (8 players and 8 audience). Show "Room is full". */
+  roomFull: 4012,
 } as const;
 export type CloseCode = (typeof closeCodes)[keyof typeof closeCodes];
 

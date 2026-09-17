@@ -1,5 +1,6 @@
-import { joinRoomRequestSchema, seatCount, type JoinRoomResponse } from "@couchcade/protocol";
+import { joinRoomRequestSchema, type JoinRoomResponse } from "@couchcade/protocol";
 import { isRoomCode, roomCode } from "@couchcade/utils";
+import { isRoomFull } from "../room/audience.ts";
 import { internalPaths, type RoomStatus } from "../room/room.ts";
 import { allowedPlayerName } from "../security/names.ts";
 import { isRateLimited } from "../security/rate-limits.ts";
@@ -8,9 +9,6 @@ import { readJsonObject } from "./body.ts";
 import type { ApiContext } from "./context.ts";
 import { errorResponse } from "./errors.ts";
 import { turnstileError } from "./turnstile.ts";
-
-/** Phones a room holds: 8 players and 8 audience (owner decision, 16 September 2026). */
-export const maxPhones = seatCount * 2;
 
 /**
  * `POST /api/rooms/:code/join`. Checks run cheapest first, and the room is called once, for its
@@ -43,7 +41,7 @@ export async function joinRoom(request: Request, code: string, ctx: ApiContext):
   const status = await answer.json<RoomStatus>();
   if (status.state !== "live") return errorResponse("not-found");
   if (status.locked) return errorResponse("room-locked");
-  if (status.phones >= maxPhones) return errorResponse("room-full");
+  if (isRoomFull(status.phones)) return errorResponse("room-full");
 
   // 6. Sign the ticket and the rejoin token for a new player id.
   const identity = { role: "player", playerId: newPlayerId(), name } as const;
