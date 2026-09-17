@@ -90,7 +90,7 @@ Fourteen games are planned. Each has its own epic in the backlog, and the names 
 
 | Game | Inspired by | Phone input | Players | Epic |
 |---|---|---|---|---|
-| **Quick Draw** | 1-2-Switch "Quick Draw", Kirby Super Star "Samurai Kirby" | Tap when the TV shouts DRAW; early is a foul | 2 to 8, everyone draws at once | CC-10 |
+| **Quick Draw** | 1-2-Switch "Quick Draw", Kirby Super Star "Samurai Kirby" | Tap when the TV shouts DRAW; early is a foul | 2 to 8, everyone draws at once; 1 plays solo practice | CC-10 |
 | **Target Range** | Wii Sports Resort "Archery" | Aim with the phone like a bow, drag down to draw, let go to shoot | 1–8 at once | CC-11 |
 | **Strike Night** | Wii Sports "Bowling" | Hold the grip, swing, release; twist for spin | 1–4 in turns | CC-12 |
 | **Putt Club** | Wii Sports "Golf" putting, Mario Golf | Hold the grip and swing like a putter | 1–4 in turns | CC-13 |
