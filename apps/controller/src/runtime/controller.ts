@@ -1,7 +1,15 @@
-import type { ControllerProps, CouchcadeController, GameInput } from "@couchcade/game-sdk/contract";
+import type {
+  ControllerMotion,
+  ControllerProps,
+  CouchcadeController,
+  GameInput,
+} from "@couchcade/game-sdk/contract";
 import type { ControllerRegistry } from "@couchcade/game-sdk/registry";
+import type { Calibration } from "@couchcade/motion/calibration";
+import type { MotionAdapter } from "@couchcade/motion/sensors";
 import type { JsonValue } from "@couchcade/protocol";
 import { markRaw, shallowRef, watch, type Component, type ShallowRef } from "vue";
+import type { MotionGame } from "../motion/session.ts";
 import type { PhoneState } from "../session/state.ts";
 import type { InputSender } from "./send.ts";
 
@@ -25,12 +33,39 @@ export function showsGameController(state: PhoneState): state is GameState {
   );
 }
 
-/** The props a game's controller component gets (`ControllerProps` from the game contract). */
+/** The motion result a game controller on this phone gets. */
+export type PhoneMotion = ControllerMotion<MotionAdapter, Calibration>;
+
+/**
+ * The props a game's controller component gets (`ControllerProps` from the game contract).
+ * `motion` is only there when the motion step ran for this game.
+ */
 export function controllerProps(
   state: GameState,
   send: InputSender,
-): ControllerProps<JsonValue, GameInput> {
-  return { screen: state.view.screen, data: state.view.data, player: state.you, send };
+  motion?: PhoneMotion,
+): ControllerProps<JsonValue, GameInput, PhoneMotion> {
+  const props = { screen: state.view.screen, data: state.view.data, player: state.you, send };
+  return motion === undefined ? props : { ...props, motion };
+}
+
+/**
+ * What the motion step settled on for the running game `gameId` (docs/architecture/platform.md,
+ * "How the phone shows a controller"). Motion only once the phone calibrated; every other outcome
+ * of the step is touch, including a step the host started the game without, and a switch to touch
+ * mid-game. Undefined when no motion step ran for this game, such as for a game without
+ * `needsMotion` or after a reload mid-game.
+ */
+export function controllerMotion(
+  game: MotionGame | null,
+  gameId: string,
+  adapter: () => MotionAdapter,
+): PhoneMotion | undefined {
+  if (game === null || game.gameId !== gameId) return undefined;
+  if (game.flow.kind === "ready" && game.calibration !== null) {
+    return { mode: "motion", adapter: adapter(), calibration: game.calibration };
+  }
+  return { mode: "touch" };
 }
 
 export type ControllerStatus =
