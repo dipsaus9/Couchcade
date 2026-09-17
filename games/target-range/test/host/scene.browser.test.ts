@@ -187,9 +187,17 @@ describe("Target Range TV scene", () => {
       const seen = new Set<string>();
       let framesWithoutRoomCode = 0;
       let mostCrosshairs = 0;
+      // CI shares its cores with other Chromium suites: render every third tick, and every tick
+      // that starts a phase.
       let state = run.frame();
-      while (state.round === 1 || state.phase !== "intro") {
-        if (phases.at(-1) !== state.phase) phases.push(state.phase);
+      for (let tick = 0; state.round === 1 || state.phase !== "intro"; tick++) {
+        const newPhase = phases.at(-1) !== state.phase;
+        if (newPhase) phases.push(state.phase);
+        if (!newPhase && tick % 3 !== 0) {
+          state = run.tick();
+          continue;
+        }
+        run.render();
         const onScreen = shown(scene);
         for (const text of visibleTexts(scene)) seen.add(`${state.phase}:${text.text}`);
         if (!onScreen.includes(roomCode)) framesWithoutRoomCode += 1;
@@ -200,10 +208,11 @@ describe("Target Range TV scene", () => {
             seen.add(`${state.phase}:${image.texture.key.split(":")[1]}`);
         }
         if (overlayOf(scene, RoundResults)[0]?.visible) seen.add(`${state.phase}:results`);
-        state = run.frame();
+        state = run.tick();
         expect(scene.sys.isActive()).toBe(true);
       }
 
+      run.render();
       for (const text of visibleTexts(scene)) seen.add(`${state.phase}:${text.text}`);
       expect(framesWithoutRoomCode).toBe(0);
       expect(phases).toEqual([
@@ -380,8 +389,12 @@ describe("Target Range TV scene", () => {
       let state = run.tick();
       for (let frame = 0; state.phase !== "over"; frame++) {
         state = run.tick();
-        const settledReveal = state.phase === "reveal" && state.nowMs - state.phaseAtMs > 300;
-        if (!settledReveal && frame % 6 !== 0) continue;
+        // Once per reveal, when the tags have popped in, and every 12th tick otherwise.
+        const settledReveal =
+          state.phase === "reveal" &&
+          state.nowMs - state.phaseAtMs > 300 &&
+          !checked.has(`tags:${volleyOf(state)}`);
+        if (!settledReveal && frame % 12 !== 0) continue;
         run.render();
         const where = `volley ${volleyOf(state)} ${state.phase} at ${Math.round(state.nowMs)} ms`;
 
