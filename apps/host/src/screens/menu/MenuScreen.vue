@@ -32,9 +32,14 @@ const pickedTitle = computed(
 );
 
 // A card getting the Sunny focus ring is the `ui` token's platform moment (audio.md "Sound tokens
-// and sound banks"). Replays if the VIP picks a different game before the countdown ends.
+// and sound banks"). `press` is the VIP's own tap that picked it (audio.md's token table: "press
+// ... a VIP card pick"). Both play together; replays if the VIP picks a different game before the
+// countdown ends.
 watch(picked, (next, previous) => {
-  if (next !== null && next !== previous) audio.play("ui");
+  if (next !== null && next !== previous) {
+    audio.play("ui");
+    audio.play("press");
+  }
 });
 
 // The countdown number, redrawn a few times a second while it runs.
@@ -58,6 +63,13 @@ watch(
 );
 onBeforeUnmount(() => {
   if (timer !== null) clearInterval(timer);
+});
+
+// Each countdown tick (audio.md's token table: "press ... the menu countdown ticks"). `seconds`
+// only changes about once a second even though `tick()` polls 5x/s, and never on the countdown
+// starting or clearing (that's the VIP-pick `press` above, not a tick).
+watch(seconds, (next, previous) => {
+  if (next !== null && previous !== null && next !== previous) audio.play("press");
 });
 
 const chooser = computed(() =>
