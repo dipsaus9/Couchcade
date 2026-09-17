@@ -56,10 +56,11 @@ onBeforeUnmount(() => {
 const chooser = computed(() =>
   leader.value ? `${leader.value.name} is choosing on their phone` : "The VIP picks on their phone",
 );
+// A refreshed TV that couldn't resume its game says so until the VIP picks the next one.
 const detail = computed(() =>
   pickedTitle.value && seconds.value !== null
     ? `${pickedTitle.value} starts in ${seconds.value}`
-    : "Games that don't fit this many players are greyed out",
+    : (props.menu.notice ?? "Games that don't fit this many players are greyed out"),
 );
 </script>
 

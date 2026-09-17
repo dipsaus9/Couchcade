@@ -460,18 +460,6 @@ describe("createHostRuntime", () => {
     );
   });
 
-  it("puts the room back in the lobby when the relay says a game runs but this TV has none", () => {
-    const { handle, ofType, lobby } = setup();
-    handle(
-      { t: "room:welcome", d: { role: "host", code: "BEAN", phase: "playing", locked: false } },
-      { ...lobby, phase: "playing", players: [] },
-    );
-    expect(ofType("room:phase")).toEqual([{ t: "room:phase", d: { phase: "lobby" } }]);
-
-    handle({ t: "player:joined", d: { player: lobby.players[0]! } });
-    expect(ofType("controller:state").at(-1)?.d.gameId).toBeNull();
-  });
-
   it("keeps the menu open when its socket reconnects, and tells the relay if it forgot", () => {
     const { runtime, handle, vip, ofType } = setup();
     handle(startAction(vip));

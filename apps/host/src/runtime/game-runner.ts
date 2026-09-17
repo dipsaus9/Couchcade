@@ -6,7 +6,7 @@ import type {
   Outcome,
   Player,
 } from "@couchcade/game-sdk/contract";
-import type { ControllerView, PayloadOf } from "@couchcade/protocol";
+import type { ControllerView, JsonValue, PayloadOf } from "@couchcade/protocol";
 
 export type InputPayload = PayloadOf<"input">;
 
@@ -16,6 +16,12 @@ export interface GameRunnerOptions {
   seed: number;
   /** Calibrated TV lag (CC-3.8), 0 until then. */
   displayLagMs: number;
+  /**
+   * A game's own snapshot to resume from instead of `init`, after a TV refresh
+   * (docs/architecture/session-flow.md, "Recovery"). Only for a game with `restore`. Game time
+   * starts at 0 again, as the game's `restore` does.
+   */
+  restore?: JsonValue;
 }
 
 export interface GameRunner {
@@ -65,7 +71,10 @@ interface QueuedInput {
 export function createGameRunner(game: CouchcadeGame, options: GameRunnerOptions): GameRunner {
   const players = [...options.players];
   const byId = new Map(players.map((player) => [player.id, player]));
-  let state = game.init(players, options.seed);
+  let state =
+    options.restore !== undefined && game.restore
+      ? game.restore(players, options.seed, options.restore)
+      : game.init(players, options.seed);
   let tick = 0;
   let startRoomMs = 0;
   let outcome = game.outcome(state);

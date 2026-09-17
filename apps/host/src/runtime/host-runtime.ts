@@ -5,9 +5,14 @@ import {
   saveDisplayLag,
 } from "@couchcade/game-sdk/clock";
 import type { RoomClock, StoredDisplayLag } from "@couchcade/game-sdk/clock";
-import type { CouchcadeGame, Outcome } from "@couchcade/game-sdk/contract";
+import type { CouchcadeGame, Outcome, Player } from "@couchcade/game-sdk/contract";
 import type { GameRegistry } from "@couchcade/game-sdk/registry";
-import type { ControllerView, HostToRelayMessage, RelayToHostMessage } from "@couchcade/protocol";
+import type {
+  ControllerView,
+  HostToRelayMessage,
+  RelayToHostMessage,
+  RoomPhase,
+} from "@couchcade/protocol";
 import { createMotionCheck, isTouch } from "../motion/motion-check.ts";
 import type { MotionCheck, MotionCheckPlayer } from "../motion/motion-check.ts";
 import { createCalibration } from "../screens/calibration/calibration.ts";
@@ -28,6 +33,8 @@ import { createFixedStepLoop } from "./fixed-step.ts";
 import type { FixedStepLoop } from "./fixed-step.ts";
 import { createGameRunner } from "./game-runner.ts";
 import type { GameRunner } from "./game-runner.ts";
+import { createSnapshotSender, planRecovery } from "./recovery.ts";
+import type { RoomSnapshot, SnapshotResume, SnapshotSender } from "./recovery.ts";
 import type { GameStage } from "./stage.ts";
 import { devWarn, localNow, scheduleTimeout } from "./timing.ts";
 import type { Scheduler } from "./timing.ts";
@@ -108,6 +115,8 @@ export interface CalibrationScreenState {
 export interface MenuScreenState {
   games: MenuGame[];
   countdown: Countdown | null;
+  /** A line for the TV, such as "The TV restarted, so that game ended", or null. */
+  notice: string | null;
 }
 
 /** What the TV results screen draws. */
@@ -167,6 +176,10 @@ export interface HostRuntime {
  * A game with `needsMotion` runs the motion step first (motion.md, "Permission, calibration and
  * resume flow"): every seated phone shows the motion permission screen, and the game starts once
  * every seated phone sent `motion:status`, or after 20 seconds.
+ *
+ * While a game runs, round snapshots go to the relay (recovery.ts). A refreshed TV rejoins, waits for
+ * its clock samples and picks up where the room was: the running game resumes at the start of its
+ * next round, and other phases go back to the menu or the lobby (session-flow.md, "Recovery").
  */
 export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
   const clock = options.clock ?? roomClock;
@@ -181,7 +194,9 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
 
   const views = createViewSync({ send: options.send, now, schedule, warn });
   let lobby: LobbyState | null = null;
-  let running: (RunningGame & { loop: FixedStepLoop; touchPlayers: Set<string> }) | null = null;
+  let running:
+    | (RunningGame & { loop: FixedStepLoop; touchPlayers: Set<string>; snapshots: SnapshotSender })
+    | null = null;
   let results: GameResults | null = null;
   let calibration: Calibration | null = null;
   let motionCheck: MotionCheck | null = null;
@@ -189,6 +204,17 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
   let motionSteps = 0;
   /** The phase last sent to the relay with `room:phase`. */
   let phase: HostPhase = "lobby";
+  /** True once the relay welcomed this runtime. Only the first welcome of a new TV tab recovers. */
+  let welcomed = false;
+  /**
+   * Set from a refreshed TV's `room:welcome` until its clock is synced: the phase the relay stored
+   * and the `room:snapshot` it sent. Platform actions and views wait meanwhile.
+   */
+  let recovery: { phase: RoomPhase; snapshot: RoomSnapshot | null } | null = null;
+  /** Counts recoveries, so a welcome on a newer socket makes an older one's wait do nothing. */
+  let recoveries = 0;
+  /** The TV menu's notice line. */
+  let menuNotice: string | null = null;
 
   const menu: GameMenu = createGameMenu({
     registry: options.registry,
@@ -201,6 +227,7 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
     },
     onChange: () => {
       if (running !== null || motionCheck !== null) return;
+      if (!menu.open || menu.countdown !== null) menuNotice = null;
       setPhase(menu.open ? "menu" : "lobby");
       showPlatformViews();
       options.onChange?.();
@@ -292,29 +319,56 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
     options.onChange?.();
   }
 
-  function start(game: CouchcadeGame, state: LobbyState, touchPlayers: Set<string>): void {
+  /**
+   * Starts `game` with the seated players, or, with `restored`, resumes it from a snapshot with the
+   * in-game players still seated.
+   */
+  function start(
+    game: CouchcadeGame,
+    state: LobbyState,
+    touchPlayers: Set<string>,
+    restored?: { players: readonly Player[]; resume: SnapshotResume },
+  ): void {
     menu.close(game.id);
     results = null;
+    menuNotice = null;
     // Read once per game, so a game sees one value from start to end.
     const displayLagMs = displayLag.ms();
     const runner = createGameRunner(game, {
-      players: seatedPlayers(state),
+      players: restored?.players ?? seatedPlayers(state),
+      // A restored game gets a new seed too. Its RNG state comes from the snapshot.
       seed: createSeed(),
       displayLagMs,
+      restore: restored?.resume.g,
     });
     const loop = createFixedStepLoop({
       now,
       schedule,
       onTick: () => {
         const outcome = runner.step();
-        if (outcome) end(outcome);
-        else views.show(game.id, runner.views());
+        if (outcome) {
+          end(outcome);
+          return;
+        }
+        snapshots.tick();
+        views.show(game.id, runner.views());
       },
     });
-    const current = { game, runner, loop, touchPlayers };
+    setPhase("playing");
+    // Round 0 right after `init`, replacing any earlier game's snapshot. A restored game keeps the
+    // stored one.
+    const snapshots = createSnapshotSender({
+      game,
+      runner,
+      send: options.send,
+      now,
+      schedule,
+      warn,
+      resume: restored?.resume,
+    });
+    const current = { game, runner, loop, touchPlayers, snapshots };
     running = current;
 
-    setPhase("playing");
     views.show(game.id, runner.views());
     options.onChange?.();
 
@@ -349,8 +403,9 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
    * "Results"). "Play again" restarts the same game, "Back to menu" opens the menu. */
   function end(outcome: Outcome): void {
     if (running === null) return;
-    const { game, runner, loop } = running;
+    const { game, runner, loop, snapshots } = running;
     loop.stop();
+    snapshots.stop();
     options.stage.stop(game);
     running = null;
     results = createGameResults({
@@ -375,6 +430,61 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
     options.onChange?.();
   }
 
+  /**
+   * A new TV tab got its first `room:welcome` with a phase other than the lobby: it was refreshed
+   * or reopened after a deploy. The relay follows the welcome with `player:joined` for every known
+   * player and the stored `room:snapshot`. Those all arrive before the first `clock:pong`, and the
+   * host needs its clock samples before it resumes anyway, so it decides once the clock is synced.
+   */
+  function beginRecovery(relayPhase: RoomPhase): void {
+    recoveries += 1;
+    const attempt = recoveries;
+    recovery = { phase: relayPhase, snapshot: null };
+    clock.whenSynced().then(
+      () => {
+        if (attempt === recoveries) finishRecovery();
+      },
+      () => {},
+    );
+  }
+
+  /** Goes where the recovery table says (session-flow.md, "Recovery"). */
+  function finishRecovery(): void {
+    if (recovery === null) return;
+    const { phase: relayPhase, snapshot } = recovery;
+    recovery = null;
+    if (lobby === null) return;
+    const plan = planRecovery({
+      phase: relayPhase,
+      snapshot,
+      registry: options.registry,
+      seated: seatedPlayers(lobby),
+    });
+    // The relay is in `relayPhase`, so `room:phase` only goes out when recovery lands elsewhere.
+    // This runtime has no party phase yet (CC-8), so a room stored in it goes back to the lobby.
+    if (relayPhase === "party") options.send({ t: "room:phase", d: { phase: "lobby" } });
+    else phase = relayPhase;
+    switch (plan.to) {
+      case "playing":
+        start(plan.game, lobby, new Set(), plan);
+        return;
+      case "menu": {
+        menuNotice = plan.notice;
+        const leaderId = vip(lobby)?.id;
+        if (leaderId !== undefined) menu.action(leaderId, { action: "start" });
+        break;
+      }
+      case "lobby":
+        break;
+    }
+    if (!menu.open) {
+      menuNotice = null;
+      setPhase("lobby");
+    }
+    showPlatformViews();
+    options.onChange?.();
+  }
+
   return {
     get phase() {
       return phase;
@@ -385,7 +495,9 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
     },
 
     get menu() {
-      return phase === "menu" ? { games: menu.games(), countdown: menu.countdown } : null;
+      return phase === "menu"
+        ? { games: menu.games(), countdown: menu.countdown, notice: menuNotice }
+        : null;
     },
 
     get results() {
@@ -455,14 +567,32 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
     handle(message, state) {
       lobby = state;
       switch (message.t) {
-        case "room:welcome":
+        case "room:welcome": {
           clock.connect((d) => options.send({ t: "clock:ping", d }));
-          // The relay remembers a different phase than this TV runs: the TV was refreshed, or a
-          // phase change got lost with the socket. Without a snapshot to resume from (CC-3.5),
-          // the relay follows the TV.
+          const fresh =
+            !welcomed &&
+            phase === "lobby" &&
+            running === null &&
+            !menu.open &&
+            calibration === null &&
+            motionCheck === null;
+          welcomed = true;
+          // A refreshed TV, or its socket dropped again before it had recovered.
+          if ((fresh || recovery !== null) && message.d.phase !== "lobby") {
+            beginRecovery(message.d.phase);
+            return;
+          }
+          recovery = null;
+          // The relay remembers a different phase than this TV runs, because a phase change got
+          // lost with the socket. The relay follows the TV.
           if (running === null && message.d.phase !== phase) {
             options.send({ t: "room:phase", d: { phase } });
           }
+          return;
+        }
+        case "room:snapshot":
+          // Only a TV that is recovering reads it. A TV whose socket just reconnected runs the game.
+          if (recovery !== null) recovery = { ...recovery, snapshot: message.d };
           return;
         case "clock:pong":
           clock.receive(message.d);
@@ -489,8 +619,9 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
           }
           return;
         case "ui:action":
-          // The motion step takes no platform actions: the game is already picked.
-          if (running !== null || motionCheck !== null) return;
+          // The motion step takes no platform actions: the game is already picked. A recovering TV
+          // takes none until it knows where the room was.
+          if (running !== null || motionCheck !== null || recovery !== null) return;
           // During the TV lag check only the VIP's skip-calibration counts.
           if (calibration !== null) calibration.action(message.from, message.d);
           else if (phase === "results") results?.action(message.from, message.d);
@@ -513,8 +644,9 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
       }
       // Presence changed: the VIP, the seated count and so the grey cards, "can play again" or "not
       // in this game" state may have changed. Phones that joined or came back get their view too.
-      // While a game runs, its next tick sends the views.
-      if (running !== null) return;
+      // While a game runs, its next tick sends the views. A recovering TV sends them once it knows
+      // where the room is.
+      if (running !== null || recovery !== null) return;
       if (motionCheck !== null) {
         // A player who left no longer holds the step up, which may start the game. Otherwise
         // joiners and returning phones get the step too.
@@ -543,8 +675,11 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
       calibration = null;
       motionCheck?.dispose();
       motionCheck = null;
+      recovery = null;
+      recoveries += 1;
       if (running) {
         running.loop.stop();
+        running.snapshots.stop();
         options.stage.stop(running.game);
         running = null;
       }
