@@ -4,7 +4,7 @@ title: Write the real-time phone-to-TV link design doc
 status: In Progress
 assignee: []
 created_date: '2026-09-17 17:23'
-updated_date: '2026-09-17 17:23'
+updated_date: '2026-09-17 17:36'
 labels:
   - story
   - owner-gate
@@ -29,7 +29,7 @@ Branch: CC-3.12/realtime-link-doc
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 docs/architecture/realtime-link.md covers every topic in the outcome, links its online sources, and passes the story-reviewer gate
+- [x] #1 docs/architecture/realtime-link.md covers every topic in the outcome, links its online sources, and passes the story-reviewer gate
 - [ ] #2 Owner approval is recorded in the task notes as "Approved by owner: <YYYY-MM-DD>" before the story is Done
 <!-- AC:END -->
 
@@ -45,4 +45,6 @@ Research WebRTC DataChannels, mDNS host candidates, free STUN and TURN, browser 
 Owner gate: open the docs PR, send the owner a short summary plus the PR link, and wait for explicit approval. Record it with --append-notes.
 Owner playtest feedback (2026-09-17), Target Range: input too laggy, more events wanted, crosshair often off, crosshair speed feels too fast or too slow. Owner decisions (2026-09-17): direct phone-to-host WebRTC link with DO signalling only and no paid TURN; fallback to the relay path at 4/s with TV-side smoothing; the phone decides its own shot; generic SDK capability for all games; tune the default aim gain, no per-player setting.
 Verify: pnpm check, pnpm test, pnpm build; the doc renders its mermaid blocks on GitHub.
+
+Review gate (dipsaus-ai:story-reviewer, haiku, round 1): pass. AC1 met, no scope violations, no findings. AC2 is the owner gate and stays open until the owner approves the PR.
 <!-- SECTION:NOTES:END -->
