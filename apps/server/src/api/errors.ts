@@ -3,7 +3,7 @@
 // status, so a code always means the same status.
 
 export const apiErrorStatus = {
-  /** The body isn't JSON under 1 KB, or doesn't match the request schema. */
+  /** The body isn't JSON under 4 KB, or doesn't match the request schema. */
   "bad-request": 400,
   /** The upgrade isn't a `GET` with `Upgrade: websocket`. */
   "websocket-required": 400,
@@ -17,7 +17,9 @@ export const apiErrorStatus = {
   "invalid-ticket": 401,
   /** The `Origin` header isn't this site. */
   "forbidden-origin": 403,
-  /** Siteverify failed or timed out (CC-2.2). */
+  /** The Turnstile token is missing, invalid, spent, or for another action or site. */
+  "turnstile-failed": 403,
+  /** TURNSTILE_SECRET_KEY isn't set, or Siteverify errored or timed out. The check fails closed. */
   "turnstile-unavailable": 403,
   /** No such route, a malformed room code, no such room, or a room without its TV. */
   "not-found": 404,
