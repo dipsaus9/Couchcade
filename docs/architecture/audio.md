@@ -2,18 +2,18 @@
 
 This is the design for sound on the TV and haptics on phones: which audio engine the host uses, how games ask for sounds, how music loops, ducks and crossfades, where the browser's autoplay lock gets opened during a game night, what the volume settings store, how phones buzz, and where the platform's CC0 sounds and lobby music come from.
 
-**For the owner.** Read [Decisions at a glance](#decisions-at-a-glance) and [Open questions for the owner](#open-questions-for-the-owner). That takes about 10 minutes.
+**For the owner.** Read [Decisions at a glance](#decisions-at-a-glance) and [Owner decisions](#owner-decisions). That takes about 10 minutes.
 
 **For agents.** Everything after the owner sections is binding for CC-7.2 to CC-7.6 and for every game that plays sound. [platform.md](platform.md), [session-flow.md](session-flow.md), [motion.md](motion.md), [security.md](security.md), [platform-screens.md](../design/platform-screens.md), README.md, [TECH_STACK.md](../TECH_STACK.md) and [HOUSE_STYLE.md](../HOUSE_STYLE.md) still apply, and this doc doesn't repeat them. Where this doc, platform.md and a story disagree, stop and flag it. [Conflicts found while writing this doc](#conflicts-with-stories-and-other-docs) lists the ones already known.
 
-Status: draft for owner approval (CC-7.1).
+Status: approved by the owner on 17 September 2026 (CC-7.1).
 
 ---
 
 ## Contents
 
 - [Decisions at a glance](#decisions-at-a-glance)
-- [Open questions for the owner](#open-questions-for-the-owner)
+- [Owner decisions](#owner-decisions)
 - [Words used in this doc](#words-used-in-this-doc)
 - [Engine](#engine)
 - [Sound tokens and sound banks](#sound-tokens-and-sound-banks)
@@ -34,7 +34,7 @@ Status: draft for owner approval (CC-7.1).
 
 ## Decisions at a glance
 
-Approving this doc approves these.
+The owner approved these on 17 September 2026.
 
 | # | Decision | In plain words |
 |---|---|---|
@@ -56,14 +56,14 @@ Approving this doc approves these.
 
 ---
 
-## Open questions for the owner
+## Owner decisions
 
-Each has a recommendation. Approving the doc without comment takes all of them.
+The owner approved this doc on 17 September 2026 and took all four recommendations.
 
-1. **Is lobby music on by default?** Recommended: yes, at music 60% and effects 80%. A silent lobby feels broken on a TV, and the first click already unlocked audio. The host can mute it in one click, and the laptop remembers. The other option is music off until the host turns it on, which is quieter for late-night parties but means most hosts never hear it.
-2. **Can the VIP change the volume from their phone?** Recommended: no, only on the laptop (a "Sound" button on the TV lobby and the `M` key for mute). The person at the laptop is the one who hears the TV. A phone control adds a protocol message and a way for any VIP to blast the room. The other option is a mute toggle on the VIP's lobby screen.
-3. **Is Safari older than 18.4 silent acceptable on the host?** Recommended: yes. The host laptop almost always runs Chrome, because casting to a Chromecast needs it, and Safari 18.4 shipped in March 2025. An AAC copy of every sound would double the audio files each game ships and each sourcing story encodes, for browsers a host rarely uses. The other option is `.m4a` copies next to every `.ogg`.
-4. **Does the TV show a "Click for sound" chip after a refresh?** Recommended: yes, a quiet Chalk chip in the bottom-left safe area, gone after the first click or key press. It isn't in the approved screens yet, so CC-7.4 adds it. The other option is staying silent until the next click with no hint, which looks like a bug.
+1. **Lobby music is on by default,** with music at 60% and effects at 80%. A silent lobby feels broken on a TV, and the first click already unlocked audio. The host can mute it in one click, and the laptop remembers.
+2. **Volume is set on the laptop only,** with a "Sound" button on the TV lobby and the `M` key for mute. The VIP's phone has no sound control. The person at the laptop hears the TV, and a phone control would add a protocol message and let any VIP blast the room.
+3. **Safari older than 18.4 on the host plays no sound.** No AAC copies ship. The host laptop almost always runs Chrome, because casting to a Chromecast needs it, and Safari 18.4 shipped in March 2025.
+4. **A refreshed TV shows a "Click for sound" chip:** a quiet Chalk chip in the bottom-left safe area, gone after the first click or key press. It isn't in the approved screens yet, so CC-7.4 adds it.
 
 ---
 
@@ -309,7 +309,7 @@ Rules:
 1. `PasscodeScreen.vue`'s `submit` calls `audio.unlock()` as its first statement, before `busy` changes and before the `await`. A wrong passcode still unlocks audio. That's harmless.
 2. `unlock()` is idempotent and synchronous. It creates the context if needed, calls `resume()` without awaiting it, and starts a one-sample silent buffer, an old WebKit workaround that costs nothing elsewhere.
 3. The host app also adds one capturing `pointerdown` and `keydown` listener on `document` that calls `unlock()` while `audio.state` is `locked`. Any click or key press on the laptop then unlocks, including "Check TV lag".
-4. **TV refresh.** The host rejoins from `sessionStorage` without the passcode screen (session-flow.md), so the page has no gesture. `audio.state` stays `locked` and the TV shows a quiet Chalk chip "Click for sound" in the bottom-left safe area. It hides the moment `state` becomes `running`. The game runs without sound in the meantime. CC-7.4 builds the chip ([open question 4](#open-questions-for-the-owner)).
+4. **TV refresh.** The host rejoins from `sessionStorage` without the passcode screen (session-flow.md), so the page has no gesture. `audio.state` stays `locked` and the TV shows a quiet Chalk chip "Click for sound" in the bottom-left safe area. It hides the moment `state` becomes `running`. The game runs without sound in the meantime. CC-7.4 builds the chip ([owner decision 4](#owner-decisions)).
 5. If the context later reports `suspended` or `interrupted` (Safari does this when another app takes the audio device), `state` goes back to `locked` and the chip shows again.
 6. Hiding the tab doesn't suspend audio. A tab cast to a Chromecast is often a background tab, and it must keep playing.
 
@@ -321,7 +321,7 @@ Rules:
 
 1. Every new sound file is OGG Vorbis (`.ogg`). WAV is allowed only for files under 100 KB that already ship (`crow-caw.wav` is the exception at 210 KB, see [Conflicts](#conflicts-with-stories-and-other-docs) item 6).
 2. Decoding uses `fetch` plus `decodeAudioData`. Same-origin `fetch` is already allowed by the CSP's `connect-src 'self'`, and no `<audio>` element is ever created, so the CSP needs no `media-src`.
-3. Safari decodes Ogg Vorbis from version 18.4. Versions 14.1 to 18.3 only decode Vorbis inside WebM ([caniuse](https://caniuse.com/ogg-vorbis)). On those, `load` marks every sound silent, logs one dev warning, and the night goes on without sound ([open question 3](#open-questions-for-the-owner)).
+3. Safari decodes Ogg Vorbis from version 18.4. Versions 14.1 to 18.3 only decode Vorbis inside WebM ([caniuse](https://caniuse.com/ogg-vorbis)). On those, `load` marks every sound silent, logs one dev warning, and the night goes on without sound ([owner decision 3](#owner-decisions)).
 
 ### When files load
 
@@ -360,7 +360,7 @@ CC-7.6 builds these in `apps/host/src/settings/`. CC-7.4 applies them to `audio`
 Rules:
 
 1. One `localStorage` key, `couchcade:host-settings`, holding a JSON object with a `v: 1` field. A missing, unreadable or older value falls back to the defaults. Access is wrapped in `try`, because `localStorage` can throw in private windows.
-2. Settings belong to the laptop, not the room. Phones never see or change them ([open question 2](#open-questions-for-the-owner)).
+2. Settings belong to the laptop, not the room. Phones never see or change them ([owner decision 2](#owner-decisions)).
 3. The TV lobby has a quiet "Sound" button that opens a settings panel (mute toggle, two sliders, reduced motion toggle). The `M` key toggles mute on any TV screen, except while a text field has focus, so typing a passcode with an "m" in it doesn't mute. Both are laptop controls, so they also unlock audio.
 4. There is no reduced-audio preference. No browser exposes a media query for it. Mute and the two volumes cover it. Reduced motion never silences a sound, because sound is how a player who looks away notices a moment.
 
@@ -499,7 +499,7 @@ Found while writing this doc. None changes a decision the owner already approved
 | 5 | CC-7.4 criterion 2 and CC-7.6 criterion 1 | CC-7.4 says "muting via settings", but CC-7.6's settings list only music volume, effects volume and reduced motion | [Host settings](#host-settings) adds `muted` | Add "muted" to CC-7.6 criterion 1 |
 | 6 | Game asset format | `crow-caw.wav` (210 KB), `release-twang.wav` (97 KB) and `arrow-whoosh.wav` (66 KB) ship as WAV | Allowed, since they decode everywhere. New files are OGG. | The Quick Draw wiring story may re-encode `crow-caw.wav` to OGG and update its credit line |
 | 7 | CC-7.2 criterion 2 | "Music ducks by 50% during callouts" needs `Callout` in `@couchcade/stage` to call `audio.duck`, outside CC-7.2's References | `Callout.play()` ducks for its entrance plus hold | Add `packages/stage/src/callout/` to CC-7.2's References |
-| 8 | CC-7.4 References | Unlocking needs one line in `apps/host/src/screens/passcode/PasscodeScreen.vue`, the chip needs a spot on the TV screens, and the runtime fade needs `apps/host/src/runtime/stage.ts` | [Unlocking audio](#unlocking-audio-the-autoplay-rule) rules 1 to 4 | Add those paths to CC-7.4. The chip isn't in the approved screens ([open question 4](#open-questions-for-the-owner)). |
+| 8 | CC-7.4 References | Unlocking needs one line in `apps/host/src/screens/passcode/PasscodeScreen.vue`, the chip needs a spot on the TV screens, and the runtime fade needs `apps/host/src/runtime/stage.ts` | [Unlocking audio](#unlocking-audio-the-autoplay-rule) rules 1 to 4 | Add those paths to CC-7.4. The chip isn't in the approved screens ([owner decision 4](#owner-decisions)). |
 | 9 | CC-7.6 | No approved design for the settings panel | Reuse the approved panel, quiet button and toggle styles from `@couchcade/ui` | CC-7.6 shows a screenshot in its PR for a one-line owner OK |
 | 10 | Epic CC-7 description | "chiptune loops mapped to the house style motion tokens" | Effects map to the motion tokens. Music loops map to phases and games, not tokens. | None. This doc is the reading. |
 
