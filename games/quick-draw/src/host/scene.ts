@@ -1,6 +1,6 @@
-import { motion, world } from "@couchcade/theme";
+import { motion } from "@couchcade/theme";
 import type { HostSceneData } from "@couchcade/game-sdk/contract";
-import { StageScene, calloutStyle } from "@couchcade/stage";
+import { StageScene, metrics, shakeIntensity, worldToOverlay } from "@couchcade/stage";
 import type { Callout, Scoreboard } from "@couchcade/stage";
 import { Math as PhaserMath } from "phaser";
 import type { GameObjects, Tweens } from "phaser";
@@ -29,7 +29,7 @@ const readableAtMs = (() => {
   return motion.celebrate.ms;
 })();
 
-/** How far a Pip's tag sits above its feet: the Pip's height and a little air. */
+/** How far a Pip's tag sits above its feet, in world pixels: the Pip's height and a little air. */
 const tagAboveFeet = 26;
 
 /**
@@ -87,7 +87,8 @@ export default class QuickDrawScene extends StageScene<QuickDrawState> {
     this.panel = new InstructionPanel(this);
     this.tags = view.pips.map(() => new PipTag(this));
     this.bangs = view.pips.map(() => bangText(this));
-    this.overlay.add([this.panel, ...this.tags, ...this.bangs]);
+    // Tags go on top of the BANG! flags, so a winner's time is never covered.
+    this.overlay.add([this.panel, ...this.bangs, ...this.tags]);
 
     this.paint(state);
   }
@@ -105,13 +106,7 @@ export default class QuickDrawScene extends StageScene<QuickDrawState> {
     if (this.shakeNextFrame) {
       this.shakeNextFrame = false;
       if (!this.reducedMotion) {
-        this.cameras.main.shake(
-          motion.celebrate.ms,
-          new PhaserMath.Vector2(
-            calloutStyle.shake / world.width,
-            calloutStyle.shake / world.height,
-          ),
-        );
+        this.cameras.main.shake(motion.celebrate.ms, shakeIntensity(this.cameras.main));
       }
     }
     for (const cue of cuesBetween(this.previous, state)) this.emitCue(cue);
@@ -139,16 +134,23 @@ export default class QuickDrawScene extends StageScene<QuickDrawState> {
     this.props.showSparkle(glinting?.muzzle ?? null, view.glint?.frame ?? 0);
   }
 
+  /** Overlays sit on the world in overlay pixels: every world position is multiplied by 4. */
   private paintOverlays(view: Presentation): void {
     this.scoreboard.setScores(this.scores(view)).setRound({ current: view.round });
     this.panel.setText(view.panel);
     view.pips.forEach((pip, index) => {
-      this.tags[index]?.show(pip.label, pip.slot.x, pip.slot.feetY - tagAboveFeet);
       const bang = this.bangs[index];
       const actor = this.pips[index];
-      if (!bang || !actor) return;
-      bang.setVisible(pip.flag === 1);
-      if (pip.flag === 1) bang.setPosition(actor.flagTop.x, actor.flagTop.y - 1);
+      let tagBottom = worldToOverlay(pip.slot.feetY - tagAboveFeet);
+      if (bang && actor) {
+        bang.setVisible(pip.flag === 1);
+        if (pip.flag !== null) {
+          bang.setPosition(worldToOverlay(actor.flagTop.x), worldToOverlay(actor.flagTop.y - 1));
+          // A winner's time sits above their BANG!, so neither covers the other.
+          tagBottom = Math.min(tagBottom, Math.floor(bang.getBounds().top) - metrics.outline);
+        }
+      }
+      this.tags[index]?.show(pip.label, worldToOverlay(pip.slot.x), tagBottom);
     });
   }
 
@@ -171,7 +173,11 @@ export default class QuickDrawScene extends StageScene<QuickDrawState> {
     }
     if (shown === null || key === null) return;
 
-    const object = this.addCallout(shown.text, { x: calloutAt.x, y: calloutAt.y, shake: false });
+    const object = this.addCallout(shown.text, {
+      x: worldToOverlay(calloutAt.x),
+      y: worldToOverlay(calloutAt.y),
+      shake: false,
+    });
     this.tweens.killTweensOf(object);
     object.setScale(1).setAlpha(1);
     const pop = this.reducedMotion

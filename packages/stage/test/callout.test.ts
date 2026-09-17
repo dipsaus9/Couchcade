@@ -1,7 +1,8 @@
-import { color, font, motion, world } from "@couchcade/theme";
+import { color, font, motion } from "@couchcade/theme";
 import { describe, expect, it } from "vitest";
 import { vi } from "vitest";
 import { Callout, calloutStyle } from "../src/callout/index.ts";
+import { overlayFrame } from "../src/layout/index.ts";
 import { StageScene } from "../src/scene/index.ts";
 import { boot, countColour, hostData } from "./boot.ts";
 
@@ -17,12 +18,12 @@ describe("Callout", () => {
     expect(callout.style.stroke).toBe(color.ink);
     expect(callout.style.strokeThickness).toBe(calloutStyle.strokeThickness);
     expect(callout.style.fontFamily).toBe(font.pixel);
-    expect(callout.style.fontSize).toBe("40px"); // 160px on the TV
+    expect(callout.style.fontSize).toBe("160px");
     expect(callout.style.shadowOffsetX).toBe(0);
     expect(callout.style.shadowOffsetY).toBe(calloutStyle.shadowOffset);
     expect(callout.style.shadowColor).toBe(color.ink);
     expect(callout.style.shadowBlur).toBe(0);
-    expect([callout.x, callout.y]).toEqual([world.width / 2, world.height / 2]);
+    expect([callout.x, callout.y]).toEqual([overlayFrame.width / 2, overlayFrame.height / 2]);
   });
 
   it("pops in with the celebrate motion and a screen shake, and renders Sunny and Ink", async () => {
@@ -37,9 +38,9 @@ describe("Callout", () => {
     await vi.waitFor(() => expect(scene.cameras.main.shakeEffect.isRunning).toBe(false), {
       timeout: 3_000,
     });
-    const box = { x: 140, y: 105, width: 200, height: 60 };
-    expect(await countColour(game, box, color.sunny)).toBeGreaterThan(100);
-    expect(await countColour(game, box, color.ink)).toBeGreaterThan(100);
+    const box = { x: 560, y: 420, width: 800, height: 240 };
+    expect(await countColour(game, box, color.sunny)).toBeGreaterThan(1600);
+    expect(await countColour(game, box, color.ink)).toBeGreaterThan(1600);
   });
 
   it("fades in without scaling or shaking with reduced motion", async () => {
