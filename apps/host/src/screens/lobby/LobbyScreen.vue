@@ -4,6 +4,7 @@ import { seatCount } from "@couchcade/protocol";
 import { CcButton, CcPanel } from "@couchcade/ui";
 import { computed } from "vue";
 import type { ConnectionStatus } from "../../net/relay-socket.ts";
+import SoundSettings from "../../settings/SoundSettings.vue";
 import JoinPanel from "./JoinPanel.vue";
 import { audience, seatedPlayers, seats, vip, type LobbyState } from "./lobby-state.ts";
 import SeatCard from "./SeatCard.vue";
@@ -54,6 +55,7 @@ const hint = computed(() =>
         </svg>
         Lock room
       </CcButton>
+      <SoundSettings />
       <CcButton screen="tv" @press="$emit('end')">End room</CcButton>
     </header>
     <main class="main">
