@@ -8,7 +8,8 @@
     "dev": "vite",
     "build": "vite build",
     "typecheck": "vue-tsc",
-    "test": "vitest run"
+    "test": "vitest run",
+    "trace:record": "vite --config src/dev/trace-recorder/vite.config.ts"
   },
   "dependencies": {
     "@couchcade/game-sdk": "workspace:*",

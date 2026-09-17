@@ -1,3 +1,4 @@
+import type { StoredDisplayLag } from "@couchcade/game-sdk/clock";
 import { onBeforeUnmount, shallowRef } from "vue";
 import { ApiError, createRoom } from "../net/api.ts";
 import {
@@ -9,6 +10,7 @@ import {
 import { registry } from "../runtime/games.ts";
 import {
   createHostRuntime,
+  type CalibrationScreenState,
   type HostRuntime,
   type MenuScreenState,
   type ResultsScreenState,
@@ -19,7 +21,20 @@ import { clearSession, loadSession, saveSession, type StoredSession } from "./st
 
 export type HostScreen =
   | { name: "passcode"; notice: string | null }
-  | { name: "lobby"; lobby: LobbyState; connection: ConnectionStatus }
+  | {
+      name: "lobby";
+      lobby: LobbyState;
+      connection: ConnectionStatus;
+      /** The stored TV lag for "Check TV lag", or null when never measured. */
+      displayLag: StoredDisplayLag | null;
+    }
+  /** The TV lag check: players tap along with the flash. */
+  | {
+      name: "calibration";
+      lobby: LobbyState;
+      connection: ConnectionStatus;
+      calibration: CalibrationScreenState;
+    }
   /** The VIP picks a game on their phone. */
   | { name: "menu"; lobby: LobbyState; connection: ConnectionStatus; menu: MenuScreenState }
   /** A game runs. The TV shows the stage with the game's scene. */
@@ -58,9 +73,12 @@ export function useHostSession() {
     const show = () => {
       const menu = roomRuntime.menu;
       const results = roomRuntime.results;
+      const calibration = roomRuntime.calibration;
       if (menu) screen.value = { name: "menu", lobby, connection, menu };
       else if (results) screen.value = { name: "results", lobby, connection, results };
-      else screen.value = { name: roomRuntime.running ? "playing" : "lobby", lobby, connection };
+      else if (calibration) screen.value = { name: "calibration", lobby, connection, calibration };
+      else if (roomRuntime.running) screen.value = { name: "playing", lobby, connection };
+      else screen.value = { name: "lobby", lobby, connection, displayLag: roomRuntime.displayLag };
     };
     show();
 
@@ -103,6 +121,14 @@ export function useHostSession() {
     }
   }
 
+  /** The TV lag check controls on the laptop (session-flow.md, "TV lag calibration"). */
+  const calibration = {
+    start: () => runtime?.checkTvLag(),
+    skip: () => runtime?.skipCalibration(),
+    retry: () => runtime?.retryCalibration(),
+    frame: (roomTime: number) => runtime?.calibrationFrame(roomTime) ?? null,
+  };
+
   /** Ends the room for everyone. The relay closes every socket with 4004. */
   function endRoom(): void {
     relay?.send({ t: "room:end", d: {} });
@@ -116,7 +142,7 @@ export function useHostSession() {
     relay?.close();
   });
 
-  return { screen, openRoom, endRoom };
+  return { screen, openRoom, endRoom, calibration };
 }
 
 function createErrorCopy(code: string): string {

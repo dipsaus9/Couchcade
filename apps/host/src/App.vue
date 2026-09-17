@@ -2,15 +2,17 @@
 import { roomClock } from "@couchcade/game-sdk/clock";
 import { onBeforeUnmount, ref } from "vue";
 import { localNow } from "./runtime/timing.ts";
+import CalibrationScreen from "./screens/calibration/CalibrationScreen.vue";
 import LobbyScreen from "./screens/lobby/LobbyScreen.vue";
 import MenuScreen from "./screens/menu/MenuScreen.vue";
 import PasscodeScreen from "./screens/passcode/PasscodeScreen.vue";
 import ResultsScreen from "./screens/results/ResultsScreen.vue";
 import { useHostSession } from "./session/use-host-session.ts";
 
-const { screen, openRoom, endRoom } = useHostSession();
+const { screen, openRoom, endRoom, calibration } = useHostSession();
 const origin = window.location.origin;
 const roomNow = () => roomClock.toHostTime(localNow());
+const toRoomTime = (localTimestamp: number) => roomClock.toHostTime(localTimestamp);
 
 // Screens are laid out on a 1920×1080 TV frame, like the design canvas, and scaled to the window.
 const frameWidth = 1920;
@@ -38,7 +40,18 @@ onBeforeUnmount(() => window.removeEventListener("resize", fit));
       :lobby="screen.lobby"
       :connection="screen.connection"
       :origin="origin"
+      :display-lag="screen.displayLag"
       @end="endRoom"
+      @check-tv-lag="calibration.start"
+    />
+    <CalibrationScreen
+      v-else-if="screen.name === 'calibration'"
+      :lobby="screen.lobby"
+      :calibration="screen.calibration"
+      :to-room-time="toRoomTime"
+      :frame="calibration.frame"
+      @skip="calibration.skip"
+      @retry="calibration.retry"
     />
     <MenuScreen
       v-else-if="screen.name === 'menu'"
