@@ -135,6 +135,41 @@ describe("aggregateCredits (fixture repo)", () => {
     expect(result.errors).toEqual([]);
     expect(result.markdown).toContain("No CC0 assets are in use yet.");
   });
+
+  it("validates apps/*/CREDITS.md too, erroring on a missing file only when public/ exists", async () => {
+    root = createFixtureRoot({
+      "apps/controller/package.json": "{}", // no public/, no CREDITS.md: not an error
+      "apps/host/public/audio/press.ogg": Buffer.from([0]),
+      "apps/host/CREDITS.md": VALID_TABLE,
+      "apps/server/public/foo.png": Buffer.from([0]), // public/ but no CREDITS.md: an error
+    });
+
+    const result = await aggregateCredits(root);
+    expect(result.errors).toEqual([
+      "apps/server/CREDITS.md is missing, but apps/server/public/ has files " +
+        '(HOUSE_STYLE.md, "Assets and credits": every CC0 asset needs a credit)',
+    ]);
+    expect(result.platform).toEqual(expect.any(Array));
+    expect(result.platform.length).toBeGreaterThan(0);
+    expect(result.markdown).toContain("## Platform");
+    expect(result.markdown).toContain("cactus.png");
+  });
+
+  it("collects every app's CREDITS.md into one shared Platform section, ahead of the game sections", async () => {
+    root = createFixtureRoot({
+      "games/credited/assets/cactus.png": Buffer.from([0]),
+      "games/credited/CREDITS.md": VALID_TABLE,
+      "apps/host/public/audio/press.ogg": Buffer.from([0]),
+      "apps/host/CREDITS.md": VALID_TABLE,
+    });
+
+    const result = await aggregateCredits(root);
+    expect(result.errors).toEqual([]);
+    expect(result.markdown.indexOf("## Platform")).toBeGreaterThanOrEqual(0);
+    expect(result.markdown.indexOf("## Platform")).toBeLessThan(
+      result.markdown.indexOf("## Credited"),
+    );
+  });
 });
 
 describe("aggregateCredits (real repo)", () => {

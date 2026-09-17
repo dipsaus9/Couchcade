@@ -4,8 +4,9 @@ import { aggregateCredits } from "./credits.ts";
 import { repoRoot } from "./repo-root.ts";
 
 // Usage: pnpm --filter ./tooling/assets run credits
-// Validates every games/*/CREDITS.md and (re)writes docs/CREDITS.md from them. Run this after
-// adding or editing a game's CREDITS.md; test/credits.test.ts fails CI if docs/CREDITS.md drifts.
+// Validates every games/*/CREDITS.md and apps/*/CREDITS.md and (re)writes docs/CREDITS.md from
+// them. Run this after adding or editing a game's or app's CREDITS.md; test/credits.test.ts fails
+// CI if docs/CREDITS.md drifts.
 const { markdown, errors } = await aggregateCredits(repoRoot);
 
 if (errors.length > 0) {

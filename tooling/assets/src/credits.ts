@@ -85,9 +85,11 @@ export interface GameCredits {
 export interface AggregatedCredits {
   /** The generated `docs/CREDITS.md` content. */
   readonly markdown: string;
-  /** Validation errors across every game's `CREDITS.md`. Non-empty means don't write `markdown`. */
+  /** Validation errors across every game's and app's `CREDITS.md`. Non-empty means don't write `markdown`. */
   readonly errors: readonly string[];
   readonly games: readonly GameCredits[];
+  /** Every app's `CREDITS.md` entry, collected into one "Platform" section of `docs/CREDITS.md`. */
+  readonly platform: readonly CreditEntry[];
 }
 
 function titleCase(id: string): string {
@@ -102,74 +104,109 @@ function hasFiles(dir: string): boolean {
 }
 
 /**
- * Validates and aggregates every game's `CREDITS.md` into one `docs/CREDITS.md`.
- *
- * A missing `CREDITS.md` is only an error when the game has shipped assets
- * (`games/<id>/assets/` exists and isn't empty) — a game with no CC0 sprites yet, like
- * `games/quick-draw` today, has nothing to credit, so it isn't required to have the file.
+ * Validates one directory of id-named subdirectories (`games/` or `apps/`), each optionally
+ * carrying a `<parent>/<id>/CREDITS.md`, against the id's shipped-asset directory. A missing
+ * `CREDITS.md` is only an error when that directory has files — an id with nothing shipped yet
+ * has nothing to credit, so it isn't required to have the file.
  */
-export async function aggregateCredits(repoRoot: string): Promise<AggregatedCredits> {
-  const gamesDir = join(repoRoot, "games");
+async function collectCredits(
+  parentDir: string,
+  parentLabel: string,
+  assetsSubdir: string,
+): Promise<{ errors: string[]; entries: Map<string, readonly CreditEntry[]> }> {
   const errors: string[] = [];
-  const games: GameCredits[] = [];
+  const entries = new Map<string, readonly CreditEntry[]>();
+  if (!existsSync(parentDir)) return { errors, entries };
 
-  if (existsSync(gamesDir)) {
-    const gameIds = readdirSync(gamesDir, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => entry.name)
-      .toSorted();
+  const ids = readdirSync(parentDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .toSorted();
 
-    for (const gameId of gameIds) {
-      const gameDir = join(gamesDir, gameId);
-      const assetsDir = join(gameDir, "assets");
-      const creditsPath = join(gameDir, "CREDITS.md");
+  for (const id of ids) {
+    const dir = join(parentDir, id);
+    const assetsDir = join(dir, assetsSubdir);
+    const creditsPath = join(dir, "CREDITS.md");
 
-      if (!existsSync(creditsPath)) {
-        if (hasFiles(assetsDir)) {
-          errors.push(
-            `games/${gameId}/CREDITS.md is missing, but games/${gameId}/assets/ has files ` +
-              `(HOUSE_STYLE.md, "Assets and credits": every CC0 asset needs a credit)`,
-          );
-        }
-        continue;
+    if (!existsSync(creditsPath)) {
+      if (hasFiles(assetsDir)) {
+        errors.push(
+          `${parentLabel}/${id}/CREDITS.md is missing, but ${parentLabel}/${id}/${assetsSubdir}/ has files ` +
+            `(HOUSE_STYLE.md, "Assets and credits": every CC0 asset needs a credit)`,
+        );
       }
-
-      const location = `games/${gameId}/CREDITS.md`;
-      const content = await readFile(creditsPath, "utf8");
-      const { entries, errors: fileErrors } = parseCreditsFile(content, location);
-      errors.push(...fileErrors);
-      if (entries.length > 0) games.push({ game: gameId, entries });
+      continue;
     }
+
+    const location = `${parentLabel}/${id}/CREDITS.md`;
+    const content = await readFile(creditsPath, "utf8");
+    const { entries: fileEntries, errors: fileErrors } = parseCreditsFile(content, location);
+    errors.push(...fileErrors);
+    if (fileEntries.length > 0) entries.set(id, fileEntries);
   }
 
-  return { markdown: renderCreditsMarkdown(games), errors, games };
+  return { errors, entries };
 }
 
-function renderCreditsMarkdown(games: readonly GameCredits[]): string {
+/**
+ * Validates and aggregates every game's and every app's `CREDITS.md` into one `docs/CREDITS.md`:
+ * each game gets its own section, and every app's `CREDITS.md` entry (platform sounds, platform
+ * sprites, …) is collected into one shared "Platform" section
+ * (`docs/architecture/audio.md`, CC-7.3 conflict #1). A missing `CREDITS.md` is only an error when
+ * the game or app has shipped assets (`games/<id>/assets/` or `apps/<id>/public/` exists and isn't
+ * empty) — an id with no CC0 assets yet, like `games/quick-draw` today, has nothing to credit, so
+ * it isn't required to have the file.
+ */
+export async function aggregateCredits(repoRoot: string): Promise<AggregatedCredits> {
+  const gameResult = await collectCredits(join(repoRoot, "games"), "games", "assets");
+  const appResult = await collectCredits(join(repoRoot, "apps"), "apps", "public");
+
+  const games: GameCredits[] = Array.from(gameResult.entries, ([game, entries]) => ({
+    game,
+    entries,
+  }));
+  const platform: CreditEntry[] = Array.from(appResult.entries.values()).flat();
+
+  return {
+    markdown: renderCreditsMarkdown(games, platform),
+    errors: [...gameResult.errors, ...appResult.errors],
+    games,
+    platform,
+  };
+}
+
+function renderCreditsMarkdown(
+  games: readonly GameCredits[],
+  platform: readonly CreditEntry[],
+): string {
   const lines = [
     "# Credits",
     "",
-    "Every CC0 asset Couchcade uses, collected from each game's `CREDITS.md` (see " +
-      "[`docs/HOUSE_STYLE.md`](HOUSE_STYLE.md#assets-and-credits)). Generated by `tooling/assets`; " +
-      "run `pnpm --filter ./tooling/assets run credits` after adding or changing a game's " +
-      "`CREDITS.md`. Don't hand-edit this file.",
+    "Every CC0 asset Couchcade uses, collected from each game's `CREDITS.md` and every " +
+      "`apps/*/CREDITS.md` (see [`docs/HOUSE_STYLE.md`](HOUSE_STYLE.md#assets-and-credits)). " +
+      "Generated by `tooling/assets`; run `pnpm --filter ./tooling/assets run credits` after " +
+      "adding or changing a `CREDITS.md`. Don't hand-edit this file.",
     "",
   ];
 
-  if (games.length === 0) {
+  const renderTable = (entries: readonly CreditEntry[]) => {
+    lines.push("| Asset | Author | Source | Licence |", "| --- | --- | --- | --- |");
+    for (const entry of entries) {
+      lines.push(`| ${entry.asset} | ${entry.author} | ${entry.source} | ${entry.licence} |`);
+    }
+    lines.push("");
+  };
+
+  if (games.length === 0 && platform.length === 0) {
     lines.push("No CC0 assets are in use yet.", "");
   } else {
+    if (platform.length > 0) {
+      lines.push("## Platform", "");
+      renderTable(platform);
+    }
     for (const game of games) {
-      lines.push(
-        `## ${titleCase(game.game)}`,
-        "",
-        "| Asset | Author | Source | Licence |",
-        "| --- | --- | --- | --- |",
-      );
-      for (const entry of game.entries) {
-        lines.push(`| ${entry.asset} | ${entry.author} | ${entry.source} | ${entry.licence} |`);
-      }
-      lines.push("");
+      lines.push(`## ${titleCase(game.game)}`, "");
+      renderTable(game.entries);
     }
   }
   return `${lines.join("\n").trimEnd()}\n`;
