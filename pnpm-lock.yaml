@@ -533,6 +533,9 @@ importers:
 
   packages/stage:
     dependencies:
+      '@couchcade/audio':
+        specifier: workspace:*
+        version: link:../audio
       '@couchcade/game-sdk':
         specifier: workspace:*
         version: link:../game-sdk
