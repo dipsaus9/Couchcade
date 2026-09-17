@@ -606,6 +606,9 @@ importers:
 
   packages/ui:
     dependencies:
+      '@couchcade/protocol':
+        specifier: workspace:*
+        version: link:../protocol
       '@couchcade/theme':
         specifier: workspace:*
         version: link:../theme

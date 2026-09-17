@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { canVibrate, playCue } from "../../src/controller/haptics.ts";
+import { canVibrate, haptic, hapticPatterns } from "../../src/haptics/index.ts";
 
-/** docs/HOUSE_STYLE.md, "Motion, sound and haptics": one pattern per cue, never required. */
+/** docs/architecture/audio.md, "Phone haptics": one pattern per cue, never required. */
 describe("haptics", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -9,6 +9,10 @@ describe("haptics", () => {
   });
 
   it("reports vibration support from Navigator.vibrate", () => {
+    // Real Chromium (this package's tests run in a browser, not jsdom) already has
+    // Navigator.vibrate on its prototype, so the "unsupported" case is stubbed explicitly rather
+    // than assumed from a fresh environment.
+    Object.defineProperty(navigator, "vibrate", { value: undefined, configurable: true });
     expect(canVibrate()).toBe(false);
     Object.defineProperty(navigator, "vibrate", {
       value: vi.fn<Navigator["vibrate"]>(),
@@ -18,18 +22,19 @@ describe("haptics", () => {
   });
 
   it("does nothing where Navigator.vibrate isn't available", () => {
-    expect(() => playCue("press")).not.toThrow();
+    Object.defineProperty(navigator, "vibrate", { value: undefined, configurable: true });
+    expect(() => haptic("press")).not.toThrow();
   });
 
   it.each([
-    ["press", 10],
-    ["your-turn", [40, 40, 40]],
-    ["celebrate", 120],
-    ["foul", [50, 50, 50, 50, 50]],
+    ["press", hapticPatterns.press],
+    ["your-turn", hapticPatterns["your-turn"]],
+    ["celebrate", hapticPatterns.celebrate],
+    ["foul", hapticPatterns.foul],
   ] as const)("plays %s as %j", (cue, pattern) => {
     const vibrate = vi.fn<Navigator["vibrate"]>();
     Object.defineProperty(navigator, "vibrate", { value: vibrate, configurable: true });
-    playCue(cue);
+    haptic(cue);
     expect(vibrate).toHaveBeenCalledTimes(1);
     expect(vibrate).toHaveBeenCalledWith(pattern);
   });
@@ -41,6 +46,6 @@ describe("haptics", () => {
       },
       configurable: true,
     });
-    expect(() => playCue("celebrate")).not.toThrow();
+    expect(() => haptic("celebrate")).not.toThrow();
   });
 });
