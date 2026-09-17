@@ -1,10 +1,10 @@
 ---
 id: CC-3.12
 title: Write the real-time phone-to-TV link design doc
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-17 17:23'
-updated_date: '2026-09-17 17:36'
+updated_date: '2026-09-17 19:58'
 labels:
   - story
   - owner-gate
@@ -30,7 +30,7 @@ Branch: CC-3.12/realtime-link-doc
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 docs/architecture/realtime-link.md covers every topic in the outcome, links its online sources, and passes the story-reviewer gate
-- [ ] #2 Owner approval is recorded in the task notes as "Approved by owner: <YYYY-MM-DD>" before the story is Done
+- [x] #2 Owner approval is recorded in the task notes as "Approved by owner: <YYYY-MM-DD>" before the story is Done
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -47,4 +47,14 @@ Owner playtest feedback (2026-09-17), Target Range: input too laggy, more events
 Verify: pnpm check, pnpm test, pnpm build; the doc renders its mermaid blocks on GitHub.
 
 Review gate (dipsaus-ai:story-reviewer, haiku, round 1): pass. AC1 met, no scope violations, no findings. AC2 is the owner gate and stays open until the owner approves the PR.
+
+Owner answers 2026-09-17, recorded in the doc under "Owner answers (2026-09-17)": (1) no STUN server at all (iceServers: []) and no TURN, so the link only uses local candidates and nothing about it leaves the house; adding STUN or TURN later needs a new owner decision. (2) The link carries input only; phone screens stay on the relay and screens-over-link is a noted follow-up idea. (3) Target Range aims at 6 world px per degree both ways, touch pad 1.5 world px per CSS px both ways, aim sent with 3 decimals. (4) Rollout as recommended: behind a switch until the spike, the E2E tests and the owner replay, then on by default with ?link=0 as the escape hatch; streams at 30 per second, 60 when a game asks.
+Approved by owner: 2026-09-17
+Implementation stories created 2026-09-17: CC-3.13 (spike), CC-3.14 (doc amendments), CC-3.15 (signalling through the room), CC-3.16 (link core), CC-3.17 (stream playback), CC-3.18 (InputChannel), CC-3.19 (controller link runtime), CC-3.20 (host links), CC-3.21 (aim sender), CC-11.9 (Target Range aim), CC-3.22 (E2E), CC-3.23 (link clock samples), CC-3.24 (owner replay and switch-on). CC-5.7 amended to depend on CC-3.18 and use input.stream. Collision check: every reported overlap is between stories that already carry a dependency edge (CC-3.17 before CC-3.18, CC-3.19 before CC-3.23 and CC-3.24, CC-3.20 before CC-3.24, CC-11.7 before CC-3.24).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added docs/architecture/realtime-link.md, the approved design for a direct phone-to-TV link. Each seated phone opens a WebRTC data channel straight to the host laptop with no STUN and no TURN server, and the room Durable Object only forwards one compact rtc:offer and one rtc:answer (2 requests per connection, both under the 1 KB frame cap). Streams such as aim go 30 times a second (60 on request) over an unordered, no-retransmit channel and events over a reliable one, all free of Durable Object requests, while the relay caps stay as they are because a night where every link fails must still fit. A phone that can't connect falls back to today's path within a second, where the TV now interpolates, briefly predicts and catches up smoothly instead of holding a quarter-second-old crosshair, and a shot carries the aim the TV was shown so the arrow lands where the player aimed. The doc covers authority, the signalling schema and its cost, channel settings and rates, budget and flood changes with proposed platform.md text, security and privacy, browser support, the full connection lifecycle, clock and latency measurement, the fallback and smoothing algorithm, the game SDK InputChannel sketch, testing with a fake link and two browser contexts, rollout behind a switch, risks, how to tune Target Range's aim speed to 6 px per degree in both directions, 17 findings and the 13 implementation stories CC-3.13 to CC-3.24 and CC-11.9. Approved by the owner on 2026-09-17, who chose no STUN instead of the recommended Cloudflare STUN and kept phone screens on the relay.
+<!-- SECTION:FINAL_SUMMARY:END -->
