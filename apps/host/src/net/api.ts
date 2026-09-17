@@ -25,12 +25,11 @@ export class ApiError extends Error {
 }
 
 /**
- * `POST /api/rooms`. The passcode lives only in this call: it's sent once and never stored
- * (docs/architecture/security.md, "Host passcode").
+ * `POST /api/rooms` with the passcode and a fresh Turnstile token. The passcode lives only in this
+ * call: it's sent once and never stored (docs/architecture/security.md, "Host passcode").
  */
-export function createRoom(passcode: string): Promise<CreateRoomResponse> {
-  // CC-2.2 renders the invisible Turnstile widget and sends its token here.
-  return post("/api/rooms", { passcode, turnstile: "" }, createRoomResponseSchema);
+export function createRoom(passcode: string, turnstile: string): Promise<CreateRoomResponse> {
+  return post("/api/rooms", { passcode, turnstile }, createRoomResponseSchema);
 }
 
 /** `POST /api/rooms/:code/rejoin`: swaps the host's rejoin token for a fresh 60-second ticket. */

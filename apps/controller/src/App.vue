@@ -20,10 +20,11 @@ import { parseResultsView } from "./screens/results/results-view.ts";
 import ResultsScreen from "./screens/results/ResultsScreen.vue";
 import { waitingCopy } from "./screens/waiting/copy.ts";
 import WaitingScreen from "./screens/waiting/WaitingScreen.vue";
+import { createTurnstile } from "./security/turnstile.ts";
 import { createPhoneSession } from "./session/session.ts";
 import { screenOf } from "./session/state.ts";
 
-const session = createPhoneSession();
+const session = createPhoneSession({ turnstile: createTurnstile({ action: "join" }) });
 const state = session.state;
 const screen = computed(() => screenOf(state.value));
 const kicked = computed(() => kickedFrom(state.value));

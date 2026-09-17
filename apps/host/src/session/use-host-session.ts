@@ -23,6 +23,7 @@ import {
   setLocked,
   type LobbyState,
 } from "../screens/lobby/lobby-state.ts";
+import { createTurnstile } from "../security/turnstile.ts";
 import { clearSession, loadSession, saveSession, type StoredSession } from "./storage.ts";
 
 export type HostScreen =
@@ -65,6 +66,8 @@ export function useHostSession() {
   let relay: RelayConnection | null = null;
   let runtime: HostRuntime | null = null;
   let moderation: Moderation | null = null;
+  // The invisible Turnstile widget. It loads and runs only when the passcode is submitted.
+  const turnstile = createTurnstile({ action: "create" });
 
   function enterRoom(session: StoredSession, ticket: string | null): void {
     relay?.close();
@@ -136,13 +139,19 @@ export function useHostSession() {
   /** Creates a room. Resolves to referee-voice copy for the error, or null on success. */
   async function openRoom(passcode: string): Promise<string | null> {
     try {
-      const { code, ticket, rejoinToken } = await createRoom(passcode);
+      const token = await turnstile.token().catch(() => {
+        throw new ApiError("turnstile", 0);
+      });
+      const { code, ticket, rejoinToken } = await createRoom(passcode, token);
       const session: StoredSession = { code, playerId: "host", rejoinToken };
       saveSession(session);
       enterRoom(session, ticket);
       return null;
     } catch (error) {
-      return createErrorCopy(error instanceof ApiError ? error.code : "unexpected");
+      const code = error instanceof ApiError ? error.code : "unexpected";
+      // A 403 means the token was refused and is spent (security.md, "Where Turnstile runs").
+      if (code.startsWith("turnstile")) turnstile.reset();
+      return createErrorCopy(code);
     }
   }
 
@@ -187,6 +196,10 @@ function createErrorCopy(code: string): string {
       return "That passcode doesn't match. Try again.";
     case "rate-limited":
       return "Too many tries. Wait a minute, then try again.";
+    case "turnstile":
+    case "turnstile-failed":
+    case "turnstile-unavailable":
+      return "We couldn't check this browser. Try again.";
     case "network":
       return "Can't reach Couchcade. Check the internet connection and try again.";
     default:
