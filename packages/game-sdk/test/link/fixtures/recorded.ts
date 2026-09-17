@@ -8,9 +8,9 @@
  * gathered zero candidates in this headless sandbox (no route to enumerate a local interface) and
  * never left `iceGatheringState: "gathering"`; that SDP is still a real, valid WebKit description
  * with `ice-ufrag`, `ice-pwd` and a fingerprint, so it stays as the Safari fixture and exercises
- * the codec's empty-candidate-list path. `synthetic.ts` covers the 6-candidate truncation and the
- * UDP/host filter instead, since none of these three live captures happened to offer more than
- * one candidate.
+ * the codec's empty-candidate-list path. `description.test.ts` covers the 6-candidate truncation
+ * and the UDP/host filter with synthetic SDP instead, since none of these three live captures
+ * happened to offer more than one candidate.
  */
 
 export interface RecordedPair {
