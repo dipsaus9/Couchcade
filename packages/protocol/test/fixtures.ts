@@ -1,5 +1,11 @@
 import type * as z from "zod/mini";
-import type { hostToRelay, phoneToRelay, relayToHost, relayToPhone } from "../src/index.ts";
+import type {
+  hostToRelay,
+  LinkDescription,
+  phoneToRelay,
+  relayToHost,
+  relayToPhone,
+} from "../src/index.ts";
 
 /** One valid and one invalid example per message type. The mapped type forces a fixture for every type. */
 type Fixtures<C extends Record<string, z.ZodMiniType>> = {
@@ -9,6 +15,14 @@ type Fixtures<C extends Record<string, z.ZodMiniType>> = {
 const alice = "ABCDEFGH";
 const bob = "JKLMNPQR";
 const profile = { skin: 2, hair: 7, hairColour: 5 };
+
+/** A compact description shaped like realtime-link.md's example: about 350 bytes with its envelope. */
+const desc: LinkDescription = {
+  u: "4pKz",
+  p: "aVeryRandomIceP4ssw0rdString",
+  f: "MEUCIQC1zX9k8Q3H8vN2yV0pQ1bE7Zt3Y6r8Xw2Fj4KpM5nL0AIgd8jY6vQ2c",
+  c: [["1", 2_130_706_431, "8f14e45f-ceea-4e8d-9c4a-1f2b3c4d5e6f.local", 54_321, "host"]],
+};
 const player = {
   id: alice,
   name: "Alice",
@@ -57,6 +71,10 @@ export const hostToRelayFixtures: Fixtures<typeof hostToRelay> = {
     valid: { t: "clock:ping", d: { id: 0, t0: 1_789_000_000_000.25 } },
     invalid: { t: "clock:ping", d: { id: 1.5, t0: 1 } },
   },
+  "rtc:answer": {
+    valid: { t: "rtc:answer", d: { to: alice, s: 123_456, desc } },
+    invalid: { t: "rtc:answer", d: { to: "host", s: 123_456, desc } },
+  },
 };
 
 export const phoneToRelayFixtures: Fixtures<typeof phoneToRelay> = {
@@ -87,6 +105,10 @@ export const phoneToRelayFixtures: Fixtures<typeof phoneToRelay> = {
   "clock:ping": {
     valid: { t: "clock:ping", d: { id: 4, t0: 812.5 } },
     invalid: { t: "clock:ping", d: { id: 4 } },
+  },
+  "rtc:offer": {
+    valid: { t: "rtc:offer", d: { s: 42, desc } },
+    invalid: { t: "rtc:offer", d: { s: -1, desc } },
   },
 };
 
@@ -142,6 +164,10 @@ export const relayToHostFixtures: Fixtures<typeof relayToHost> = {
     valid: { t: "clock:pong", d: { id: 4, t0: 812.5, t1: 1_789_000_000_000 } },
     invalid: { t: "clock:pong", d: { id: 4, t0: 812.5, t1: 1.5 } },
   },
+  "rtc:offer": {
+    valid: { t: "rtc:offer", d: { s: 42, desc }, from: alice },
+    invalid: { t: "rtc:offer", d: { s: 42, desc } },
+  },
 };
 
 export const relayToPhoneFixtures: Fixtures<typeof relayToPhone> = {
@@ -170,5 +196,9 @@ export const relayToPhoneFixtures: Fixtures<typeof relayToPhone> = {
   "clock:pong": {
     valid: { t: "clock:pong", d: { id: 0, t0: 1, t1: 2 } },
     invalid: { t: "clock:pong", d: { id: 0, t1: 2 } },
+  },
+  "rtc:answer": {
+    valid: { t: "rtc:answer", d: { s: 42, desc } },
+    invalid: { t: "rtc:answer", d: { s: -1, desc } },
   },
 };

@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CC-3.13 spike — Phone</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 20px;
+        background: #10131f;
+        color: #fafcff;
+        font-family: system-ui, sans-serif;
+      }
+      h1 {
+        font-size: 18px;
+      }
+      label {
+        display: block;
+        margin: 12px 0 4px;
+        font-size: 14px;
+        opacity: 0.85;
+      }
+      select,
+      input,
+      button {
+        font-size: 16px;
+        padding: 10px;
+        border-radius: 8px;
+        border: 1px solid #37b26c;
+        width: 100%;
+        box-sizing: border-box;
+        background: #1e2a4a;
+        color: #fafcff;
+      }
+      button {
+        margin-top: 16px;
+        background: #ffc83d;
+        color: #1e2a4a;
+        font-weight: 700;
+        border: none;
+      }
+      button:disabled {
+        opacity: 0.5;
+      }
+      #status {
+        margin-top: 16px;
+        font-size: 16px;
+      }
+      #live {
+        font-size: 13px;
+        opacity: 0.75;
+        min-height: 18px;
+      }
+      #summary {
+        width: 100%;
+        box-sizing: border-box;
+        height: 220px;
+        margin-top: 12px;
+        font: 12px/1.5 monospace;
+        background: #1e2a4a;
+        color: #fafcff;
+        border: 1px solid #37b26c;
+        border-radius: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>CC-3.13 spike — Phone page</h1>
+
+    <label for="network">Network condition (for the results header)</label>
+    <select id="network">
+      <option>Wi-Fi</option>
+      <option>4G</option>
+      <option>iCloud Private Relay</option>
+      <option>Low Power Mode</option>
+      <option>Android Wi-Fi</option>
+    </select>
+
+    <label for="device">Device name</label>
+    <input id="device" value="iPhone" />
+
+    <button id="start">Start</button>
+    <div id="status">Tap Start, then move the phone around.</div>
+    <div id="live"></div>
+
+    <button id="copy" disabled>Copy results</button>
+    <textarea id="summary" readonly placeholder="Results appear here after each run."></textarea>
+
+    <script type="module" src="/src/phone.ts"></script>
+  </body>
+</html>

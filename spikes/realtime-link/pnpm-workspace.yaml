@@ -1,0 +1,3 @@
+# Standalone spike, not part of any root workspace (see the root pnpm-workspace.yaml comment).
+allowBuilds:
+  esbuild: true

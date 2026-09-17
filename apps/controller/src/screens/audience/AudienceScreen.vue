@@ -1,21 +1,18 @@
 <script setup lang="ts">
+import { CcPlayerChip } from "@couchcade/ui";
 import { audienceCopy, lineLabel, type AudienceView } from "./audience-view.ts";
 
 // "Watching" for phones past the 8 seats, from the approved audience artboard
 // (docs/design/platform-screens.md, "Waiting"). Audience members have no colour or shape, so the
-// chip shows a plain Sky circle. The place in line comes from the host's `audience` view
-// (docs/architecture/session-flow.md, "Screens").
+// chip shows CcPlayerChip's plain Sky circle (no `player`). The place in line comes from the
+// host's `audience` view (docs/architecture/session-flow.md, "Screens").
 
 defineProps<{ name: string; view: AudienceView | null }>();
 </script>
 
 <template>
   <section class="screen">
-    <div class="chip">
-      <span class="dot" aria-hidden="true" />
-      <span class="name">{{ name }}</span>
-      <span class="tag">{{ audienceCopy.tag }}</span>
-    </div>
+    <CcPlayerChip class="chip" :name="name" />
 
     <div class="status" role="status">
       <svg class="tv" viewBox="0 0 120 98" width="200" height="164" aria-hidden="true">
@@ -45,38 +42,7 @@ defineProps<{ name: string; view: AudienceView | null }>();
 }
 
 .chip {
-  display: flex;
-  align-items: center;
-  gap: var(--cc-space-3);
-  min-height: var(--cc-touch-min);
-  padding: var(--cc-space-2) var(--cc-space-4) var(--cc-space-2) var(--cc-space-3);
-  background: var(--cc-chalk);
-  border: var(--cc-outline-phone) solid var(--cc-ink);
-  border-radius: var(--cc-radius-pill);
-  box-shadow: var(--cc-depth-panel);
-}
-
-.dot {
-  width: var(--cc-space-7);
-  height: var(--cc-space-7);
-  background: var(--cc-sky);
-  border: var(--cc-outline-phone) solid var(--cc-ink);
-  border-radius: var(--cc-radius-pill);
-}
-
-.name {
-  font-size: var(--cc-text-body-phone);
-  font-weight: var(--cc-text-title-weight);
-}
-
-.tag {
-  margin-left: auto;
-  padding: var(--cc-space-1) var(--cc-space-3);
-  background: var(--cc-chalk);
-  border: var(--cc-outline-phone) solid var(--cc-ink);
-  border-radius: var(--cc-radius-tag);
-  font-size: var(--cc-text-small-phone);
-  font-weight: var(--cc-text-title-weight);
+  align-self: flex-start;
 }
 
 .status {
