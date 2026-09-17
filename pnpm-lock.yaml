@@ -168,6 +168,9 @@ importers:
 
   apps/host:
     dependencies:
+      '@couchcade/audio':
+        specifier: workspace:*
+        version: link:../../packages/audio
       '@couchcade/game-sdk':
         specifier: workspace:*
         version: link:../../packages/game-sdk

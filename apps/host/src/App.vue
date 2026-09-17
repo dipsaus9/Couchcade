@@ -1,6 +1,12 @@
 <script setup lang="ts">
+import { audio } from "@couchcade/audio";
 import { roomClock } from "@couchcade/game-sdk/clock";
-import { onBeforeUnmount, ref } from "vue";
+import { onBeforeUnmount, ref, watch } from "vue";
+import { isClickForSoundVisible } from "./audio/click-for-sound.ts";
+import { applyHostSettings } from "./audio/host-settings.ts";
+import { applyPhaseMusic } from "./audio/phase-music.ts";
+import { registerPlatformSounds } from "./audio/platform-sounds.ts";
+import { watchForUnlock } from "./audio/unlock.ts";
 import MotionStepScreen from "./motion/MotionStepScreen.vue";
 import { localNow } from "./runtime/timing.ts";
 import CalibrationScreen from "./screens/calibration/CalibrationScreen.vue";
@@ -25,6 +31,27 @@ const fit = () => {
 fit();
 window.addEventListener("resize", fit);
 onBeforeUnmount(() => window.removeEventListener("resize", fit));
+
+// Sound (docs/architecture/audio.md). Applies the laptop's stored volumes (CC-7.6 builds the
+// settings that write them), registers and starts fetching the platform's own sounds, and opens
+// the autoplay lock on any click or key press while it's still shut -- the passcode submit also
+// opens it directly (PasscodeScreen.vue), since a refreshed TV skips that screen entirely.
+applyHostSettings();
+registerPlatformSounds();
+const stopWatchingForUnlock = watchForUnlock();
+onBeforeUnmount(stopWatchingForUnlock);
+
+// The music for the phase the TV is showing. `screen.name` already models `playing` (the frame
+// stays empty then), so this covers every phase without reading the runtime's `HostPhase` too.
+watch(() => screen.value.name, applyPhaseMusic);
+
+// The "Click for sound" chip: shown while the autoplay lock is still shut (owner decision 4), and
+// again if it falls back to locked (Safari suspending on an interruption).
+const audioLocked = ref(isClickForSoundVisible(audio.state));
+const stopWatchingAudioState = audio.onStateChange((state) => {
+  audioLocked.value = isClickForSoundVisible(state);
+});
+onBeforeUnmount(stopWatchingAudioState);
 </script>
 
 <template>
@@ -78,6 +105,9 @@ onBeforeUnmount(() => window.removeEventListener("resize", fit));
       :open-room="openRoom"
     />
     <!-- While a game runs the frame stays empty, so the stage under it shows the game's scene. -->
+
+    <!-- audio.md owner decision 4: a refreshed TV has had no click or key press yet. -->
+    <p v-if="audioLocked" class="sound-chip">Click for sound</p>
   </div>
 </template>
 
@@ -89,6 +119,22 @@ onBeforeUnmount(() => window.removeEventListener("resize", fit));
   box-sizing: border-box;
   /* safe-tv: 96px left and right, 54px top and bottom at 1080p. */
   padding: 54px 96px;
+}
+
+.sound-chip {
+  /* .frame's own padding is the safe-tv margin; absolute children sit outside it, so this repeats
+     those two values to land inside the safe area instead. */
+  position: absolute;
+  left: 96px;
+  bottom: 54px;
+  margin: 0;
+  padding: var(--cc-space-2) var(--cc-space-4);
+  font: 700 var(--cc-text-small-tv) var(--cc-text-small-font);
+  color: var(--cc-ink);
+  background: var(--cc-chalk);
+  border: var(--cc-outline-tv) solid var(--cc-ink);
+  border-radius: var(--cc-radius-pill);
+  box-shadow: var(--cc-depth-panel);
 }
 </style>
 
