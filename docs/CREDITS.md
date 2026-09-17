@@ -21,3 +21,24 @@ Every CC0 asset Couchcade uses, collected from each game's `CREDITS.md` (see [`d
 | Dust puff thud (`assets/sounds/dust-thud.ogg`, Impact Sounds "impactSoft_medium_000") | Kenney | https://kenney.nl/assets/impact-sounds | CC0 |
 | Standoff wind loop (`assets/sounds/wind-loop.ogg`) | SketchMan3 | https://opengameart.org/content/wind-whoosh-loop | CC0 |
 | Crow caw, fake-out (`assets/sounds/crow-caw.wav`) | zeroisnotnull | https://opengameart.org/content/crow-caw | CC0 |
+
+## Target Range
+
+| Asset | Author | Source | Licence |
+| --- | --- | --- | --- |
+| Grass tile (`assets/sprites/grass.png`, Tiny Town tile row 1 col 1) | Kenney | https://kenney.nl/assets/tiny-town | CC0 |
+| Grass tile, light variant (`assets/sprites/grass-light.png`, tile row 1 col 2) | Kenney | https://kenney.nl/assets/tiny-town | CC0 |
+| Pine tree (`assets/sprites/pine-tree.png`, tile row 1-2 col 5) | Kenney | https://kenney.nl/assets/tiny-town | CC0 |
+| Round hedge bush (`assets/sprites/hedge-bush.png`, tile row 3 col 5) | Kenney | https://kenney.nl/assets/tiny-town | CC0 |
+| Wooden fence post (`assets/sprites/fence.png`, tile row 6 col 9) | Kenney | https://kenney.nl/assets/tiny-town | CC0 |
+| Draw creak (`assets/sounds/draw-creak.ogg`, RPG Audio `creak1`) | Kenney | https://kenney.nl/assets/rpg-audio | CC0 |
+| Release twang (`assets/sounds/release-twang.wav`, Battle Sound Effects `Bow.wav`) | artisticdude | https://opengameart.org/content/battle-sound-effects | CC0 |
+| Arrow whoosh (`assets/sounds/arrow-whoosh.wav`, Battle Sound Effects `swish_2.wav`) | artisticdude | https://opengameart.org/content/battle-sound-effects | CC0 |
+| Arrow thud into straw (`assets/sounds/arrow-thud-straw.ogg`, Impact Sounds `impactSoft_heavy_000`) | Kenney | https://kenney.nl/assets/impact-sounds | CC0 |
+| Arrow thud into the fence (`assets/sounds/arrow-thud-fence.ogg`, Impact Sounds `impactPlank_medium_000`) | Kenney | https://kenney.nl/assets/impact-sounds | CC0 |
+| Clock tick, last 3 seconds (`assets/sounds/clock-tick.ogg`, Interface Sounds `tick_001`) | Kenney | https://kenney.nl/assets/interface-sounds | CC0 |
+| Bullseye ding (`assets/sounds/bullseye-ding.ogg`, Interface Sounds `bong_001`) | Kenney | https://kenney.nl/assets/interface-sounds | CC0 |
+| Round start jingle (`assets/sounds/round-start.ogg`, Music Jingles "8-Bit jingles/jingles_NES00") | Kenney | https://kenney.nl/assets/music-jingles | CC0 |
+| Match end jingle (`assets/sounds/match-end.ogg`, Music Jingles "Pizzicato jingles/jingles_PIZZI02") | Kenney | https://kenney.nl/assets/music-jingles | CC0 |
+| Wind loop, rounds 2 to 4 (`assets/sounds/wind-loop.ogg`) | SketchMan3 | https://opengameart.org/content/wind-whoosh-loop | CC0 |
+| Game music loop (`assets/sounds/game-music-loop.ogg`) | Scribe (Daniel Stephens) | https://opengameart.org/content/summer-park-8bit-tune-loop | CC0 |
