@@ -36,6 +36,7 @@ function setup({
   const warnings: string[] = [];
   const stageLog: string[] = [];
   const sceneLag: number[] = [];
+  const sceneRooms: Array<{ roomCode?: string; joinUrl?: string }> = [];
   let stored = storedLag;
   const displayLag: DisplayLagStore = {
     ms: () => stored?.ms ?? 0,
@@ -49,6 +50,7 @@ function setup({
     start: (game, data) => {
       stageLog.push(`start ${game.id} ${data.players.length}`);
       sceneLag.push(data.displayLagMs);
+      sceneRooms.push({ roomCode: data.roomCode, joinUrl: data.joinUrl });
       return sceneFails ? Promise.reject(new Error("no scene")) : Promise.resolve();
     },
     stop: (game) => stageLog.push(`stop ${game.id}`),
@@ -68,6 +70,7 @@ function setup({
     warn: (message) => warnings.push(message),
     onChange: () => (changes += 1),
     displayLag,
+    origin: "https://couchcade.workers.dev",
   });
   const lobby = lobbyWith(3);
   const [vip, second] = lobby.players.map((player) => player.id) as [string, string];
@@ -86,6 +89,7 @@ function setup({
     warnings,
     stageLog,
     sceneLag,
+    sceneRooms,
     stored: () => stored,
     runtime,
     lobby,
@@ -189,7 +193,7 @@ describe("createHostRuntime", () => {
 
   it("starts the picked game with the seated players and a seed when the countdown ends", async () => {
     const games = [echoGame({ id: "zebra" }), echoGame({ id: "aardvark" })];
-    const { runtime, handle, vip, lobby, ofType, stageLog, time } = setup({ games });
+    const { runtime, handle, vip, lobby, ofType, stageLog, sceneRooms, time } = setup({ games });
     handle(startAction(vip));
     handle(pickAction(vip, "zebra"));
     expect(runtime.menu?.countdown?.gameId).toBe("zebra");
@@ -206,6 +210,10 @@ describe("createHostRuntime", () => {
     expect(ofType("room:phase").map((message) => message.d.phase)).toEqual(["menu", "playing"]);
     expect(ofType("controller:state").at(-1)?.d.gameId).toBe("zebra");
     expect(stageLog).toEqual(["start zebra 3"]);
+    // The scene gets the room code and join URL, so it can keep the room code on screen.
+    expect(sceneRooms).toEqual([
+      { roomCode: "BEAN", joinUrl: "https://couchcade.workers.dev/?room=BEAN" },
+    ]);
   });
 
   it("cancels the countdown on back-to-menu", () => {

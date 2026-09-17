@@ -1,12 +1,14 @@
 import { motion } from "@couchcade/theme";
 import type { HostSceneData } from "@couchcade/game-sdk/contract";
-import { StageScene, metrics, shakeIntensity, worldToOverlay } from "@couchcade/stage";
+import { StageScene, shakeIntensity, worldToOverlay } from "@couchcade/stage";
 import type { Callout, Scoreboard } from "@couchcade/stage";
 import { Math as PhaserMath } from "phaser";
 import type { GameObjects, Tweens } from "phaser";
 import type { QuickDrawState } from "../shared/index.ts";
 import { cuesBetween, quickDrawCueEvent } from "./cues.ts";
 import type { QuickDrawCue } from "./cues.ts";
+import { placeTags } from "./label-layout.ts";
+import type { Box } from "./label-layout.ts";
 import { calloutAt } from "./layout.ts";
 import { InstructionPanel, PipTag, bangText } from "./overlays.ts";
 import { present } from "./present.ts";
@@ -31,6 +33,11 @@ const readableAtMs = (() => {
 
 /** How far a Pip's tag sits above its feet, in world pixels: the Pip's height and a little air. */
 const tagAboveFeet = 26;
+
+/** The address players type, as the lobby shows it: the host name, like `couchcade.workers.dev`. */
+function joinAddress(joinUrl: string): string {
+  return URL.canParse(joinUrl) ? new URL(joinUrl).host : joinUrl;
+}
 
 /**
  * Quick Draw on the TV: the desert street from the game's CC0 and hand-drawn sprites, with the
@@ -84,10 +91,19 @@ export default class QuickDrawScene extends StageScene<QuickDrawState> {
       scores: this.scores(view),
       round: { current: view.round },
     });
-    this.panel = new InstructionPanel(this);
+    // The room code stays in the bottom-right corner for the whole game, for anyone joining late.
+    const { roomCode, joinUrl } = this.host;
+    const roomCodePanel =
+      roomCode === undefined
+        ? null
+        : this.addRoomCode({
+            code: roomCode,
+            url: joinUrl === undefined ? "" : joinAddress(joinUrl),
+          });
+    this.panel = new InstructionPanel(this, roomCodePanel?.panelBounds.x);
     this.tags = view.pips.map(() => new PipTag(this));
     this.bangs = view.pips.map(() => bangText(this));
-    // Tags go on top of the BANG! flags, so a winner's time is never covered.
+    // Tags draw over the BANG! flags, though they are placed so they never touch.
     this.overlay.add([this.panel, ...this.bangs, ...this.tags]);
 
     this.paint(state);
@@ -134,23 +150,48 @@ export default class QuickDrawScene extends StageScene<QuickDrawState> {
     this.props.showSparkle(glinting?.muzzle ?? null, view.glint?.frame ?? 0);
   }
 
-  /** Overlays sit on the world in overlay pixels: every world position is multiplied by 4. */
+  /**
+   * Overlays sit on the world in overlay pixels: every world position is multiplied by 4. A
+   * winner's BANG! stays on their flag, and each tag starts over its Pip's head and moves up until
+   * it covers no BANG! and no other tag. Tags are placed without their FOUL! wobble, so a tag
+   * never jumps while it shakes.
+   */
   private paintOverlays(view: Presentation): void {
     this.scoreboard.setScores(this.scores(view)).setRound({ current: view.round });
     this.panel.setText(view.panel);
+
+    const flags: Box[] = [];
     view.pips.forEach((pip, index) => {
       const bang = this.bangs[index];
       const actor = this.pips[index];
-      let tagBottom = worldToOverlay(pip.slot.feetY - tagAboveFeet);
-      if (bang && actor) {
-        bang.setVisible(pip.flag === 1);
-        if (pip.flag !== null) {
-          bang.setPosition(worldToOverlay(actor.flagTop.x), worldToOverlay(actor.flagTop.y - 1));
-          // A winner's time sits above their BANG!, so neither covers the other.
-          tagBottom = Math.min(tagBottom, Math.floor(bang.getBounds().top) - metrics.outline);
-        }
-      }
-      this.tags[index]?.show(pip.label, worldToOverlay(pip.slot.x), tagBottom);
+      if (!bang || !actor) return;
+      bang.setVisible(pip.flag === 1);
+      if (pip.flag === null) return;
+      // The flag's box counts while it pops out too, so the tags don't move when BANG! appears.
+      bang.setPosition(worldToOverlay(actor.flagTop.x), worldToOverlay(actor.flagTop.y - 1));
+      const bounds = bang.getBounds();
+      flags.push({
+        left: Math.floor(bounds.left),
+        top: Math.floor(bounds.top),
+        right: Math.ceil(bounds.right),
+        bottom: Math.ceil(bounds.bottom),
+      });
+    });
+
+    const requests = view.pips.map((pip, index) => {
+      const size = this.tags[index]?.setLabel(pip.label) ?? null;
+      return size === null
+        ? null
+        : {
+            x: worldToOverlay(pip.slot.x),
+            bottom: worldToOverlay(pip.slot.feetY - tagAboveFeet),
+            ...size,
+          };
+    });
+    placeTags(requests, flags).forEach((box, index) => {
+      const label = view.pips[index]?.label;
+      const request = requests[index];
+      if (box && label && request) this.tags[index]?.place(label, request.x, box.bottom);
     });
   }
 

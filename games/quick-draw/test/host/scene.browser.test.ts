@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { color, toPhaserColor, typeScale, world } from "@couchcade/theme";
+import { color, motion, toPhaserColor, typeScale, world } from "@couchcade/theme";
 import type { Hex } from "@couchcade/theme";
 import { tickMs } from "@couchcade/game-sdk/contract";
 import type { HostSceneData } from "@couchcade/game-sdk/contract";
-import { Callout, Scoreboard, StageScene } from "@couchcade/stage";
+import { Callout, RoomCodePanel, Scoreboard, StageScene, safeArea } from "@couchcade/stage";
 import { AUTO, Game, GameObjects, Scenes } from "phaser";
 import type { Display, Scene } from "phaser";
 import { getScenePalette } from "@couchcade/theme/scenes";
@@ -11,7 +11,9 @@ import game from "../../src/index.ts";
 import { quickDrawCueEvent } from "../../src/host/cues.ts";
 import type { QuickDrawCue } from "../../src/host/cues.ts";
 import { pipSlots } from "../../src/host/layout.ts";
-import { InstructionPanel, instructionPanelRect } from "../../src/host/overlays.ts";
+import { overlaps } from "../../src/host/label-layout.ts";
+import type { Box } from "../../src/host/label-layout.ts";
+import { InstructionPanel, PipTag, instructionPanelRect } from "../../src/host/overlays.ts";
 import QuickDrawScene from "../../src/host/scene.ts";
 import { sprites } from "../../src/host/sprites.ts";
 import { worldPipLook } from "../../src/host/world-pip.ts";
@@ -90,7 +92,11 @@ async function startScene(
   players: number,
   seed: number,
   plan: BotPlan = mixedBots,
-  options: { reducedMotion?: boolean; canvas?: { width: number; height: number } } = {},
+  options: {
+    reducedMotion?: boolean;
+    canvas?: { width: number; height: number };
+    room?: boolean;
+  } = {},
 ): Promise<Run> {
   const stage = await bootStage(options.canvas ?? world);
   phaser = stage;
@@ -100,6 +106,9 @@ async function startScene(
     players: bots.room.players,
     displayLagMs: 0,
     reducedMotion: options.reducedMotion ?? false,
+    ...(options.room === false
+      ? {}
+      : { roomCode: "BEAN", joinUrl: "https://couchcade.workers.dev/?room=BEAN" }),
   };
   const SceneClass = await game.hostScene();
   stage.scene.add(game.id, SceneClass, true, data as unknown as object);
@@ -166,6 +175,26 @@ function visibleTextures(scene: Scene): string[] {
       ? [child.texture.key]
       : [],
   );
+}
+
+/**
+ * Round n is won by seat n - 1 (modulo the players). The next seat fouls and the one after never
+ * taps, so time, FOUL! and -.--- tags all stand next to the winner.
+ */
+const eachSeatWins =
+  (players: number): BotPlan =>
+  (round, slot) => {
+    const winner = (round - 1) % players;
+    if (slot === winner) return 200;
+    if (players > 2 && slot === (winner + 1) % players) return -400;
+    if (players > 3 && slot === (winner + 2) % players) return null;
+    return 300 + slot * 10;
+  };
+
+/** A text's bounds on the overlay, as a box. */
+function overlayBox(text: GameObjects.Text): Box {
+  const rect = text.getBounds();
+  return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom };
 }
 
 function drawCallout(scene: StageScene): Callout | undefined {
@@ -247,7 +276,20 @@ describe("Quick Draw TV scene", () => {
       "Player 1",
       "Player 2",
     ]);
-    expect(run.scene.overlay.list.some((child) => child instanceof InstructionPanel)).toBe(true);
+    const panel = run.scene.overlay.list.find(
+      (child): child is InstructionPanel => child instanceof InstructionPanel,
+    );
+    expect(panel).toBeInstanceOf(InstructionPanel);
+    // The room code panel sits in the bottom-right corner, clear of the instruction panel.
+    const roomCode = run.scene.overlay.list.find(
+      (child): child is RoomCodePanel => child instanceof RoomCodePanel,
+    );
+    if (!panel || !roomCode) throw new Error("expected the instruction and room code panels");
+    expect([roomCode.code, roomCode.url]).toEqual(["BEAN", "couchcade.workers.dev"]);
+    expect(roomCode.panelBounds.x + roomCode.panelBounds.width).toBe(safeArea.right);
+    expect(roomCode.panelBounds.y).toBe(panel.rect.y);
+    expect(panel.rect.x + panel.rect.width).toBeLessThan(roomCode.panelBounds.x);
+    let framesWithoutRoomCode = 0;
 
     const phases: Phase[] = [];
     const seen = new Set<string>();
@@ -269,9 +311,12 @@ describe("Quick Draw TV scene", () => {
       } else if (draw) {
         shookAfterDraw ||= run.scene.cameras.main.shakeEffect.isRunning;
       }
+      if (!shown(run.scene).includes(roomCode)) framesWithoutRoomCode += 1;
       state = run.frame();
       expect(run.scene.sys.isActive()).toBe(true);
     }
+    // It is on screen during the whole game.
+    expect(framesWithoutRoomCode).toBe(0);
 
     expect(phases).toEqual(["intro", "standoff", "draw", "result"]);
     expect(seen).toContain("intro:Tap your phone when the TV shouts DRAW");
@@ -406,7 +451,7 @@ describe("Quick Draw TV scene", () => {
         width: Math.ceil(bounds.width / zoom) * zoom,
         height: Math.ceil(bounds.height / zoom) * zoom,
       };
-      expect(area.y).toBeGreaterThanOrEqual(instructionPanelRect.y);
+      expect(area.y).toBeGreaterThanOrEqual(instructionPanelRect().y);
       const pixels = await readArea(stage, area);
       const dark = (x: number, y: number) => {
         const i = (y * area.width + x) * 4;
@@ -454,4 +499,113 @@ describe("Quick Draw TV scene", () => {
     expect(new Set(draws.map((draw) => draw.alpha))).toEqual(new Set([1]));
     expect(problems).toEqual([]);
   });
+
+  it("starts without a room code panel when the host gives no room code", async () => {
+    const run = await startScene(2, 1, mixedBots, { room: false });
+    run.frame();
+    expect(run.scene.overlay.list.some((child) => child instanceof RoomCodePanel)).toBe(false);
+    const panel = run.scene.overlay.list.find((child) => child instanceof InstructionPanel);
+    expect((panel as InstructionPanel).rect).toEqual(instructionPanelRect());
+    expect(problems).toEqual([]);
+  });
+
+  it(
+    "never lets a tag cover a winner's BANG! or another tag, for every winning seat with 2 to 8 players",
+    { timeout: 120_000 },
+    async () => {
+      // A world-sized canvas is enough: overlays are laid out in overlay pixels at any canvas size.
+      const stage = await bootStage(world);
+      phaser = stage;
+      const checked: string[] = [];
+      const clashes: string[] = [];
+      let time = 0;
+      const render = (): void => {
+        time += tickMs;
+        stage.step(time, tickMs);
+      };
+
+      for (let players = 2; players <= 8; players++) {
+        const bots = botRoom(players, 1, eachSeatWins(players));
+        const data: HostSceneData<QuickDrawState> = {
+          getState: () => bots.room.state,
+          players: bots.room.players,
+          displayLagMs: 0,
+          reducedMotion: false,
+          roomCode: "BEAN",
+          joinUrl: "https://couchcade.workers.dev/?room=BEAN",
+        };
+        if (stage.scene.getScene(game.id)) stage.scene.remove(game.id);
+        stage.scene.add(game.id, QuickDrawScene, true, data as unknown as object);
+        await vi.waitFor(
+          () => {
+            render();
+            if (stage.scene.getScene(game.id)?.sys.settings.status !== Scenes.RUNNING) {
+              throw new Error("Not running yet");
+            }
+          },
+          { timeout: 10_000, interval: 5 },
+        );
+        const scene = stage.scene.getScene(game.id) as QuickDrawScene;
+
+        let state = bots.room.state;
+        let lastRound = 0;
+        while (!bots.room.over) {
+          state = bots.step();
+          // Once BANG! is fully out: the tags never move after that in a round.
+          const settled = state.phase === "result" && state.nowMs - state.phaseAtMs > motion.ui.ms;
+          if (!settled || state.round === lastRound) continue;
+          lastRound = state.round;
+          render();
+
+          const overlays = shown(scene);
+          const bangs = overlays
+            .filter(
+              (child): child is GameObjects.Text =>
+                child instanceof GameObjects.Text && child.text === "BANG!",
+            )
+            .map(overlayBox);
+          // A tag's box is its pill and shadow; the text Phaser measured must sit inside it.
+          const tags = overlays
+            .filter((child): child is PipTag => child instanceof PipTag)
+            .flatMap((tag) => {
+              const text = tag.list.find((child) => child instanceof GameObjects.Text);
+              return tag.box && tag.text && text instanceof GameObjects.Text
+                ? [{ text: tag.text, box: tag.box, glyphs: overlayBox(text) }]
+                : [];
+            });
+          const where = `${players} players, round ${state.round}`;
+          for (const { text, box, glyphs } of tags) {
+            const inside =
+              glyphs.left >= box.left &&
+              glyphs.right <= box.right &&
+              glyphs.top >= box.top &&
+              glyphs.bottom <= box.bottom;
+            if (!inside) clashes.push(`${where}: ${text} text sticks out of its tag`);
+          }
+          if (bangs.length !== state.winners.length || bangs.length === 0 || tags.length < 2) {
+            clashes.push(`${where}: ${bangs.length} BANG! and ${tags.length} tags`);
+          }
+          for (const [i, tag] of tags.entries()) {
+            for (const bang of bangs) {
+              if (overlaps(tag.box, bang)) clashes.push(`${where}: ${tag.text} covers BANG!`);
+            }
+            for (const other of tags.slice(i + 1)) {
+              if (overlaps(tag.box, other.box)) {
+                clashes.push(`${where}: ${tag.text} covers ${other.text}`);
+              }
+            }
+          }
+          checked.push(`${players}:${(state.round - 1) % players}`);
+        }
+      }
+
+      // Every seat won a round, for every player count.
+      const expected = Array.from({ length: 7 }, (_, index) => index + 2).flatMap((players) =>
+        Array.from({ length: players }, (_, seat) => `${players}:${seat}`),
+      );
+      expect(new Set(checked)).toEqual(new Set(expected));
+      expect(clashes).toEqual([]);
+      expect(problems).toEqual([]);
+    },
+  );
 });
