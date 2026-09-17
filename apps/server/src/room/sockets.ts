@@ -1,4 +1,5 @@
 import type { PipProfile, PlayerId, PlayerInfo } from "@couchcade/protocol";
+import type { FloodBucket } from "./flood.ts";
 
 /**
  * Connection tags. They are fixed when a socket connects, so they only say host or phone. Seat and
@@ -9,12 +10,14 @@ export const phoneTag = "phone";
 
 /**
  * Per-socket state, stored with `connection.setState()` so it survives hibernation. Keep it well
- * under 1 KB. CC-2.5 adds the flood bucket here.
+ * under 1 KB.
  */
 export interface HostSocketState {
   role: "host";
   /** Room time of the socket's last message other than a clock ping. */
   lastActiveAt: number;
+  /** The flood bucket (flood.ts). Every frame that reaches the message handler takes a token. */
+  flood: FloodBucket;
 }
 
 export interface PhoneSocketState {
@@ -26,6 +29,7 @@ export interface PhoneSocketState {
   profile: PipProfile;
   joinedAt: number;
   lastActiveAt: number;
+  flood: FloodBucket;
 }
 
 export type SocketState = HostSocketState | PhoneSocketState;

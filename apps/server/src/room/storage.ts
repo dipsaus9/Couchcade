@@ -8,8 +8,8 @@ import {
 
 /**
  * The room's SQLite tables (docs/architecture/platform.md, "Room storage"). The room writes only
- * on create, join, leave, seat release, profile change and phase change, never per message. CC-2.5
- * and CC-2.6 set `kicked` and `revoked`, and CC-3.5 adds the `snapshot` table.
+ * on create, join, leave, seat release, profile change, phase change and flood
+ * revocation, never per message. CC-2.6 sets `kicked`, and CC-3.5 adds the `snapshot` table.
  *
  * Tables are created by `create()`, not on start, so a socket or request that reaches a room that
  * was never created leaves no tables behind.
@@ -21,7 +21,8 @@ CREATE TABLE IF NOT EXISTS meta (
   created_at INTEGER NOT NULL,
   locked INTEGER NOT NULL DEFAULT 0,
   phase TEXT NOT NULL DEFAULT 'lobby',
-  host_seen_at INTEGER
+  host_seen_at INTEGER,
+  host_revoked INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS players (
   id TEXT PRIMARY KEY,
@@ -43,6 +44,8 @@ export interface RoomMeta {
   phase: RoomPhase;
   /** Room time when the host last left. Null while the host has never connected. */
   hostSeenAt: number | null;
+  /** True once the host socket flooded. The host's rejoin token no longer works. */
+  hostRevoked: boolean;
 }
 
 export interface PlayerRecord {
@@ -53,8 +56,10 @@ export interface PlayerRecord {
   joinedAt: number;
   /** Room time the player's socket last closed, or null while they are connected. */
   leftAt: number | null;
-  /** True once the seat was given up: the player left, or their seat window ran out. */
+  /** True once the seat was given up: the player left, was revoked, or their seat window ran out. */
   released: boolean;
+  /** True once the player's socket flooded. Their rejoin token no longer works. */
+  revoked: boolean;
 }
 
 type MetaRow = {
@@ -63,6 +68,7 @@ type MetaRow = {
   locked: number;
   phase: string;
   host_seen_at: number | null;
+  host_revoked: number;
 };
 
 type PlayerRow = {
@@ -73,9 +79,10 @@ type PlayerRow = {
   joined_at: number;
   left_at: number | null;
   released: number;
+  revoked: number;
 };
 
-const playerColumns = "id, name, slot, profile, joined_at, left_at, released";
+const playerColumns = "id, name, slot, profile, joined_at, left_at, released, revoked";
 
 /** Every Pip part at its first option, until the player customises it (CC-6.5). */
 export const defaultProfile: PipProfile = { skin: 0, hair: 0, hairColour: 0 };
@@ -108,7 +115,9 @@ export class RoomStorage {
     if (exists.length === 0) return null;
     this.#migrate();
     const [row] = this.#sql
-      .exec<MetaRow>("SELECT code, created_at, locked, phase, host_seen_at FROM meta WHERE id = 1")
+      .exec<MetaRow>(
+        "SELECT code, created_at, locked, phase, host_seen_at, host_revoked FROM meta WHERE id = 1",
+      )
       .toArray();
     if (!row) return null;
     const phase = roomPhaseSchema.safeParse(row.phase);
@@ -118,6 +127,7 @@ export class RoomStorage {
       locked: row.locked === 1,
       phase: phase.success ? phase.data : "lobby",
       hostSeenAt: row.host_seen_at,
+      hostRevoked: row.host_revoked === 1,
     };
   }
 
@@ -127,6 +137,11 @@ export class RoomStorage {
 
   setHostSeenAt(now: number): void {
     this.#sql.exec("UPDATE meta SET host_seen_at = ? WHERE id = 1", now);
+  }
+
+  /** The host socket flooded. Later host connects close with 4008. */
+  revokeHost(): void {
+    this.#sql.exec("UPDATE meta SET host_revoked = 1 WHERE id = 1");
   }
 
   readPlayer(id: PlayerId): PlayerRecord | null {
@@ -148,7 +163,7 @@ export class RoomStorage {
   }
 
   /** Records a join. A player who joins again keeps their row, with `left_at` cleared. */
-  savePlayer(player: Omit<PlayerRecord, "leftAt" | "released">): void {
+  savePlayer(player: Omit<PlayerRecord, "leftAt" | "released" | "revoked">): void {
     this.#sql.exec(
       `INSERT INTO players (id, name, slot, profile, joined_at, left_at) VALUES (?, ?, ?, ?, ?, NULL)
        ON CONFLICT (id) DO UPDATE SET name = excluded.name, slot = excluded.slot,
@@ -180,17 +195,36 @@ export class RoomStorage {
   }
 
   /**
+   * The player's socket flooded: their seat is released and later connects with their id close
+   * with 4008. One write, on the violation only.
+   */
+  revokePlayer(id: PlayerId, now: number): void {
+    this.#sql.exec(
+      "UPDATE players SET left_at = COALESCE(left_at, ?), released = 1, revoked = 1 WHERE id = ?",
+      now,
+      id,
+    );
+  }
+
+  /**
    * Adds columns that later stories introduced to a room created before them, so a room that lives
    * through a deploy keeps working. Runs once per instance.
    */
   #migrate(): void {
     if (this.#migrated) return;
     this.#migrated = true;
-    const released = this.#sql
-      .exec("SELECT 1 FROM pragma_table_info('players') WHERE name = 'released'")
+    const [row] = this.#sql
+      .exec<{ released: number; hostRevoked: number }>(
+        `SELECT
+           (SELECT COUNT(*) FROM pragma_table_info('players') WHERE name = 'released') AS released,
+           (SELECT COUNT(*) FROM pragma_table_info('meta') WHERE name = 'host_revoked') AS hostRevoked`,
+      )
       .toArray();
-    if (released.length === 0) {
+    if (row?.released === 0) {
       this.#sql.exec("ALTER TABLE players ADD COLUMN released INTEGER NOT NULL DEFAULT 0");
+    }
+    if (row?.hostRevoked === 0) {
+      this.#sql.exec("ALTER TABLE meta ADD COLUMN host_revoked INTEGER NOT NULL DEFAULT 0");
     }
   }
 }
@@ -204,6 +238,7 @@ function toPlayerRecord(row: PlayerRow): PlayerRecord {
     joinedAt: row.joined_at,
     leftAt: row.left_at,
     released: row.released === 1,
+    revoked: row.revoked === 1,
   };
 }
 
