@@ -4,18 +4,18 @@
 
 Couchcade's first gyroscope game. Everyone stands on a sunny archery range and shoots at the same target at the same time. The phone is the bow: move it to aim, pull a thumb down the screen to draw, let go to loose the arrow. Wind and distance change as the match goes on. A match is 12 arrows and lasts about 2 minutes.
 
-**For the owner.** Read [At a glance](#at-a-glance) and [Open questions for the owner](#open-questions-for-the-owner). That takes about 5 minutes.
+**For the owner.** Read [At a glance](#at-a-glance) and [Owner decisions](#owner-decisions-2026-09-17). That takes about 5 minutes.
 
-**For agents.** Once approved, everything below is binding for CC-11.2 to CC-11.7. [platform.md](../architecture/platform.md), [motion.md](../architecture/motion.md), [session-flow.md](../architecture/session-flow.md), [HOUSE_STYLE.md](../HOUSE_STYLE.md) and [platform-screens.md](../design/platform-screens.md) still apply. Where this spec and a story disagree, stop and flag it.
+**For agents.** Everything below is binding for CC-11.2 to CC-11.7. [platform.md](../architecture/platform.md), [motion.md](../architecture/motion.md), [session-flow.md](../architecture/session-flow.md), [HOUSE_STYLE.md](../HOUSE_STYLE.md) and [platform-screens.md](../design/platform-screens.md) still apply. Where this spec and a story disagree, stop and flag it.
 
-Status: draft for owner approval (CC-11.1).
+Status: approved by the owner on 2026-09-17 (CC-11.1), with the four decisions below.
 
 ---
 
 ## Contents
 
 - [At a glance](#at-a-glance)
-- [Open questions for the owner](#open-questions-for-the-owner)
+- [Owner decisions](#owner-decisions-2026-09-17)
 - [Inspiration](#inspiration)
 - [Rules and scoring](#rules-and-scoring)
 - [Round flow and timings](#round-flow-and-timings)
@@ -48,26 +48,14 @@ Status: draft for owner approval (CC-11.1).
 | Cost | About 1,300 requests for a typical 8-player match, never more than 4 messages per second per phone. About 0.25 `controller:state` messages per second from the TV. |
 | Assets | CC0 packs from Kenney and OpenGameArt, recoloured to a new `range` palette. The target, wind flag, bow and arrows are drawn from scratch. |
 
-## Open questions for the owner
+## Owner decisions (2026-09-17)
 
-Product forks only. Each has a recommendation, and the spec below is written as if the owner takes it.
+The owner approved the spec and took the recommendation on all four open questions.
 
-1. **Everyone shoots each arrow together, or at their own pace?**
-   - *Volleys (recommended):* each arrow is a volley of up to 10 seconds. It ends early once everyone has shot. Wind is the same for everyone, the TV reveals all the arrows together, and a player who's still aiming is waited for, but never for more than 10 seconds.
-   - *Free fire:* each player shoots their 3 arrows whenever they like within a 30-second round. It's quicker for fast players, but arrows land at random moments, the wind can't change per arrow, and slow players get rushed.
-   - Recommendation: volleys. They give one shared "everyone look" moment per arrow, which suits a TV party game.
-2. **Moving targets?** Wii Sports Resort slides its targets from Intermediate on.
-   - *Static targets in the first version (recommended):* a hit then depends only on the phone's aim, so TV lag and the 250 ms crosshair trail never change a score, and there's no rewind or lag calibration.
-   - *A sliding target in round 4:* more exciting, but the shot has to be judged against where the target was on the player's TV (`atMs − displayLagMs − 250 ms`). Players who skipped the TV lag check would miss a lot, and the crosshair trail becomes noticeable.
-   - Recommendation: static for now. Revisit after the playtest (CC-11.7) as a follow-up story.
-3. **Does the crosshair show where the phone points, or where the arrow will land?**
-   - *Where the phone points (recommended):* players aim a little high at a distance and into the wind, and learn from the arrows that stay in the target. That's the skill, as in Wii Sports Resort.
-   - *Where the arrow will land:* the crosshair already allows for drop and wind. It's easier for first-timers, but wind and draw power stop mattering, so everyone scores about the same.
-   - Recommendation: where the phone points. Round 1 has no wind and little drop, so first-timers still land arrows.
-4. **A hidden bonus target?** Wii Sports Resort hides a far-away fruit on each course, worth 10 and costing an arrow.
-   - *Leave it out of the first version (recommended):* scoring stays one simple rule, and nothing small competes with 8 crosshairs on screen.
-   - *Add one in round 4:* for example an apple on a fence post, worth 10, costing that arrow. It gives trailing players a gamble.
-   - Recommendation: leave it out, and decide after the playtest whether rounds feel samey.
+1. **Everyone shoots each arrow together.** Each arrow is a volley that lasts up to 10 seconds and ends early once everyone has shot. Wind is the same for everyone, and the TV reveals all the arrows together. Free fire, with 3 arrows at your own pace in a 30-second round, was rejected. It would bring arrows landing at random moments, no wind change per arrow, and slow players feeling rushed.
+2. **Static targets for now.** A hit depends only on the phone's aim, so TV lag and the 250 ms crosshair trail never change a score. No rewind and no lag calibration are needed. A sliding target is revisited after the playtest (CC-11.7) as a follow-up story. It would be judged at `atMs − displayLagMs − 250 ms`.
+3. **The crosshair shows where the phone points.** Players allow for drop and wind themselves and learn from the arrows that stay in the target. Round 1 has no wind and little drop, so first-timers still land arrows. A crosshair that shows the landing point was rejected, because wind and draw power would stop mattering.
+4. **No hidden bonus target for now.** Scoring stays one simple rule, and nothing small competes with 8 crosshairs. Whether rounds feel samey is decided after the playtest.
 
 ---
 
@@ -85,9 +73,9 @@ Target Range copies how these games play, not their names, characters or art.
 
 What we don't take from Wii Sports Resort, and why:
 
-- **Moving targets and blocking boards.** Its Intermediate and Expert courses slide targets along a rope and put boards in front of them. Moving targets make TV lag matter. See [question 2](#open-questions-for-the-owner).
+- **Moving targets and blocking boards.** Its Intermediate and Expert courses slide targets along a rope and put boards in front of them. Moving targets make TV lag matter. See [owner decision 2](#owner-decisions-2026-09-17).
 - **The shrinking focus circle.** A circle shrinks while the player holds the draw, blinks with a chime when it's smallest, then grows and fades. With 8 crosshairs at once, 8 pulsing circles would bury the target. Our 10-second volley clock does the "don't hold forever" job.
-- **Hidden bonus targets.** Each Resort area hides a far-away fruit or object worth 10 that uses up an arrow. See [question 4](#open-questions-for-the-owner).
+- **Hidden bonus targets.** Each Resort area hides a far-away fruit or object worth 10 that uses up an arrow. See [owner decision 4](#owner-decisions-2026-09-17).
 - **Turns.** Resort's archery is 1 to 4 players taking turns. We shoot all at once, so 8 players don't wait.
 
 Research on controls and code:
@@ -175,7 +163,7 @@ What that means for a player:
 
 - **Full draw is best.** A weak draw at 30% makes the arrow fly 1.7 times longer, drop 3 times as far and drift 1.7 times as much. At full draw a far arrow drops 14 px, over half the target's radius, so players aim a little high.
 - **Wind pushes across.** In round 4, wind 4 at full draw moves the arrow 16 px, two thirds of the radius.
-- **The crosshair is where the phone points.** It doesn't show drop or wind. Arrows from earlier volleys stay in the target for the round, so each player sees how far off they were and corrects. See [question 3](#open-questions-for-the-owner).
+- **The crosshair is where the phone points.** It doesn't show drop or wind. Arrows from earlier volleys stay in the target for the round, so each player sees how far off they were and corrects. See [owner decision 3](#owner-decisions-2026-09-17).
 - Aim ranges are the `@couchcade/motion` defaults: ±25° of yaw is ±200 px and ±15° of pitch is ±90 px, so 1° is about 8 px on the TV world, and the near target's 10 ring (3.6 px) is about half a degree. CC-11.3 checks this against a recorded aim trace (motion.md, [Manual check](../architecture/motion.md#test-layers)) and may tune the two range numbers once, before the playtest.
 
 The crosshair's home, where `yaw = 0` and `pitch = 0`, is (240, 140) in the world. A phone held still at full draw lands at (240, 140 + drop), plus wind. When the RNG puts the target centre within 6 px of that point, it rolls again, so nobody scores a 10 just by holding still.
@@ -323,7 +311,7 @@ Up to 8 players aim at one target at once. The rules that keep that readable fro
 
 1. **The phone's aim decides.** `shoot` carries the aim at `pointerup` (motion.md, "Fitting the input budget", rule 3). The crosshair on the TV trails the hand by 250 ms plus the TV's own lag, but the hit uses the phone's own aim. A player who holds still while releasing hits where the crosshair shows.
 2. **Room clock, not arrival time.** The shot's `at` comes from the `pointerup` `event.timeStamp` through `toHostTime`. The host judges "shot before the close" on `ctx.atMs`, and waits 500 ms after the clock runs out for late messages, the most the platform lets `atMs` lag behind.
-3. **TV lag doesn't matter here.** Targets don't move, so a hit doesn't depend on when the player saw something. Target Range ignores `ctx.displayLagMs` and doesn't mention calibration in its intro. If moving targets come later ([question 2](#open-questions-for-the-owner)), the target's position is judged at `atMs − displayLagMs − 250`, what the player saw when they let go.
+3. **TV lag doesn't matter here.** Targets don't move, so a hit doesn't depend on when the player saw something. Target Range ignores `ctx.displayLagMs` and doesn't mention calibration in its intro. If moving targets come later ([owner decision 2](#owner-decisions-2026-09-17)), the target's position is judged at `atMs − displayLagMs − 250`, what the player saw when they let go.
 4. **No rewind.** One player's arrow never affects another's, and nothing in the world moves, so there's nothing to rewind. Target Range doesn't use `withRewind` (CC-3.7).
 5. **Same wind for everyone.** Wind is fixed for the whole volley, so shooting early or late in a volley changes nothing.
 6. **Touch versus motion.** Dragging a pad is steadier than holding a phone in the air. For friends on a couch that's accepted, as motion.md says the touch fallback is fair. The playtest (CC-11.7) watches for it. If touch players win clearly, a follow-up can add a gentle sway to touch aim.
