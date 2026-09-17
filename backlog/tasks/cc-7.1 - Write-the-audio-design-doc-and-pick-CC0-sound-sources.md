@@ -4,7 +4,7 @@ title: Write the audio design doc and pick CC0 sound sources
 status: In Progress
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-17 15:08'
+updated_date: '2026-09-17 15:34'
 labels:
   - story
   - owner-gate
@@ -28,7 +28,7 @@ Branch: CC-7.1/audio-design-doc
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 docs/architecture/audio.md covers engine, token-to-sound mapping, ducking, music loops and CC0 sources with licence links
+- [x] #1 docs/architecture/audio.md covers engine, token-to-sound mapping, ducking, music loops and CC0 sources with licence links
 - [ ] #2 Owner approval is recorded in the task notes as "Approved by owner: <YYYY-MM-DD>" before the story is Done
 <!-- AC:END -->
 
@@ -46,4 +46,7 @@ Branch: CC-7.1/audio-design-doc
 
 <!-- SECTION:NOTES:BEGIN -->
 Owner gate: open the docs PR, send the owner a short summary plus the PR link in chat, and wait for explicit approval. Merge only after approval; record it with --append-notes.
+
+Review (dipsaus-ai:story-reviewer, round 1): pass. AC1 met; AC2 pending owner. Advisories: (a) owner gate stays open; (b) the Conflicts table amendments to CC-7.2..7.6 and the new Quick Draw and Target Range sound wiring stories must be applied with backlog-plan amend mode after approval; (c) setTargetAtTime wording fixed to a linear 50 ms ramp.
+CC0 shortlist: every licence read on its source page 2026-09-17 (Freesound links to publicdomain/zero/1.0, Kenney pages say Creative Commons CC0, OpenGameArt License(s): CC0). Lobby loop primary Holizna 'Adventure Begins Loop' measured 130 BPM; backup congusbongus 'Welcome to the Item Shop' 115 BPM. Engine evidence: host platform JS 413.1/450 KB (pnpm budgets); howler 2.2.4 7.9 KB gzip core, last release 2023-09-19; Tone.js 15.1.22 79 KB gzip.
 <!-- SECTION:NOTES:END -->
