@@ -1,10 +1,10 @@
 ---
 id: CC-4.12
 title: Expand the font subsets to accented Latin letters
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-17 09:02'
-updated_date: '2026-09-17 10:39'
+updated_date: '2026-09-17 10:42'
 labels:
   - story
 dependencies:
@@ -58,3 +58,17 @@ Findings (probed upstream cmaps with harfbuzzjs before writing tooling/fonts/src
 - Result: fredoka.woff2 grew from 17,464 B to 22,136 B; pixelify-sans.woff2 unchanged at 3,124 B; total 25,260 B (was 20,588 B), well under the 40 KB budget (61.7% used, pnpm budgets: Controller fonts 24.67 KB / 40.00 KB PASS).
 - Added harfbuzzjs + fontverter (already subset-font's own dependencies, pnpm-workspace.yaml catalog) as packages/theme devDependencies to read the committed WOFF2's cmap directly in the AC3 test, instead of adding a new font-inspection library.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Fredoka's subset now covers Basic Latin plus the full Latin-1 Supplement letter range (62/62, upstream has it all) and the Latin Extended-A letters upstream Fredoka actually ships a glyph for (10/128: dotless-i, L/l-stroke, OE/oe, S/s-caron, Y-diaeresis, Z/z-caron), so the owner's 2026-09-17 examples (Renee, Chloe, Zoe, Jurgen - all Latin-1 Supplement) and most Western-European accented names render in the house font instead of a box. Pixelify Sans's charset is unchanged: HOUSE_STYLE.md confirms player names only ever render in Fredoka, so expanding Pixelify's subset would have cost budget for glyphs never drawn.
+
+fredoka.woff2 grew from 17,464 B to 22,136 B; pixelify-sans.woff2 stays at 3,124 B; total 25,260 B, well under the 40 KB budget (pnpm budgets: Controller fonts 24.67 KB / 40.00 KB, PASS).
+
+AC3: packages/theme/test/fonts.test.ts adds a coverage test that decodes the *committed* fredoka.woff2 (fontverter) and reads its actual cmap via harfbuzzjs's collectUnicodes() (both already subset-font's own dependencies, reused rather than adding a new library) to verify every character this subset claims - Basic Latin, digits, all Latin-1 Supplement letters, the owner's four named examples, and the 10 claimed Extended-A letters - maps to a real glyph, not .notdef.
+
+118 of 128 Latin Extended-A codepoints (Polish/Baltic/Czech diacritics etc.) are not in upstream Fredoka at all and can't be conjured by subsetting; flagged on this task's notes for CC-2.4 (player-name validation, not yet built, depends on this story) to decide whether its allowlist should match this exact set or accept the --font-ui fallback chain (Nunito, Arial Rounded MT Bold, system-ui, sans-serif) for that gap - never a box, per security.md, but not in Fredoka's own voice.
+
+Verify: pnpm check, pnpm test, pnpm build, pnpm budgets, pnpm check:deps, pnpm check:style all green. Reviewer (dipsaus-ai:story-reviewer): pass, round 1, no blocking findings.
+<!-- SECTION:FINAL_SUMMARY:END -->
