@@ -1,8 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { createPlayers } from "@couchcade/game-sdk/testing";
-import { init, onPlayerInput, outcome, restore, snapshot, winningTaps } from "../src/shared/rules.ts";
+import {
+  init,
+  onPlayerInput,
+  outcome,
+  restore,
+  snapshot,
+  winningTaps,
+} from "../src/shared/rules.ts";
 
-const [alice, bob] = createPlayers(2) as [ReturnType<typeof createPlayers>[number], ReturnType<typeof createPlayers>[number]];
+const [alice, bob] = createPlayers(2) as [
+  ReturnType<typeof createPlayers>[number],
+  ReturnType<typeof createPlayers>[number],
+];
 
 const tap = { type: "tap" as const };
 

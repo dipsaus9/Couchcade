@@ -1,9 +1,10 @@
 /**
  * Proves the generator's output actually works: generates a real game into a temporary folder
  * inside the workspace, runs its typecheck and tests, and deletes it
- * (docs/architecture/session-flow.md, "Create-game template"). It also runs the same
- * dependency-cruiser rules `pnpm check:deps` runs, scoped to the whole repo, so the generated
- * game's import boundaries (src/shared/, src/host/, src/controller/) are proven too.
+ * (docs/architecture/session-flow.md, "Create-game template"). It also runs the same oxfmt, oxlint
+ * and dependency-cruiser checks `pnpm check` and `pnpm check:deps` run (the whole of AC 2), so a
+ * template edit that reintroduces a formatting or lint problem (a line over the repo's printWidth,
+ * say) fails here instead of shipping in the next generated game.
  *
  * The generated package needs its own `node_modules` to typecheck and test (workspace:* and
  * catalog: dependencies). Rather than running a real `pnpm install` here - which would rewrite the
@@ -48,12 +49,20 @@ function linkNodeModules(): void {
 }
 
 describe("the generated game", () => {
-  it("passes typecheck, its tests (including testGameContract) and check:deps", async () => {
+  it("passes pnpm check (format, lint, typecheck), its tests and check:deps", async () => {
     expect(existsSync(targetDir), `games/${id} must not already exist`).toBe(false);
     expect(existsSync(ownNodeModules), "run pnpm install in this worktree first").toBe(true);
 
     writeGame({ id, title, gamesDir });
     linkNodeModules();
+
+    const relativeDir = `games/${id}`;
+    await expect(
+      run("pnpm", ["exec", "oxfmt", "--check", relativeDir], { cwd: repoRoot }),
+    ).resolves.toBeDefined();
+    await expect(
+      run("pnpm", ["exec", "oxlint", relativeDir], { cwd: repoRoot }),
+    ).resolves.toBeDefined();
 
     const pkgName = `@couchcade/game-${id}`;
     await expect(

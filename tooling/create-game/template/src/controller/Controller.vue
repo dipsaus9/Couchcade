@@ -20,7 +20,9 @@ const props = defineProps<{
 }>();
 
 const done = computed(() => props.data.winnerId !== null);
-const label = computed(() => (done.value ? "Round over" : `${props.data.yours} / ${props.data.target}`));
+const label = computed(() =>
+  done.value ? "Round over" : `${props.data.yours} / ${props.data.target}`,
+);
 
 function onPress(event: Event): void {
   if (done.value) return;
