@@ -1,7 +1,8 @@
 import type { Player } from "@couchcade/game-sdk/contract";
 import type { ControllerView } from "@couchcade/protocol";
 import { targetPoints } from "./constants.ts";
-import { findPlayer } from "./state.ts";
+import { isMatchDecided } from "./rules.ts";
+import { averageMs, findPlayer } from "./state.ts";
 import type { QuickDrawState } from "./state.ts";
 
 export type QuickDrawScreen = "qd-watch" | "qd-standoff" | "qd-result";
@@ -16,6 +17,18 @@ export type QuickDrawResultView = QuickDrawRoundView & {
   result: RoundResult;
   ms: number | null;
   winner: string | null;
+  /** Only in solo practice. */
+  practice?: PracticeView;
+};
+
+/** Solo practice on a result: the player's best and average so far, whole ms. */
+export type PracticeView = {
+  /** This round's valid time beat the best before it. */
+  newBest: boolean;
+  bestMs: number | null;
+  averageMs: number | null;
+  /** The match ends after this round, so the phone shows the best and average. */
+  final: boolean;
 };
 
 export type QuickDrawView = QuickDrawRoundView | QuickDrawResultView;
@@ -67,16 +80,26 @@ function resultView(state: QuickDrawState, player: Player, round: number): Quick
   const winnerId = won ? player.id : state.winners[0];
   const winner = winnerId === undefined ? null : (findPlayer(state, winnerId)?.name ?? null);
 
+  const data: QuickDrawResultView = {
+    round,
+    target: targetPoints,
+    points: current?.points ?? 0,
+    result,
+    ms: tap?.ms ?? null,
+    winner,
+  };
+  if (state.practice) {
+    data.practice = {
+      newBest: result === "won" && state.practice.newBest,
+      bestMs: current?.bestMs ?? null,
+      averageMs: averageMs(state.practice),
+      final: state.phase === "over" || isMatchDecided(state),
+    };
+  }
+
   return {
     screen: "qd-result",
-    data: {
-      round,
-      target: targetPoints,
-      points: current?.points ?? 0,
-      result,
-      ms: tap?.ms ?? null,
-      winner,
-    },
+    data,
     ...(result === "won" ? { cue: "celebrate" as const } : {}),
     ...(result === "foul" || result === "fooled" ? { cue: "foul" as const } : {}),
   };
