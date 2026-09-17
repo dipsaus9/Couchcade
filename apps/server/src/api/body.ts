@@ -1,5 +1,9 @@
-/** Request bodies over this many bytes are refused, like protocol frames. */
-export const maxBodyBytes = 1024;
+/**
+ * Request bodies over this many bytes are refused. Larger than a protocol frame's 1 KB, because a
+ * Turnstile token alone can be 2,048 characters (docs/architecture/security.md, "Check order per
+ * endpoint").
+ */
+export const maxBodyBytes = 4096;
 
 /**
  * Reads a JSON object body of at most `maxBodyBytes`. Returns null for anything else: a larger
