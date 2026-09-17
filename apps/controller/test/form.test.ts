@@ -1,4 +1,6 @@
+import { EN_NAME_BLOCKLIST } from "@couchcade/utils/names";
 import { describe, expect, it } from "vitest";
+import { nameHint } from "../src/join/copy.ts";
 import {
   checkJoinForm,
   checkName,
@@ -6,6 +8,7 @@ import {
   nameLength,
   normaliseName,
   roomCodeFromSearch,
+  type NameProblem,
 } from "../src/join/form.ts";
 
 describe("roomCodeFromSearch", () => {
@@ -59,6 +62,22 @@ describe("name rules", () => {
     expect(checkName("S")).toBeNull();
     expect(checkName("Twelve chars")).toBeNull();
     expect(checkName("Thirteen char")).toBe("too-long");
+  });
+
+  it("runs the same allowlist and blocklist as the Worker", () => {
+    expect(checkName("Zoë")).toBeNull();
+    expect(checkName("Sam 🙂")).toBe("character");
+    expect(checkName("- _ -")).toBe("no-letter");
+    expect(checkName(EN_NAME_BLOCKLIST.anywhere[0] ?? "")).toBe("blocked");
+  });
+
+  it("has a referee-voice hint for every problem, short enough for the phone", () => {
+    const problems: NameProblem[] = ["empty", "too-long", "character", "no-letter", "blocked"];
+    for (const problem of problems) {
+      expect(nameHint[problem].length).toBeGreaterThan(0);
+      expect(nameHint[problem].length).toBeLessThan(40);
+    }
+    expect(nameHint.blocked).toBe("That name's a foul. Pick another one.");
   });
 });
 

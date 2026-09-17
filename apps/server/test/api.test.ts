@@ -5,6 +5,7 @@ import {
   joinRoomResponseSchema,
   rejoinResponseSchema,
 } from "@couchcade/protocol";
+import { EN_NAME_BLOCKLIST, NL_NAME_BLOCKLIST } from "@couchcade/utils/names";
 import { describe, expect, it, vi } from "vitest";
 import { apiErrorCodes, apiErrorStatus } from "../src/api/index.ts";
 import { maxPhones } from "../src/api/join.ts";
@@ -187,6 +188,15 @@ describe("POST /api/rooms/:code/join", () => {
     },
   );
 
+  it("stores the name normalised: NFKC, trimmed and with single spaces", async () => {
+    const { code } = await liveRoom();
+    const { status, body } = await call(
+      post(`/api/rooms/${code}/join`, { name: "  Ｐａｔ   de  Wit ", turnstile }),
+    );
+    expect(status).toBe(200);
+    expect(joinRoomResponseSchema.parse(body).name).toBe("Pat de Wit");
+  });
+
   it("answers 400 for a bad body or name without calling a room", async () => {
     const { code } = await liveRoom();
     for (const [body, error] of [
@@ -195,6 +205,12 @@ describe("POST /api/rooms/:code/join", () => {
       [{ name: "Pat", turnstile, profile: { skin: 99, hair: 0, hairColour: 0 } }, "bad-request"],
       [{ name: "   ", turnstile }, "name-not-allowed"],
       [{ name: "Thirteen chrs", turnstile }, "name-not-allowed"],
+      [{ name: "Pat 🙂", turnstile }, "name-not-allowed"],
+      [{ name: "P\u200Bat", turnstile }, "name-not-allowed"],
+      [{ name: "P\u0430t", turnstile }, "name-not-allowed"],
+      [{ name: "...", turnstile }, "name-not-allowed"],
+      [{ name: EN_NAME_BLOCKLIST.anywhere[0], turnstile }, "name-not-allowed"],
+      [{ name: NL_NAME_BLOCKLIST.whole[0]?.toUpperCase(), turnstile }, "name-not-allowed"],
     ] as const) {
       const response = await call(post(`/api/rooms/${code}/join`, body));
       expect(response).toEqual({ status: 400, body: { error }, rooms: [] });
@@ -293,8 +309,10 @@ describe("Turnstile", () => {
 
   it("checks the name before Turnstile, so a rejected name doesn't spend the token", async () => {
     siteverifyTokens.splice(0);
-    const response = await call(post(`/api/rooms/${freshCode()}/join`, { name: "  ", turnstile }));
-    expect(response.status).toBe(400);
+    for (const name of ["  ", NL_NAME_BLOCKLIST.anywhere[0]]) {
+      const response = await call(post(`/api/rooms/${freshCode()}/join`, { name, turnstile }));
+      expect(response).toMatchObject({ status: 400, body: { error: "name-not-allowed" } });
+    }
     expect(siteverifyTokens).toEqual([]);
   });
 });

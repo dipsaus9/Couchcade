@@ -15,6 +15,7 @@
   },
   "devDependencies": {
     "@couchcade/config": "workspace:*",
+    "@couchcade/utils": "workspace:*",
     "fontverter": "catalog:",
     "harfbuzzjs": "catalog:",
     "typescript": "catalog:",

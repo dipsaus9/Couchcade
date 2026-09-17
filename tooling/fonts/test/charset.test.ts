@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { NAME_CHARACTERS } from "@couchcade/utils/names";
 import { FREDOKA_TEXT, PIXELIFY_TEXT } from "../src/charset.ts";
 
 describe("FREDOKA_TEXT", () => {
@@ -32,6 +33,10 @@ describe("FREDOKA_TEXT", () => {
 
   it("covers the Latin Extended-A letters upstream Fredoka actually has a glyph for", () => {
     for (const ch of "ıŁłŒœŠšŸŽž") expect(FREDOKA_TEXT).toContain(ch);
+  });
+
+  it("covers every character a player name may use (CC-2.4)", () => {
+    for (const ch of NAME_CHARACTERS) expect(FREDOKA_TEXT).toContain(ch);
   });
 });
 
