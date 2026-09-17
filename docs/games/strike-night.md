@@ -108,7 +108,7 @@ Research on controls and physics:
 
    The score is final when the frame ends. There are no bonus rolls in the last frame. A perfect match is 30 × frames: 300 for 1 player, 90 for 5 to 8.
 6. **Turn timer.** Every roll has 20,000 ms from the start of `lineup`. A `bowl` counts if its `atMs` is at or before the deadline. If nothing counts by 500 ms after the deadline, the game bowls for the player: their current position, `speed` 0.3, `angle` 0, `spin` 0. That's an auto-roll. It scores like any roll.
-7. **Away players.** A player whose last 2 rolls were auto-rolls is away. Their next rolls get 5,000 ms instead of 20,000. Any accepted input from them (`move`, `grip` or `bowl`) clears away, and that lineup's deadline moves to 15,000 ms after the input, never earlier than it was. A dropped phone then costs about 8 seconds per roll instead of 20.
+7. **Away players.** A player whose last 2 rolls were auto-rolls is away. Their next rolls get 5,000 ms instead of 20,000. Any accepted input from them (`move`, `grip` or `bowl`) clears away, and that lineup's deadline moves to 15,000 ms after the input, never earlier than it was. A dropped phone then holds up each roll for about 5.5 s of lining up instead of 20.5 s.
 8. **Match end.** After the last player's last frame, or when no seated players remain.
 9. **Placements** (`outcome`). Sort by total points, most first. Break ties with more strikes, then more spares. Players still tied share a place. `score` is the points total.
 10. **Players leaving.** When a seat expires (`onPlayerLeft`), the player keeps their points and bowls no more frames. If they were in `lineup`, the turn passes at once. If their ball is rolling, the roll finishes and counts, then the turn passes.
@@ -132,7 +132,7 @@ stateDiagram-v2
 |---|---|---|---|
 | `intro` | 3,000 ms | Approach shot. Title chip "Strike Night · 4 frames". Bottom panel: "Hold the ball, swing, let go". | Everyone `sn-watch`. The first bowler gets `sn-next`. |
 | `lineup` | Until a `bowl` is accepted. At most 20,000 ms plus the 500 ms wait (5,000 ms for an away player). | Approach shot. On roll 1, "Noor is up" in the bottom panel and the bowler's chip lifts. The bowler's Pip slides to each `move` and lifts the ball on `grip`. On roll 2, the pin map shows the standing pins. A clock chip counts down the last 5 seconds with a tick each second. | Bowler `sn-bowl`, next bowler `sn-next`, everyone else `sn-watch` |
-| `rolling` | From release until the pins settle. About 2 to 8 seconds, typically 4.5. | The ball rolls up the lane. When it passes 13.5 m the TV cuts to the pin shot. Pins tumble. | Bowler on the local "Ball away!" state, everyone else unchanged |
+| `rolling` | From release until the pins settle. About 2 to 8 seconds, typically 4.5. | The ball rolls up the lane. When it passes 16 m the TV cuts to the pin shot. Pins tumble. | Bowler on the local "Ball away!" state, everyone else unchanged |
 | `result` | 1,500 ms, or 2,500 ms with a callout | The pin count pops over the deck ("9"). STRIKE!, SPARE! or TURKEY! when earned. After roll 1, the sweep bar clears the fallen pins. When the frame is over, its score pops on the bowler's chip. | Bowler `sn-result` |
 | `frameEnd` | 2,500 ms, 4,000 ms after the last frame | Scorecard overlay with every player's frame marks and totals. Bottom panel: "Noor leads with 72". | Unchanged. The next `lineup` batch brings the new totals. |
 
@@ -169,7 +169,7 @@ When a `bowl` is accepted (or an auto-roll fires), with `x`, `speed`, `angle` an
 
 What that means for a player:
 
-- **Fast is straighter, not stronger.** A full-speed ball reaches the pins in 2.2 s, a slow one in 4.8 s. Both hook the same distance, so the line only depends on where you stand, how straight you swing and how much you twist.
+- **Speed doesn't change the hook.** A full-speed ball reaches the pins in 2.2 s, a slow one in 4.8 s. Both hook the same distance, so the line only depends on where you stand, how straight you swing and how much you twist.
 - **The pocket.** Hitting between the head pin and the pin behind it on either side, 6 to 10 cm from the centre, strikes about half the time. Straight into the head pin usually leaves 3 or 4 pins.
 - **Hook from the edge.** Standing near the right edge and twisting left brings the ball back into the pocket, like a real hook. Left-handers mirror it.
 
@@ -326,10 +326,10 @@ Anything else is ignored, including a `bowl` that arrives after the auto-roll.
 | World | 480×270, integer scaled, pixel art. A wooden lane under a dusky ceiling with warm lights, two neighbouring lanes half visible at the sides. |
 | Scene palette | `alley`, which already exists. See [Scene palette: alley](#scene-palette-alley). |
 | Approach shot | For `intro`, `lineup` and the start of `rolling`. The lane in perspective from behind the foul line, with `z = y + 6.1`, `s = 925 / z` px per metre, `sx = 240 + (x − 0.527) × s`, `sy = 48 + 1171 / z`. The foul line is at y = 240 with the lane 160 px wide. The head pin is at y = 96 with the lane 40 px wide. Seven Ink target arrows sit 4.57 m (15 ft) down the lane. |
-| Pin shot | Cut to it when the ball passes `y = 13.5`, until `result` ends. The last few metres and the deck from above, with `z = y − 7.56`, `s = 1832 / z`, `sx = 240 + (x − 0.527) × s`, `sy = 1933 / z − 30`. The head pin is at (240, 150), pins are about 20 px wide and rows 12 px apart. The ball enters from the bottom edge. |
+| Pin shot | Cut to it when the ball passes `y = 16`, until `result` ends. The last few metres and the deck from above and behind, with `z = y − 7.56`, `s = 1832 / z` px per metre across the lane, `sx = 240 + (x − 0.527) × s`, and a flat depth scale `sy = 170 − (y − 18.29) × 45`. The head pin stands at (240, 170), the back row at y = 134, pins are about 20 px wide and pin rows are 12 px apart, so the tops of the back pins stay below y = 95. The ball enters from the bottom edge at `y ≈ 16.1`. |
 | Players | World Pips. The bowler stands on the approach beside the ball's position, holding the ball at their side, and lifts it on `grip`. The Pip spec has no back view, so Pips face the couch as in Target Range. The other players sit on a bench at the lower left in seat order, and the next bowler stands at the end of the bench. |
 | Pins | Drawn upright: an 8×16 frame in the approach shot, 24×40 in the pin shot. A falling pin plays 3 tumble frames in the direction it's moving, then lies flat. Down pins stay on the deck until the sweep. |
-| Ball | Sky with a Chalk shine and an Ink outline, in 16×16, 8×8 and 4×4 frames chosen by `s`, with 4 roll frames at a rate that follows the speed. |
+| Ball | Sky with a Chalk shine and an Ink outline, in 32×32, 16×16, 8×8 and 4×4 frames, the nearest to `0.216 × s`, with 4 roll frames at a rate that follows the speed. In the approach shot the ball is capped at 16×16, so a ball near the foul line never looks bigger than the 16×24 bowler. In the pin shot it is 32×32 against 20 px pins, the real size ratio. |
 | Overlays | From `@couchcade/stage`: scoreboard with player chips and totals, the round counter chip showing "Frame 2/4", callouts, room code panel. The bottom instruction panel and the clock chip follow Quick Draw's game-local panel until the stage package has one. The pin map and scorecard are game-local overlay drawings with stage helpers. |
 | Callouts | `STRIKE!` for 10 on roll 1, `TURKEY!` instead for a player's third strike in a row, `SPARE!` for a spare. No callout for a gutter or a split, so nobody is singled out. |
 | Expressions | On `result`, the bowler's Pip looks happy after a strike or spare and surprised after a gutter. The bench is neutral. Nobody looks sad. |
@@ -369,7 +369,7 @@ Strike Night follows the CC-4.11 rule in platform.md, [TV rendering](../architec
 | Seat expires mid-match | `onPlayerLeft` keeps the player's points and skips their remaining frames. With no seated players left, the match ends with placements. |
 | Late joiner | Gets a seat and waits on the platform `next-game` screen. They play from the next match. |
 | Audience | Sees the platform `audience` screen and can't send input. |
-| TV refresh or deploy mid-frame | The frame in progress is lost. `snapshot` stores `{ f, pts, st, sp, fr, xs }` at each `frameEnd`: completed frames, totals, strikes, spares, frame scores and positions, about 250 bytes for 8 players. `restore` resumes at the first bowler of the next frame. |
+| TV refresh or deploy mid-frame | The frame in progress is lost. `snapshot` stores `{ f, pts, st, sp, fr }` at each `frameEnd`: completed frames, totals, strikes, spares and frame scores, about 200 bytes for 8 players. It holds no positions (session-flow.md snapshot rule 4). `restore` resumes at the first bowler of the next frame, with every player back at `x = 0`. |
 | Bowl released just before the deadline | Counts if `atMs` is at or before the deadline. It arrives within the 500 ms wait. |
 | `bowl` from an earlier turn arrives late | Dropped, because `payload.turn` doesn't match. |
 | `move` or `grip` still pending when `bowl` goes out | `fire` goes first. The late `set` values arrive during `rolling` and are ignored. |
