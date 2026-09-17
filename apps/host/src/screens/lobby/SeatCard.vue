@@ -1,10 +1,14 @@
 <script setup lang="ts">
+import { CcButton } from "@couchcade/ui";
 import { computed } from "vue";
 import type { Seat } from "./lobby-state.ts";
 import PlayerShape from "./PlayerShape.vue";
 
-// One of the 8 lobby cards. An empty seat previews the shape the next player gets.
-const props = defineProps<{ seat: Seat; isVip: boolean }>();
+// One of the 8 lobby cards. An empty seat previews the shape the next player gets. Hovering or
+// focusing a player's card shows the 64px Kick button in place of the status line
+// (docs/design/platform-screens.md, "Join and lobby").
+const props = defineProps<{ seat: Seat; isVip: boolean; canKick: boolean }>();
+defineEmits<{ kick: [id: string] }>();
 
 const colour = computed(() => `var(--cc-player-${props.seat.style.id})`);
 const status = computed(() => {
@@ -28,7 +32,23 @@ const status = computed(() => {
     />
     <p v-if="seat.player" class="name">{{ seat.player.name }}</p>
     <p v-else class="name small">Slot {{ seat.slot + 1 }}</p>
-    <p class="status" :class="{ tag: isVip && seat.player?.connected }">{{ status }}</p>
+    <div class="foot">
+      <p class="status" :class="{ tag: isVip && seat.player?.connected }">{{ status }}</p>
+      <!-- Screen readers hear "Kick Ana". The label falls through to the <button>; strict templates
+           only type-check declared props, so it is bound as an object. -->
+      <CcButton
+        v-if="seat.player"
+        class="kick"
+        variant="stop"
+        screen="tv"
+        small
+        :disabled="!canKick"
+        v-bind="{ 'aria-label': `Kick ${seat.player.name}` }"
+        @press="$emit('kick', seat.player.id)"
+      >
+        Kick
+      </CcButton>
+    </div>
   </article>
 </template>
 
@@ -45,6 +65,11 @@ const status = computed(() => {
   border-radius: var(--cc-radius-panel);
   box-shadow: var(--cc-depth-panel);
   min-width: 0;
+}
+.seat:not(.empty):hover,
+.seat:not(.empty):focus-within {
+  outline: var(--cc-focus-ring-width) solid var(--cc-sunny);
+  outline-offset: var(--cc-focus-ring-offset);
 }
 .seat.empty {
   background: var(--cc-sky);
@@ -81,5 +106,25 @@ const status = computed(() => {
   background: var(--cc-sky);
   border: var(--cc-outline-tv) solid var(--cc-ink);
   border-radius: var(--cc-radius-tag);
+}
+/* The status and the Kick button share one spot, so the card never changes height. */
+.foot {
+  display: grid;
+  place-items: center;
+  max-width: 100%;
+}
+.foot > * {
+  grid-area: 1 / 1;
+}
+.kick {
+  opacity: 0;
+}
+.seat:hover .kick,
+.seat:focus-within .kick {
+  opacity: 1;
+}
+.seat:hover .foot:has(.kick) .status,
+.seat:focus-within .foot:has(.kick) .status {
+  visibility: hidden;
 }
 </style>

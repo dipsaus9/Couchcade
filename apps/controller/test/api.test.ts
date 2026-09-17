@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { joinFailureFor, requestJoin, requestRejoin, type FetchFn } from "../src/join/api.ts";
+import { noticeCopy } from "../src/join/copy.ts";
 
 const joined = { playerId: "ABCDEFGH", name: "Sam", ticket: "t.sig", rejoinToken: "r.sig" };
 
@@ -89,5 +90,19 @@ describe("requestRejoin", () => {
       ok: false,
       failure: "unavailable",
     });
+  });
+});
+
+describe("locked room", () => {
+  it("tells a new joiner the room is locked, in the referee voice", async () => {
+    const result = await requestJoin(
+      "BEAN",
+      { name: "Sam", turnstile: "" },
+      answer(423, { error: "room-locked" }),
+    );
+    if (result.ok) throw new Error("expected a failed join");
+    expect(noticeCopy({ kind: "join-failed", failure: result.failure })).toBe(
+      "Room is locked. Ask the host to unlock it, then try again.",
+    );
   });
 });

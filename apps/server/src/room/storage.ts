@@ -8,8 +8,8 @@ import {
 
 /**
  * The room's SQLite tables (docs/architecture/platform.md, "Room storage"). The room writes only
- * on create, join, leave, seat release, profile change, phase change and flood
- * revocation, never per message. CC-2.6 sets `kicked`, and CC-3.5 adds the `snapshot` table.
+ * on create, join, leave, seat release, profile change, kick, lock, phase change and flood
+ * revocation, never per message. CC-3.5 adds the `snapshot` table.
  *
  * Tables are created by `create()`, not on start, so a socket or request that reaches a room that
  * was never created leaves no tables behind.
@@ -60,6 +60,8 @@ export interface PlayerRecord {
   released: boolean;
   /** True once the player's socket flooded. Their rejoin token no longer works. */
   revoked: boolean;
+  /** True once the host kicked the player. Their rejoin token no longer works. */
+  kicked: boolean;
 }
 
 type MetaRow = {
@@ -80,9 +82,10 @@ type PlayerRow = {
   left_at: number | null;
   released: number;
   revoked: number;
+  kicked: number;
 };
 
-const playerColumns = "id, name, slot, profile, joined_at, left_at, released, revoked";
+const playerColumns = "id, name, slot, profile, joined_at, left_at, released, revoked, kicked";
 
 /** Every Pip part at its first option, until the player customises it (CC-6.5). */
 export const defaultProfile: PipProfile = { skin: 0, hair: 0, hairColour: 0 };
@@ -131,6 +134,11 @@ export class RoomStorage {
     };
   }
 
+  /** The host locked or unlocked the room. New joins get 423 while it is locked. */
+  setLocked(locked: boolean): void {
+    this.#sql.exec("UPDATE meta SET locked = ? WHERE id = 1", locked ? 1 : 0);
+  }
+
   setPhase(phase: RoomPhase): void {
     this.#sql.exec("UPDATE meta SET phase = ? WHERE id = 1", phase);
   }
@@ -163,7 +171,7 @@ export class RoomStorage {
   }
 
   /** Records a join. A player who joins again keeps their row, with `left_at` cleared. */
-  savePlayer(player: Omit<PlayerRecord, "leftAt" | "released" | "revoked">): void {
+  savePlayer(player: Omit<PlayerRecord, "leftAt" | "released" | "revoked" | "kicked">): void {
     this.#sql.exec(
       `INSERT INTO players (id, name, slot, profile, joined_at, left_at) VALUES (?, ?, ?, ?, ?, NULL)
        ON CONFLICT (id) DO UPDATE SET name = excluded.name, slot = excluded.slot,
@@ -207,6 +215,18 @@ export class RoomStorage {
   }
 
   /**
+   * The host kicked the player: their seat is released and later connects with their id close with
+   * 4003. One write.
+   */
+  kickPlayer(id: PlayerId, now: number): void {
+    this.#sql.exec(
+      "UPDATE players SET left_at = COALESCE(left_at, ?), released = 1, kicked = 1 WHERE id = ?",
+      now,
+      id,
+    );
+  }
+
+  /**
    * Adds columns that later stories introduced to a room created before them, so a room that lives
    * through a deploy keeps working. Runs once per instance.
    */
@@ -239,6 +259,7 @@ function toPlayerRecord(row: PlayerRow): PlayerRecord {
     leftAt: row.left_at,
     released: row.released === 1,
     revoked: row.revoked === 1,
+    kicked: row.kicked === 1,
   };
 }
 

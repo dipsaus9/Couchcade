@@ -31,6 +31,8 @@ export interface PhoneSession {
   join(draft: JoinDraft): Promise<void>;
   /** Sends a message to the room. Dropped while the phone has no socket. */
   send(message: PhoneToRelayMessage): void;
+  /** Leaves an ended-room screen such as Kicked for an empty join form. */
+  dismissNotice(): void;
   /**
    * Asks for the screen wake lock again unless it is held. Call it inside a tap, such as the motion
    * step's "Tap to enable motion" or "Tap to resume".
@@ -153,6 +155,7 @@ export function createPhoneSession({
     state,
     join,
     send,
+    dismissNotice: () => dispatch({ type: "notice-dismissed" }),
     keepAwake: () => wakeLock?.renew(),
     dispose: () => {
       clock.disconnect();

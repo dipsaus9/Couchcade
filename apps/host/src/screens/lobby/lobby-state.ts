@@ -65,6 +65,14 @@ export function applyRelayMessage(state: LobbyState, message: RelayToHostMessage
   }
 }
 
+/**
+ * The host locked or unlocked the room. The relay doesn't echo `room:lock`, so the TV applies it
+ * itself, and the next `room:welcome` carries the stored value.
+ */
+export function setLocked(state: LobbyState, locked: boolean): LobbyState {
+  return state.locked === locked ? state : { ...state, locked };
+}
+
 /** The 8 seats in slot order. */
 export function seats(state: LobbyState): Seat[] {
   return playerStyles.slice(0, seatCount).map((style, slot) => ({

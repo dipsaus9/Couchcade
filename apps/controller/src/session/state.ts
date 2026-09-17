@@ -56,7 +56,9 @@ export type PhoneEvent =
   | { type: "socket-open" }
   | { type: "socket-lost" }
   | { type: "message"; message: RelayToPhoneMessage }
-  | { type: "ended"; reason: EndReason };
+  | { type: "ended"; reason: EndReason }
+  /** "Join another room" after an ended room: an empty join form, the name kept. */
+  | { type: "notice-dismissed" };
 
 /** Which screen the phone shows. `showsGameController` decides about game controllers. */
 export type PhoneScreen =
@@ -104,6 +106,13 @@ export function reduce(state: PhoneState, event: PhoneEvent): PhoneState {
       return { ...state, online: event.type === "socket-open" };
     case "message":
       return onMessage(state, event.message);
+    case "notice-dismissed":
+      if (state.status !== "join" || state.notice === null) return state;
+      return {
+        ...state,
+        draft: { code: "", name: state.draft.name, codeFromUrl: false },
+        notice: null,
+      };
     case "ended": {
       if (state.status === "join") return state;
       const { code } = state.session;
