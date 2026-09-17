@@ -1,0 +1,1128 @@
+{
+  "recording": {
+    "gameId": "target-range",
+    "seed": 20260917,
+    "players": [
+      {
+        "id": "AAAAAAAA",
+        "name": "Player 1",
+        "slot": 0,
+        "profile": {
+          "skin": 0,
+          "hair": 0,
+          "hairColour": 0
+        },
+        "joinedAt": 1789516800000,
+        "connected": true
+      },
+      {
+        "id": "BBBBBBBB",
+        "name": "Player 2",
+        "slot": 1,
+        "profile": {
+          "skin": 1,
+          "hair": 1,
+          "hairColour": 1
+        },
+        "joinedAt": 1789516801000,
+        "connected": true
+      },
+      {
+        "id": "CCCCCCCC",
+        "name": "Player 3",
+        "slot": 2,
+        "profile": {
+          "skin": 2,
+          "hair": 2,
+          "hairColour": 2
+        },
+        "joinedAt": 1789516802000,
+        "connected": true
+      }
+    ],
+    "events": [
+      {
+        "tick": 218,
+        "playerId": "AAAAAAAA",
+        "input": {
+          "type": "aim",
+          "payload": {
+            "aim": [
+              [-133, 0.13, 0.3],
+              [0, 0.15, 0.29]
+            ]
+          }
+        },
+        "atMs": 3499.9999999999995
+      },
+      {
+        "tick": 248,
+        "playerId": "AAAAAAAA",
+        "input": {
+          "type": "aim",
+          "payload": {
+            "aim": [
+              [-133, 0.13, 0.3],
+              [0, 0.15, 0.29]
+            ]
+          }
+        },
+        "atMs": 3999.9999999999995
+      },
+      {
+        "tick": 278,
+        "playerId": "AAAAAAAA",
+        "input": {
+          "type": "shoot",
+          "payload": {
+            "volley": 1,
+            "aim": {
+              "yaw": 0.15,
+              "pitch": 0.29
+            },
+            "power": 1
+          }
+        },
+        "atMs": 4500
+      },
+      {
+        "tick": 278,
+        "playerId": "BBBBBBBB",
+        "input": {
+          "type": "aim",
+          "payload": {
+            "aim": [
+              [-133, 0.14, 0.29],
+              [0, 0.16, 0.28]
+            ]
+          }
+        },
+        "atMs": 4500
+      },
+      {
+        "tick": 308,
+        "playerId": "BBBBBBBB",
+        "input": {
+          "type": "aim",
+          "payload": {
+            "aim": [
+              [-133, 0.14, 0.29],
+              [0, 0.16, 0.28]
+            ]
+          }
+        },
+        "atMs": 5000
+      },
+      {
+        "tick": 338,
+        "playerId": "BBBBBBBB",
+        "input": {
+          "type": "shoot",
+          "payload": {
+            "volley": 1,
+            "aim": {
+              "yaw": 0.16,
+              "pitch": 0.28
+            },
+            "power": 0.8
+          }
+        },
+        "atMs": 5500
+      },
+      {
+        "tick": 398,
+        "playerId": "CCCCCCCC",
+        "input": {
+          "type": "aim",
+          "payload": {
+            "aim": [
+              [-133, 0.17, 0.39],
+              [0, 0.19, 0.38]
+            ]
+          }
+        },
+        "atMs": 6500
+      },
+      {
+        "tick": 428,
+        "playerId": "CCCCCCCC",
+        "input": {
+          "type": "aim",
+          "payload": {
+            "aim": [
+              [-133, 0.17, 0.39],
+              [0, 0.19, 0.38]
+            ]
+          }
+        },
+        "atMs": 7000
+      },
+      {
+        "tick": 458,
+        "playerId": "CCCCCCCC",
+        "input": {
+          "type": "shoot",
+          "payload": {
+            "volley": 1,
+            "aim": {
+              "yaw": 0.19,
+              "pitch": 0.38
+            },
+            "power": 0.5
+          }
+        },
+        "atMs": 7500
+      },
+      {
+        "tick": 698,
+        "playerId": "AAAAAAAA",
+        "input": {
+          "type": "shoot",
+          "payload": {
+            "volley": 2,
+            "aim": {
+              "yaw": 0.15,
+              "pitch": 0.29
+            },
+            "power": 1
+          }
+        },
+        "atMs": 11500.000000000013
+      },
+      {
+        "tick": 758,
+        "playerId": "BBBBBBBB",
+        "input": {
+          "type": "shoot",
+          "payload": {
+            "volley": 2,
+            "aim": {
+              "yaw": 0.17,
+              "pitch": 0.28
+            },
+            "power": 0.8
+          }
+        },
+        "atMs": 12500.000000000013
+      },
+      {
+        "tick": 878,
+        "playerId": "CCCCCCCC",
+        "input": {
+          "type": "shoot",
+          "payload": {
+            "volley": 2,
+            "aim": {
+              "yaw": 0.19,
+              "pitch": 0.38
+            },
+            "power": 0.5
+          }
+        },
+        "atMs": 14500.000000000013
+      },
+      {
+        "tick": 1118,
+        "playerId": "AAAAAAAA",
+        "input": {
+          "type": "shoot",
+          "payload": {
+            "volley": 3,
+            "aim": {
+              "yaw": 0.15,
+              "pitch": 0.29
+            },
+            "power": 1
+          }
+        },
+        "atMs": 18499.99999999977
+      },
+      {
+        "tick": 1178,
+        "playerId": "BBBBBBBB",
+        "input": {
+          "type": "shoot",
+          "payload": {
+            "volley": 3,
+            "aim": {
+              "yaw": 0.17,
+              "pitch": 0.28
+            },
+            "power": 0.8
+          }
+        },
+        "atMs": 19499.99999999977
+      },
+      {
+        "tick": 1298,
+        "playerId": "CCCCCCCC",
+        "input": {
+          "type": "shoot",
+          "payload": {
+            "volley": 3,
+            "aim": {
+              "yaw": 0.19,
+              "pitch": 0.38
+            },
+            "power": 0.5
+          }
+        },
+        "atMs": 21499.99999999977
+      },
+      {
+        "tick": 1778,
+        "playerId": "BBBBBBBB",
+        "input": {
+          "type": "aim",
+          "payload": {
+            "aim": [
+              [-133, -0.17, 0.19],
+              [0, -0.15, 0.18]
+            ]
+          }
+        },
+        "atMs": 29500.00000000068
+      },
+      {
+        "tick": 1808,
+        "playerId": "AAAAAAAA",
+        "input": {
+          "type": "aim",
+          "payload": {
+            "aim": [
+              [-133, -0.18, 0.19],
+              [0, -0.16, 0.18]
+            ]
+          }
+        },
+        "atMs": 30000.00000000068
+      },
+      {
+        "tick": 1808,
+        "playerId": "BBBBBBBB",
+        "input": {
+          "type": "aim",
+          "payload": {
+            "aim": [
+              [-133, -0.17, 0.19],
+              [0, -0.15, 0.18]
+            ]
+          }
+        },
+        "atMs": 30000.00000000068
+      },
+      {
+        "tick": 1838,
+        "playerId": "AAAAAAAA",
+        "input": {
+          "type": "aim",
+          "payload": {
+            "aim": [
+              [-133, -0.18, 0.19],
+              [0, -0.16, 0.18]
+            ]
+          }
+        },
+        "atMs": 30500.00000000068
+      },
+      {
+        "tick": 1838,
+        "playerId": "BBBBBBBB",
+        "input": {
+          "type": "lower",
+          "payload": {
+            "volley": 4
+          }
+        },
+        "atMs": 30500.00000000068
+      },
+      {
+        "tick": 1868,
+        "playerId": "AAAAAAAA",
+        "input": {
+          "type": "shoot",
+          "payload": {
+            "volley": 4,
+            "aim": {
+              "yaw": -0.16,
+              "pitch": 0.18
+            },
+            "power": 1
+          }
+        },
+        "atMs": 31000.00000000068
+      },
+      {
+        "tick": 1928,
+        "playerId": "BBBBBBBB",
+        "input": {
+          "type": "aim",
+          "payload": {
+            "aim": [
+              [-133, -0.17, 0.19],
+              [0, -0.15, 0.18]
+            ]
+          }
+        },
+        "atMs": 32000.00000000068
+      },
+      {
+        "tick": 1958,
+        "playerId": "BBBBBBBB",
+        "input": {
+          "type": "aim",
+          "payload": {
+            "aim": [
+              [-133, -0.17, 0.19],
+              [0, -0.15, 0.18]
+            ]
+          }
+        },
+        "atMs": 32500.00000000068
+      },
+      {
+        "tick": 1988,
+        "playerId": "BBBBBBBB",
+        "input": {
+          "type": "shoot",
+          "payload": {
+            "volley": 4,
+            "aim": {
+              "yaw": -0.15,
+              "pitch": 0.18
+            },
+            "power": 0.8
+          }
+        },
+        "atMs": 33000.000000000684
+      },
+      {
+        "tick": 1988,
+        "playerId": "CCCCCCCC",
+        "input": {
+          "type": "aim",
+          "payload": {
+            "aim": [
+              [-133, -0.15, 0.32],
+              [0, -0.13, 0.31]
+            ]
+          }
+        },
+        "atMs": 33000.000000000684
+      },
+      {
+        "tick": 2018,
+        "playerId": "CCCCCCCC",
+        "input": {
+          "type": "aim",
+          "payload": {
+            "aim": [
+              [-133, -0.15, 0.32],
+              [0, -0.13, 0.31]
+            ]
+          }
+        },
+        "atMs": 33500.000000000684
+      },
+      {
+        "tick": 2048,
+        "playerId": "CCCCCCCC",
+        "input": {
+          "type": "shoot",
+          "payload": {
+            "volley": 4,
+            "aim": {
+              "yaw": -0.13,
+              "pitch": 0.31
+            },
+            "power": 0.5
+          }
+        },
+        "atMs": 34000.000000000684
+      },
+      {
+        "tick": 2301,
+        "playerId": "AAAAAAAA",
+        "input": {
+          "type": "shoot",
+          "payload": {
+            "volley": 5,
+            "aim": {
+              "yaw": -0.16,
+              "pitch": 0.18
+            },
+            "power": 1
+          }
+        },
+        "atMs": 38216.66666666712
+      },
+      {
+        "tick": 2361,
+        "playerId": "BBBBBBBB",
+        "input": {
+          "type": "shoot",
+          "payload": {
+            "volley": 5,
+            "aim": {
+              "yaw": -0.16,
+              "pitch": 0.18
+            },
+            "power": 0.8
+          }
+        },
+        "atMs": 39216.66666666712
+      },
+      {
+        "tick": 2481,
+        "playerId": "CCCCCCCC",
+        "input": {
+          "type": "shoot",
+          "payload": {
+            "volley": 5,
+            "aim": {
+              "yaw": -0.13,
+              "pitch": 0.31
+            },
+            "power": 0.5
+          }
+        },
+        "atMs": 41216.66666666712
+      },
+      {
+        "tick": 2734,
+        "playerId": "AAAAAAAA",
+        "input": {
+          "type": "shoot",
+          "payload": {
+            "volley": 6,
+            "aim": {
+              "yaw": -0.13,
+              "pitch": 0.18
+            },
+            "power": 1
+          }
+        },
+        "atMs": 45433.33333333274
+      },
+      {
+        "tick": 2794,
+        "playerId": "BBBBBBBB",
+        "input": {
+          "type": "shoot",
+          "payload": {
+            "volley": 6,
+            "aim": {
+              "yaw": -0.12,
+              "pitch": 0.18
+            },
+            "power": 0.8
+          }
+        },
+        "atMs": 46433.33333333274
+      },
+      {
+        "tick": 3784,
+        "playerId": "AAAAAAAA",
+        "input": {
+          "type": "shoot",
+          "payload": {
+            "volley": 7,
+            "aim": {
+              "yaw": -0.22,
+              "pitch": 0.16
+            },
+            "power": 1
+          }
+        },
+        "atMs": 62933.33333333019
+      },
+      {
+        "tick": 3844,
+        "playerId": "BBBBBBBB",
+        "input": {
+          "type": "shoot",
+          "payload": {
+            "volley": 7,
+            "aim": {
+              "yaw": -0.21,
+              "pitch": 0.18
+            },
+            "power": 0.8
+          }
+        },
+        "atMs": 63933.33333333019
+      },
+      {
+        "tick": 3964,
+        "playerId": "CCCCCCCC",
+        "input": {
+          "type": "shoot",
+          "payload": {
+            "volley": 7,
+            "aim": {
+              "yaw": -0.21,
+              "pitch": 0.36
+            },
+            "power": 0.5
+          }
+        },
+        "atMs": 65933.3333333302
+      },
+      {
+        "tick": 4230,
+        "playerId": "AAAAAAAA",
+        "input": {
+          "type": "shoot",
+          "payload": {
+            "volley": 8,
+            "aim": {
+              "yaw": -0.14,
+              "pitch": 0.16
+            },
+            "power": 1
+          }
+        },
+        "atMs": 70366.66666666367
+      },
+      {
+        "tick": 4290,
+        "playerId": "BBBBBBBB",
+        "input": {
+          "type": "shoot",
+          "payload": {
+            "volley": 8,
+            "aim": {
+              "yaw": -0.12,
+              "pitch": 0.18
+            },
+            "power": 0.8
+          }
+        },
+        "atMs": 71366.66666666367
+      },
+      {
+        "tick": 4410,
+        "playerId": "CCCCCCCC",
+        "input": {
+          "type": "shoot",
+          "payload": {
+            "volley": 8,
+            "aim": {
+              "yaw": -0.09,
+              "pitch": 0.36
+            },
+            "power": 0.5
+          }
+        },
+        "atMs": 73366.66666666367
+      },
+      {
+        "tick": 4616,
+        "playerId": "AAAAAAAA",
+        "input": {
+          "type": "aim",
+          "payload": {
+            "aim": [
+              [-133, -0.24, 0.17],
+              [0, -0.22, 0.16]
+            ]
+          }
+        },
+        "atMs": 76799.99999999917
+      },
+      {
+        "tick": 4646,
+        "playerId": "AAAAAAAA",
+        "input": {
+          "type": "aim",
+          "payload": {
+            "aim": [
+              [-133, -0.24, 0.17],
+              [0, -0.22, 0.16]
+            ]
+          }
+        },
+        "atMs": 77299.99999999917
+      },
+      {
+        "tick": 4676,
+        "playerId": "AAAAAAAA",
+        "input": {
+          "type": "shoot",
+          "payload": {
+            "volley": 9,
+            "aim": {
+              "yaw": -0.22,
+              "pitch": 0.16
+            },
+            "power": 1
+          }
+        },
+        "atMs": 77799.99999999917
+      },
+      {
+        "tick": 4676,
+        "playerId": "BBBBBBBB",
+        "input": {
+          "type": "aim",
+          "payload": {
+            "aim": [
+              [-133, -0.22, 0.19],
+              [0, -0.2, 0.18]
+            ]
+          }
+        },
+        "atMs": 77799.99999999917
+      },
+      {
+        "tick": 4706,
+        "playerId": "BBBBBBBB",
+        "input": {
+          "type": "aim",
+          "payload": {
+            "aim": [
+              [-133, -0.22, 0.19],
+              [0, -0.2, 0.18]
+            ]
+          }
+        },
+        "atMs": 78299.99999999917
+      },
+      {
+        "tick": 4736,
+        "playerId": "BBBBBBBB",
+        "input": {
+          "type": "shoot",
+          "payload": {
+            "volley": 9,
+            "aim": {
+              "yaw": -0.2,
+              "pitch": 0.18
+            },
+            "power": 0.8
+          }
+        },
+        "atMs": 78799.99999999917
+      },
+      {
+        "tick": 5096,
+        "playerId": "CCCCCCCC",
+        "input": {
+          "type": "aim",
+          "payload": {
+            "aim": [
+              [-133, -0.23, 0.37],
+              [0, -0.21, 0.36]
+            ]
+          }
+        },
+        "atMs": 84799.99999999917
+      },
+      {
+        "tick": 5126,
+        "playerId": "CCCCCCCC",
+        "input": {
+          "type": "aim",
+          "payload": {
+            "aim": [
+              [-133, -0.23, 0.37],
+              [0, -0.21, 0.36]
+            ]
+          }
+        },
+        "atMs": 85299.99999999917
+      },
+      {
+        "tick": 5168,
+        "playerId": "CCCCCCCC",
+        "input": {
+          "type": "shoot",
+          "payload": {
+            "volley": 9,
+            "aim": {
+              "yaw": -0.21,
+              "pitch": 0.36
+            },
+            "power": 0.5
+          }
+        },
+        "atMs": 85999.99999999917
+      },
+      {
+        "tick": 5726,
+        "playerId": "AAAAAAAA",
+        "input": {
+          "type": "shoot",
+          "payload": {
+            "volley": 10,
+            "aim": {
+              "yaw": 0.18,
+              "pitch": 0.04
+            },
+            "power": 1
+          }
+        },
+        "atMs": 95300.00000000426
+      },
+      {
+        "tick": 5786,
+        "playerId": "BBBBBBBB",
+        "input": {
+          "type": "shoot",
+          "payload": {
+            "volley": 10,
+            "aim": {
+              "yaw": 0.19,
+              "pitch": 0.07
+            },
+            "power": 0.8
+          }
+        },
+        "atMs": 96300.00000000426
+      },
+      {
+        "tick": 5906,
+        "playerId": "CCCCCCCC",
+        "input": {
+          "type": "shoot",
+          "payload": {
+            "volley": 10,
+            "aim": {
+              "yaw": 0.25,
+              "pitch": 0.25
+            },
+            "power": 0.5
+          }
+        },
+        "atMs": 98300.00000000426
+      },
+      {
+        "tick": 6172,
+        "playerId": "AAAAAAAA",
+        "input": {
+          "type": "shoot",
+          "payload": {
+            "volley": 11,
+            "aim": {
+              "yaw": 0.04,
+              "pitch": 0.04
+            },
+            "power": 1
+          }
+        },
+        "atMs": 102733.33333333976
+      },
+      {
+        "tick": 6232,
+        "playerId": "BBBBBBBB",
+        "input": {
+          "type": "shoot",
+          "payload": {
+            "volley": 11,
+            "aim": {
+              "yaw": 0.04,
+              "pitch": 0.07
+            },
+            "power": 0.8
+          }
+        },
+        "atMs": 103733.33333333976
+      },
+      {
+        "tick": 6352,
+        "playerId": "CCCCCCCC",
+        "input": {
+          "type": "shoot",
+          "payload": {
+            "volley": 11,
+            "aim": {
+              "yaw": 0.05,
+              "pitch": 0.25
+            },
+            "power": 0.5
+          }
+        },
+        "atMs": 105733.33333333976
+      },
+      {
+        "tick": 6618,
+        "playerId": "AAAAAAAA",
+        "input": {
+          "type": "shoot",
+          "payload": {
+            "volley": 12,
+            "aim": {
+              "yaw": 0.2,
+              "pitch": 0.04
+            },
+            "power": 1
+          }
+        },
+        "atMs": 110166.66666667526
+      },
+      {
+        "tick": 6678,
+        "playerId": "BBBBBBBB",
+        "input": {
+          "type": "shoot",
+          "payload": {
+            "volley": 12,
+            "aim": {
+              "yaw": 0.23,
+              "pitch": 0.07
+            },
+            "power": 0.8
+          }
+        },
+        "atMs": 111166.66666667526
+      },
+      {
+        "tick": 6798,
+        "playerId": "CCCCCCCC",
+        "input": {
+          "type": "shoot",
+          "payload": {
+            "volley": 12,
+            "aim": {
+              "yaw": 0.27,
+              "pitch": 0.25
+            },
+            "power": 0.5
+          }
+        },
+        "atMs": 113166.66666667526
+      }
+    ],
+    "ticks": 7116
+  },
+  "finalState": {
+    "phase": "over",
+    "round": 4,
+    "arrow": 3,
+    "nowMs": 118600.00000001163,
+    "phaseAtMs": 118600.00000001163,
+    "target": {
+      "x": 264,
+      "y": 150
+    },
+    "winds": [-3, 4, -4],
+    "openAtMs": 108166.66666667526,
+    "closeAtMs": 113300.00000001008,
+    "timedOut": false,
+    "arrows": [
+      {
+        "playerId": "AAAAAAAA",
+        "volley": 10,
+        "atMs": 95300.00000000426,
+        "aim": {
+          "yaw": 0.18,
+          "pitch": 0.04
+        },
+        "power": 1,
+        "x": 264,
+        "y": 150.4,
+        "flightMs": 650,
+        "landsAtMs": 95950.00000000426,
+        "points": 10,
+        "landed": true
+      },
+      {
+        "playerId": "BBBBBBBB",
+        "volley": 10,
+        "atMs": 96300.00000000426,
+        "aim": {
+          "yaw": 0.19,
+          "pitch": 0.07
+        },
+        "power": 0.8,
+        "x": 264.4,
+        "y": 151.8,
+        "flightMs": 739,
+        "landsAtMs": 97039.00000000426,
+        "points": 10,
+        "landed": true
+      },
+      {
+        "playerId": "CCCCCCCC",
+        "volley": 10,
+        "atMs": 98300.00000000426,
+        "aim": {
+          "yaw": 0.25,
+          "pitch": 0.25
+        },
+        "power": 0.5,
+        "x": 272.8,
+        "y": 146.1,
+        "flightMs": 929,
+        "landsAtMs": 99229.00000000426,
+        "points": 6,
+        "landed": true
+      },
+      {
+        "playerId": "AAAAAAAA",
+        "volley": 11,
+        "atMs": 102733.33333333976,
+        "aim": {
+          "yaw": 0.04,
+          "pitch": 0.04
+        },
+        "power": 1,
+        "x": 264,
+        "y": 150.4,
+        "flightMs": 650,
+        "landsAtMs": 103383.33333333976,
+        "points": 10,
+        "landed": true
+      },
+      {
+        "playerId": "BBBBBBBB",
+        "volley": 11,
+        "atMs": 103733.33333333976,
+        "aim": {
+          "yaw": 0.04,
+          "pitch": 0.07
+        },
+        "power": 0.8,
+        "x": 266.2,
+        "y": 151.8,
+        "flightMs": 739,
+        "landsAtMs": 104472.33333333976,
+        "points": 9,
+        "landed": true
+      },
+      {
+        "playerId": "CCCCCCCC",
+        "volley": 11,
+        "atMs": 105733.33333333976,
+        "aim": {
+          "yaw": 0.05,
+          "pitch": 0.25
+        },
+        "power": 0.5,
+        "x": 272.9,
+        "y": 146.1,
+        "flightMs": 929,
+        "landsAtMs": 106662.33333333976,
+        "points": 6,
+        "landed": true
+      },
+      {
+        "playerId": "AAAAAAAA",
+        "volley": 12,
+        "atMs": 110166.66666667526,
+        "aim": {
+          "yaw": 0.2,
+          "pitch": 0.04
+        },
+        "power": 1,
+        "x": 264,
+        "y": 150.4,
+        "flightMs": 650,
+        "landsAtMs": 110816.66666667526,
+        "points": 10,
+        "landed": true
+      },
+      {
+        "playerId": "BBBBBBBB",
+        "volley": 12,
+        "atMs": 111166.66666667526,
+        "aim": {
+          "yaw": 0.23,
+          "pitch": 0.07
+        },
+        "power": 0.8,
+        "x": 267.8,
+        "y": 151.8,
+        "flightMs": 739,
+        "landsAtMs": 111905.66666667526,
+        "points": 9,
+        "landed": true
+      },
+      {
+        "playerId": "CCCCCCCC",
+        "volley": 12,
+        "atMs": 113166.66666667526,
+        "aim": {
+          "yaw": 0.27,
+          "pitch": 0.25
+        },
+        "power": 0.5,
+        "x": 271.1,
+        "y": 146.1,
+        "flightMs": 929,
+        "landsAtMs": 114095.66666667526,
+        "points": 7,
+        "landed": true
+      }
+    ],
+    "players": [
+      {
+        "id": "AAAAAAAA",
+        "name": "Player 1",
+        "points": 120,
+        "tens": 12,
+        "left": false,
+        "aiming": false,
+        "aim": [],
+        "result": 10,
+        "last": 10
+      },
+      {
+        "id": "BBBBBBBB",
+        "name": "Player 2",
+        "points": 111,
+        "tens": 4,
+        "left": false,
+        "aiming": false,
+        "aim": [],
+        "result": 9,
+        "last": 9
+      },
+      {
+        "id": "CCCCCCCC",
+        "name": "Player 3",
+        "points": 71,
+        "tens": 0,
+        "left": false,
+        "aiming": false,
+        "aim": [],
+        "result": 7,
+        "last": 7
+      }
+    ],
+    "rng": 4059463425,
+    "roundStart": {
+      "r": 4,
+      "pts": {
+        "AAAAAAAA": 90,
+        "BBBBBBBB": 83,
+        "CCCCCCCC": 52
+      },
+      "tens": {
+        "AAAAAAAA": 9,
+        "BBBBBBBB": 3,
+        "CCCCCCCC": 0
+      },
+      "rng": 2291838809
+    }
+  },
+  "outcome": {
+    "placements": [
+      {
+        "playerId": "AAAAAAAA",
+        "place": 1,
+        "score": 120
+      },
+      {
+        "playerId": "BBBBBBBB",
+        "place": 2,
+        "score": 111
+      },
+      {
+        "playerId": "CCCCCCCC",
+        "place": 3,
+        "score": 71
+      }
+    ]
+  }
+}

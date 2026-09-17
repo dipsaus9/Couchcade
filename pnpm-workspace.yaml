@@ -55,9 +55,12 @@ catalog:
   playwright: ~1.63.0
   "@vitest/browser-playwright": ~4.1.11 # Matches vitest
   "@vue/test-utils": ^2.5.0
+  jsdom: ^28.0.0 # Component tests of game controllers
   "@lhci/cli": ~0.15.1
   dependency-cruiser: ^18.3.0
 
-  # Fonts (CC-4.3)
+  # Fonts (CC-4.3, CC-4.12)
   subset-font: ^2.7.0 # harfbuzzjs (WASM) subsetting, no python/fonttools needed
   "@types/subset-font": ^2.3.0
+  harfbuzzjs: ^0.10.3 # already a subset-font dependency; reused directly to read a WOFF2's cmap (CC-4.12 AC3)
+  fontverter: ^2.0.0 # already a subset-font dependency; decodes the committed WOFF2 back to sfnt for harfbuzzjs (CC-4.12 AC3)

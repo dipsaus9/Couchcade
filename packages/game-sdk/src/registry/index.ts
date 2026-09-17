@@ -93,7 +93,8 @@ function expectEntry(path: string, id: string, entry: unknown, problems: string[
 /**
  * Builds the host registry from an eager glob: `{ "<...>/<id>/src/index.ts": game }`. Throws when
  * a module isn't a valid game (see `checkGameDefinition`), when an id doesn't match its folder, or
- * when two games share an id.
+ * when two games share an id. A game with `hidden: true` is checked the same way but left out, so
+ * an unfinished game is never on the menu and can't be started.
  */
 export function createRegistry(modules: Readonly<Record<string, unknown>>): GameRegistry {
   const games = [...pathsById(Object.keys(modules))]
@@ -102,6 +103,7 @@ export function createRegistry(modules: Readonly<Record<string, unknown>>): Game
       expectEntry(path, id, game, checkGameDefinition(game));
       return game as CouchcadeGame;
     })
+    .filter((game) => game.hidden !== true)
     .toSorted((a, b) => a.title.localeCompare(b.title, "en") || a.id.localeCompare(b.id, "en"));
   const byId = new Map(games.map((game) => [game.id, game]));
 

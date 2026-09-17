@@ -42,14 +42,41 @@ export interface HostSceneData<TState> {
   players: readonly Player[];
   displayLagMs: number;
   reducedMotion: boolean;
+  /**
+   * The room code, such as `BEAN`, so a scene can keep the stage room code panel on screen for
+   * latecomers. The host always passes it; tests and tools may leave it out.
+   */
+  roomCode?: string;
+  /** The URL a phone opens to join this room, such as `https://couchcade.workers.dev/?room=BEAN`. */
+  joinUrl?: string;
 }
 
-export interface ControllerProps<TView, TInput extends GameInput> {
+/**
+ * What the phone's motion step (CC-5.10) settled on for the running game, handed to its controller.
+ *
+ * - `motion`: permission granted and the phone calibrated. The controller feeds `adapter` samples
+ *   through one pose tracker built from `calibration`.
+ * - `touch`: the player chose touch, the browser said no, the phone has no gyroscope, or motion
+ *   stopped mid-game. The runtime switches the value when that happens, so a controller follows it.
+ *
+ * The types are generic because game-sdk (core) may not import `@couchcade/motion` (kit). A
+ * controller names them: `ControllerMotion<MotionAdapter, Calibration>`.
+ */
+export type ControllerMotion<TAdapter = unknown, TCalibration = unknown> =
+  | { mode: "motion"; adapter: TAdapter; calibration: TCalibration }
+  | { mode: "touch" };
+
+export interface ControllerProps<TView, TInput extends GameInput, TMotion = ControllerMotion> {
   screen: string;
   data: TView;
   player: Player;
   /** Stamps `at` in room time. */
   send(input: TInput, eventTimeStamp?: number): void;
+  /**
+   * Set for a game with `needsMotion` once the motion step ran on this phone, absent otherwise.
+   * A motion game treats absent as `touch`, such as after a reload mid-game.
+   */
+  motion?: TMotion;
 }
 
 export interface CouchcadeGame<
@@ -69,6 +96,12 @@ export interface CouchcadeGame<
   needsMotion: boolean;
   /** "desert", "alley", ... */
   scene: ScenePaletteId;
+  /**
+   * true while the game isn't playable end to end yet (no controller, TV scene or bot-match E2E
+   * test). The host registry still checks it but leaves it out, so the menu never lists it and
+   * nothing can start it. The story that registers the game removes the flag.
+   */
+  hidden?: boolean;
   /** Every input is validated before onPlayerInput. */
   inputSchema: ZodMiniType<TInput>;
 
@@ -178,6 +211,8 @@ export function checkGameDefinition(game: unknown): string[] {
   for (const key of ["realtime", "needsMotion"] as const) {
     if (typeof g[key] !== "boolean") problems.push(`${key} is not a boolean`);
   }
+  if (g.hidden !== undefined && typeof g.hidden !== "boolean")
+    problems.push("hidden is not a boolean");
   if (typeof g.scene !== "string" || g.scene === "") problems.push("scene is empty");
 
   const schema = g.inputSchema as { safeParse?: unknown } | undefined;

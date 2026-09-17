@@ -1,4 +1,5 @@
 import type { Rng } from "../rng/index.ts";
+import { BLOCKED_ROOM_CODES } from "./blocklist.ts";
 
 /** Letters a room code can use: A to Z without I and O, which read like 1 and 0 on a TV. */
 export const ROOM_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -7,6 +8,8 @@ export const ROOM_CODE_LENGTH = 4;
 
 const ROOM_CODE_PATTERN = new RegExp(`^[${ROOM_CODE_ALPHABET}]{${ROOM_CODE_LENGTH}}$`);
 
+const blockedCodes = new Set(BLOCKED_ROOM_CODES);
+
 /** `crypto.getRandomValues` exists in browsers, Workers and Node, but not in the ES lib types. */
 type CryptoSource = { getRandomValues<T extends Uint8Array>(array: T): T };
 
@@ -14,16 +17,21 @@ type CryptoSource = { getRandomValues<T extends Uint8Array>(array: T): T };
  * Returns a new room code: 4 uppercase letters from `ROOM_CODE_ALPHABET`.
  *
  * By default the letters come from `crypto.getRandomValues`, so codes can't be predicted. Pass a
- * seeded `Rng` to get repeatable codes, for example in tests.
+ * seeded `Rng` to get repeatable codes, for example in tests. A code on the small NL + EN
+ * blocklist (security.md decision 20) is never returned: it's redrawn, on both paths. The
+ * blocklist is tiny next to the 24^4 possible codes, so the redraw always terminates.
  */
 export function roomCode(rng?: Pick<Rng, "int">): string {
   const nextIndex = rng
     ? () => rng.int(0, ROOM_CODE_ALPHABET.length - 1)
     : secureIndex(ROOM_CODE_ALPHABET.length);
-  let code = "";
-  for (let i = 0; i < ROOM_CODE_LENGTH; i++) {
-    code += ROOM_CODE_ALPHABET[nextIndex()];
-  }
+  let code: string;
+  do {
+    code = "";
+    for (let i = 0; i < ROOM_CODE_LENGTH; i++) {
+      code += ROOM_CODE_ALPHABET[nextIndex()];
+    }
+  } while (blockedCodes.has(code));
   return code;
 }
 

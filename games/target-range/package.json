@@ -1,0 +1,37 @@
+{
+  "name": "@couchcade/game-target-range",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Target Range: point the phone at the TV like a bow, pull down to draw, let go to shoot. Spec in docs/games/target-range.md.",
+  "type": "module",
+  "sideEffects": false,
+  "scripts": {
+    "typecheck": "vue-tsc",
+    "test": "playwright install chromium-headless-shell && vitest run"
+  },
+  "dependencies": {
+    "@couchcade/game-sdk": "workspace:*",
+    "@couchcade/motion": "workspace:*",
+    "@couchcade/protocol": "workspace:*",
+    "@couchcade/stage": "workspace:*",
+    "@couchcade/theme": "workspace:*",
+    "@couchcade/ui": "workspace:*",
+    "@couchcade/utils": "workspace:*",
+    "phaser": "catalog:",
+    "vue": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@couchcade/config": "workspace:*",
+    "@vitejs/plugin-vue": "catalog:",
+    "@vitest/browser-playwright": "catalog:",
+    "@vue/test-utils": "catalog:",
+    "fast-check": "catalog:",
+    "jsdom": "catalog:",
+    "playwright": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:",
+    "vue-tsc": "catalog:"
+  }
+}

@@ -26,6 +26,9 @@ export default defineLibConfig({
       {
         test: {
           name: "browser",
+          // Phaser boots in software WebGL on CI, and two game suites share the runner, so the
+          // 15 s default is too tight for a full round.
+          testTimeout: 60_000,
           include: [browserTests],
           browser: {
             enabled: true,

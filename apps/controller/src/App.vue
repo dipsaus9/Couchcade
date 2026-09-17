@@ -108,6 +108,7 @@ onBeforeUnmount(() => {
       v-else-if="showsGameController(state)"
       :state="state"
       :send-message="session.send"
+      :motion="motionGame"
     />
     <WaitingScreen v-else v-bind="waitingCopy(state)" />
   </main>
