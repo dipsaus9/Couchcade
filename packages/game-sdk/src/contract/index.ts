@@ -42,6 +42,13 @@ export interface HostSceneData<TState> {
   players: readonly Player[];
   displayLagMs: number;
   reducedMotion: boolean;
+  /**
+   * The room code, such as `BEAN`, so a scene can keep the stage room code panel on screen for
+   * latecomers. The host always passes it; tests and tools may leave it out.
+   */
+  roomCode?: string;
+  /** The URL a phone opens to join this room, such as `https://couchcade.workers.dev/?room=BEAN`. */
+  joinUrl?: string;
 }
 
 export interface ControllerProps<TView, TInput extends GameInput> {

@@ -8,6 +8,13 @@ each source page on 16 September 2026.
 Sprites not listed here (`mesa.png`, `tumbleweed.png`, `popgun-bang.png`, `dust-puff.png`, `crow.png`,
 `popgun-sparkle.png`) are drawn from scratch for Couchcade, as the game spec calls for, and need no credit.
 
+The cacti and rocks were re-recoloured in CC-10.9. Recoloured straight from the pack, the cactus's light teal
+greens landed on Sky, so the cacti looked blue, and the rocks' rose shading landed on Signal. Before running
+`pnpm assets:recolour <file> desert` on the original tiles, their colours were pre-shifted within the pack's own
+colours: the cactus body and highlight (`#7BD8C4`, `#9DF8E4`) to the cactus shade `#63B8A6`, which matches Turf,
+and the rock shading (`#C47C71`, `#A35B5F`) to the rock sand `#DFA988`, which matches `#E0A15E`. The cacti are now
+Turf with an Ink outline and the rocks are sand with an Ink outline. The desert palette is unchanged.
+
 | Asset | Author | Source | Licence |
 | --- | --- | --- | --- |
 | Sand ground tile (`assets/sprites/ground-sand.png`, Desert Shooter Pack tile 54) | Kenney | https://kenney.nl/assets/desert-shooter-pack | CC0 |
