@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { CcPanel } from "@couchcade/ui";
 import { computed } from "vue";
 import { joinAddress, joinUrl } from "./join-url.ts";
 import QrCode from "./QrCode.vue";
@@ -11,8 +12,8 @@ const address = computed(() => joinAddress(props.origin));
 </script>
 
 <template>
-  <section class="join" aria-label="Join on your phone">
-    <span class="tab">Join on your phone</span>
+  <!-- CcPanel gives the section its accessible name via the tab (aria-labelledby, as != 'div'). -->
+  <CcPanel class="join" screen="tv" as="section" tab="Join on your phone">
     <QrCode :value="url" :size="360" label="QR code to join this room" />
     <p class="small">Scan with your phone camera</p>
     <p class="body">
@@ -23,34 +24,18 @@ const address = computed(() => joinAddress(props.origin));
       <span v-for="(letter, i) in code" :key="i" class="tile">{{ letter }}</span>
     </p>
     <p class="small">Room code</p>
-  </section>
+  </CcPanel>
 </template>
 
 <style scoped>
 .join {
-  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: var(--cc-space-4);
   width: 520px;
   flex: none;
-  padding: var(--cc-space-7) var(--cc-space-6) var(--cc-space-6);
   text-align: center;
-  background: var(--cc-chalk);
-  border: var(--cc-outline-tv) solid var(--cc-ink);
-  border-radius: var(--cc-radius-panel);
-  box-shadow: var(--cc-depth-panel);
-}
-.tab {
-  position: absolute;
-  top: -26px;
-  left: var(--cc-space-5);
-  padding: var(--cc-space-1) var(--cc-space-4);
-  font: 700 var(--cc-text-small-tv) var(--cc-text-small-font);
-  background: var(--cc-sky);
-  border: var(--cc-outline-tv) solid var(--cc-ink);
-  border-radius: var(--cc-radius-tag);
 }
 .small,
 .body,

@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { seatCount } from "@couchcade/protocol";
 import { players as playerStyles } from "@couchcade/theme";
+import { CcPanel, CcPlayerShape } from "@couchcade/ui";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import type { MenuScreenState } from "../../runtime/host-runtime.ts";
 import { audience, seatedPlayers, vip, type LobbyState } from "../lobby/lobby-state.ts";
-import PlayerShape from "../lobby/PlayerShape.vue";
 import { playerCountLabel, secondsLeft } from "./menu.ts";
 
 // The TV game menu (docs/design/platform-screens.md, "Game menu"; session-flow.md, "Game menu"):
 // every registered game as a card, grey when the player count doesn't fit, and the Sunny focus
-// ring on the game the VIP picked while its countdown runs. CC-4.7 restyles it.
+// ring on the game the VIP picked while its countdown runs.
 const props = defineProps<{
   lobby: LobbyState;
   menu: MenuScreenState;
@@ -72,12 +72,7 @@ const detail = computed(() =>
       <p v-if="watching > 0" class="small">{{ watching }} watching</p>
       <ul class="chips" aria-label="Players">
         <li v-for="{ player, style } in seated" :key="player.id" class="chip">
-          <PlayerShape
-            class="shape"
-            :shape="style.shape"
-            :size="32"
-            :style="{ fill: `var(--cc-player-${style.id})` }"
-          />
+          <CcPlayerShape class="shape" :player="style.id" :size="32" screen="tv" />
           <span class="chip-name">{{ player.name }}</span>
         </li>
       </ul>
@@ -104,14 +99,14 @@ const detail = computed(() =>
     </ul>
 
     <footer class="foot">
-      <div class="panel">
+      <CcPanel class="panel" screen="tv">
         <p class="body">{{ chooser }}</p>
         <p class="small">{{ detail }}</p>
-      </div>
-      <div class="panel code-panel">
+      </CcPanel>
+      <CcPanel class="panel code-panel" screen="tv">
         <p class="small">Room code</p>
         <p class="code">{{ lobby.code }}</p>
-      </div>
+      </CcPanel>
     </footer>
   </section>
 </template>
@@ -173,9 +168,6 @@ const detail = computed(() =>
   border: var(--cc-outline-tv) solid var(--cc-ink);
   border-radius: var(--cc-radius-pill);
   box-shadow: var(--cc-depth-panel);
-}
-.shape {
-  stroke: var(--cc-ink);
 }
 .chip-name {
   font: 700 var(--cc-text-small-tv) var(--cc-text-body-font);
@@ -247,11 +239,6 @@ const detail = computed(() =>
   flex-direction: column;
   justify-content: center;
   gap: var(--cc-space-1);
-  padding: var(--cc-space-5) var(--cc-space-6);
-  background: var(--cc-chalk);
-  border: var(--cc-outline-tv) solid var(--cc-ink);
-  border-radius: var(--cc-radius-panel);
-  box-shadow: var(--cc-depth-panel);
 }
 .panel:first-child {
   flex: 1;

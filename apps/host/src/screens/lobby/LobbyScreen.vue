@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { StoredDisplayLag } from "@couchcade/game-sdk/clock";
 import { seatCount } from "@couchcade/protocol";
+import { CcButton, CcPanel } from "@couchcade/ui";
 import { computed } from "vue";
 import type { ConnectionStatus } from "../../net/relay-socket.ts";
 import JoinPanel from "./JoinPanel.vue";
@@ -35,15 +36,16 @@ const hint = computed(() =>
         {{ connection === "connecting" ? "Connecting…" : "Reconnecting…" }}
       </p>
       <p v-if="displayLag" class="body">TV lag {{ displayLag.ms }} ms</p>
-      <button class="button" type="button" :disabled="!online" @click="$emit('checkTvLag')">
+      <CcButton screen="tv" :disabled="!online" @press="$emit('checkTvLag')">
         Check TV lag
-      </button>
-      <button
-        class="button lock"
-        type="button"
-        :aria-pressed="lobby.locked"
+      </CcButton>
+      <CcButton
+        class="lock"
+        screen="tv"
+        :variant="lobby.locked ? 'primary' : 'quiet'"
+        v-bind="{ 'aria-pressed': lobby.locked }"
         :disabled="!online"
-        @click="$emit('lock', !lobby.locked)"
+        @press="$emit('lock', !lobby.locked)"
       >
         <svg class="icon" viewBox="0 0 40 40" width="40" height="40" aria-hidden="true">
           <path v-if="lobby.locked" d="M12 18 V13 a8 8 0 0 1 16 0 V18" />
@@ -51,11 +53,11 @@ const hint = computed(() =>
           <rect x="7" y="18" width="26" height="18" rx="4" />
         </svg>
         Lock room
-      </button>
-      <button class="button" type="button" @click="$emit('end')">End room</button>
+      </CcButton>
+      <CcButton screen="tv" @press="$emit('end')">End room</CcButton>
     </header>
     <main class="main">
-      <section class="players" aria-label="Players">
+      <CcPanel class="players" screen="tv" as="section" v-bind="{ 'aria-label': 'Players' }">
         <div class="players-head">
           <h1 class="title">Players</h1>
           <p class="count">{{ playerCount }}/{{ seatCount }}</p>
@@ -73,7 +75,7 @@ const hint = computed(() =>
             @kick="$emit('kick', $event)"
           />
         </div>
-      </section>
+      </CcPanel>
       <JoinPanel :code="lobby.code" :origin="origin" />
     </main>
   </div>
@@ -101,20 +103,6 @@ const hint = computed(() =>
 .body {
   margin: 0;
   font: var(--cc-text-body-weight) var(--cc-text-body-tv) var(--cc-text-body-font);
-}
-.button {
-  height: 88px;
-  padding: 0 var(--cc-space-6);
-  font: var(--cc-text-action-weight) var(--cc-text-action-tv) var(--cc-text-action-font);
-  color: var(--cc-ink);
-  background: var(--cc-chalk);
-  border: var(--cc-outline-tv) solid var(--cc-ink);
-  border-radius: var(--cc-radius-pill);
-  box-shadow: var(--cc-depth-rest);
-  cursor: pointer;
-}
-.button[aria-pressed="true"] {
-  background: var(--cc-sunny);
 }
 .lock {
   display: inline-flex;
@@ -144,16 +132,6 @@ const hint = computed(() =>
   border-radius: var(--cc-radius-tag);
   white-space: nowrap;
 }
-.button:disabled {
-  color: var(--cc-ink-45);
-  border-color: var(--cc-ink-20);
-  box-shadow: none;
-  cursor: not-allowed;
-}
-.button:focus-visible {
-  outline: var(--cc-focus-ring-width) solid var(--cc-sunny);
-  outline-offset: var(--cc-focus-ring-offset);
-}
 .main {
   display: flex;
   flex: 1;
@@ -166,11 +144,6 @@ const hint = computed(() =>
   flex-direction: column;
   gap: var(--cc-space-5);
   min-width: 0;
-  padding: var(--cc-space-6);
-  background: var(--cc-chalk);
-  border: var(--cc-outline-tv) solid var(--cc-ink);
-  border-radius: var(--cc-radius-panel);
-  box-shadow: var(--cc-depth-panel);
 }
 .players-head {
   display: flex;
