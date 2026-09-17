@@ -54,6 +54,9 @@ catalogs:
     jsdom:
       specifier: ^28.0.0
       version: 28.1.0
+    nipplejs:
+      specifier: ^1.0.4
+      version: 1.0.4
     oxfmt:
       specifier: ^0.68.0
       version: 0.68.0
@@ -579,6 +582,9 @@ importers:
       '@couchcade/theme':
         specifier: workspace:*
         version: link:../theme
+      nipplejs:
+        specifier: 'catalog:'
+        version: 1.0.4
     devDependencies:
       '@couchcade/config':
         specifier: workspace:*
@@ -2204,6 +2210,9 @@ packages:
     engines: {node: ^18 || >=20}
     hasBin: true
 
+  nipplejs@1.0.4:
+    resolution: {integrity: sha512-YtvRZDuyWQ+tOj0nUjfnZt4ZQmJVWfK9+yPmV5OXpQ4k4AkOGcSfKvSXbPNkV0ERqc4eakkBSZ7/Wyx1y6h/Sg==}
+
   nopt@10.0.1:
     resolution: {integrity: sha512-df3sBr/6ax9hSGuC3CspvLlbnX8cP5L5nZwXF8cGN8l0zSWR6BvzmQ6jPUKjvo6+/xdpkNvEcucBNUdBeeV13g==}
     engines: {node: ^22.22.2 || ^24.15.0 || >=26.0.0}
@@ -3769,6 +3778,8 @@ snapshots:
   nanoid@3.3.19: {}
 
   nanoid@5.1.16: {}
+
+  nipplejs@1.0.4: {}
 
   nopt@10.0.1:
     dependencies:

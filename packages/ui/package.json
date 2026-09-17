@@ -2,7 +2,7 @@
   "name": "@couchcade/ui",
   "version": "0.0.0",
   "private": true,
-  "description": "The Clubhouse UI kit for phones and menus: buttons, panels, player chips and the big action. Tier 3 kit: imports core, theme, protocol and utils only.",
+  "description": "The Clubhouse UI kit for phones and menus: buttons, panels, player chips, the big action and controller input components. Tier 3 kit: imports core, theme, protocol and utils only.",
   "type": "module",
   "sideEffects": [
     "*.vue"
@@ -16,7 +16,8 @@
     "test": "playwright install chromium-headless-shell && vitest run"
   },
   "dependencies": {
-    "@couchcade/theme": "workspace:*"
+    "@couchcade/theme": "workspace:*",
+    "nipplejs": "catalog:"
   },
   "devDependencies": {
     "@couchcade/config": "workspace:*",
