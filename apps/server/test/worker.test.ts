@@ -5,6 +5,7 @@ import type { Room } from "../src/room/room.ts";
 import * as entry from "../src/worker.ts";
 import { roomStub } from "../src/worker.ts";
 import {
+  clientHeaders,
   connect,
   connectHost,
   createRoom,
@@ -117,7 +118,7 @@ describe("worker forwarding", () => {
     const identity = playerIdentity();
     const request = new Request(
       `${origin}/ws/${code}?v=1&_pk=host&ticket=${encodeURIComponent(JSON.stringify(identity))}`,
-      { headers: { Upgrade: "websocket", Origin: origin } },
+      { headers: clientHeaders({ Upgrade: "websocket", Origin: origin }) },
     );
     const impostor = new TestSocket((await worker.fetch(request, env)).webSocket as WebSocket);
     await impostor.expect("room:welcome");
