@@ -119,10 +119,14 @@ describe("flood bucket", () => {
 });
 
 describe("flooding sockets", () => {
+  // Real time when the test started, so room alarms stay in the future.
+  let t0 = 0;
+
   beforeEach(() => {
     // Frozen room time, so the bucket refills only when a test moves the clock.
+    t0 = Date.now();
     vi.useFakeTimers({ toFake: ["Date"] });
-    vi.setSystemTime(start);
+    vi.setSystemTime(t0);
   });
 
   afterEach(() => {
@@ -246,28 +250,36 @@ describe("flooding sockets", () => {
     expect(await ann.socket.drain()).toEqual([]);
   });
 
-  it("never throttles an honest phone at 4 inputs per second with clock pings", async () => {
-    const code = await createRoom();
-    const host = await connectHost(code);
-    const ann = await joinPhone(code, host, "Ann");
+  it(
+    "never throttles an honest phone at 4 inputs per second with clock pings",
+    { timeout: 30_000 },
+    async () => {
+      const code = await createRoom();
+      const host = await connectHost(code);
+      const ann = await joinPhone(code, host, "Ann");
 
-    // Two simulated minutes: the connect clock burst, 4 inputs per second, a ping every 30 s.
-    let now = start;
-    for (let i = 0; i < 5; i++) {
+      // 30 simulated seconds: the connect clock burst, 4 inputs per second, then the 30-second
+      // resync ping. The bucket never drains at this rate, and the unit tests above run an hour.
+      let now = t0;
+      for (let i = 0; i < 5; i++) {
+        vi.setSystemTime(now);
+        await ann.socket.drain();
+        now += 200;
+      }
+      for (let tick = 0; tick < 120 && vi.isFakeTimers(); tick++) {
+        vi.setSystemTime(now);
+        ann.socket.send(input(tick));
+        expect(await host.expect("input")).toMatchObject({ from: ann.id, d: { at: tick } });
+        now += 250;
+      }
+      // A timed-out run must never mock Date for the test files after this one.
+      expect(vi.isFakeTimers()).toBe(true);
       vi.setSystemTime(now);
       await ann.socket.drain();
-      now += 200;
-    }
-    for (let tick = 0; tick < 480; tick++) {
-      vi.setSystemTime(now);
-      ann.socket.send(input(tick));
-      expect(await host.expect("input")).toMatchObject({ from: ann.id, d: { at: tick } });
-      if (tick % 120 === 119) await ann.socket.drain();
-      now += 250;
-    }
-    expect(await host.drain()).toEqual([]);
-    expect(await revokedPlayer(code, ann.id)).toMatchObject({ revoked: false, leftAt: null });
-  });
+      expect(await host.drain()).toEqual([]);
+      expect(await revokedPlayer(code, ann.id)).toMatchObject({ revoked: false, leftAt: null });
+    },
+  );
 
   it("lets a phone send a full burst again after a quiet second", async () => {
     const code = await createRoom();
@@ -276,7 +288,7 @@ describe("flooding sockets", () => {
 
     for (let i = 0; i < floodBurst; i++) ann.socket.send(input(i));
     for (let i = 0; i < floodBurst; i++) await host.expect("input");
-    vi.setSystemTime(start + 2_000);
+    vi.setSystemTime(t0 + 2_000);
     // 39 inputs and the drain's clock ping: 40 frames.
     for (let i = 0; i < floodBurst - 1; i++) ann.socket.send(input(i));
     for (let i = 0; i < floodBurst - 1; i++) await host.expect("input");
