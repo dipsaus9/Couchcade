@@ -1,10 +1,10 @@
 ---
 id: CC-3.8
 title: Add the TV lag calibration screen on the host
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-17 08:29'
+updated_date: '2026-09-17 08:31'
 labels:
   - story
 dependencies:
@@ -76,4 +76,12 @@ Delivery notes (CC-3.8):
 - References amended to the glue files (host runtime/session/App/lobby, controller App/state, tests, new e2e spec).
 - Reduced motion: the flash stays (it is the measurement, a colour change at 1.3 Hz, under the 3 flashes/s limit).
 - Scratch check: a local Playwright run tapping on a timer stored 'TV lag 20 ms' (localhost tap latency), chromium e2e 5/5 and calibration spec on webkit pass.
+
+Review gate (dipsaus-ai:story-reviewer, round 1): pass. Criteria 1-3 met, no scope violations, no findings.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added the TV lag calibration. From the TV lobby, 'Check TV lag' starts a calibration phase: a Turf panel flashes 3 practice + 5 counting times on a 750 ms beat, every seated phone gets a CcBigAction 'Tap with the flash' (VIP also gets Skip), and taps arrive as calibration:tap with room-time at from the tap event. The host records each flash's draw time from the requestAnimationFrame that first lit it, matches taps to the nearest drawn flash within half a beat (practice flashes and far taps dropped, one tap per flash per player), takes each player's median (3+ taps) and the median of those, clamped to 0-400 ms, and stores {ms, measuredAt} under couchcade:display-lag in localStorage. getDisplayLagMs() in @couchcade/game-sdk/clock (display-lag.ts) returns it, or 0; the host runtime passes it to games as InputContext.displayLagMs and HostSceneData.displayLagMs. Skip on the TV or the VIP's skip-calibration returns to the lobby without changing the value; with too few taps the TV offers Try again. Unit tests cover the maths (median, outliers, reaction-time independence, draw-time flashAt), skip and retry paths and the storage default; a new E2E spec covers the phone tap button and both skips.
+<!-- SECTION:FINAL_SUMMARY:END -->
