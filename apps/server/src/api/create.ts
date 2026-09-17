@@ -1,5 +1,6 @@
 import { createRoomRequestSchema, type CreateRoomResponse } from "@couchcade/protocol";
 import { internalPaths } from "../room/room.ts";
+import { isRateLimited } from "../security/rate-limits.ts";
 import { signRejoinToken, signTicket } from "../security/tickets.ts";
 import { readJsonObject } from "./body.ts";
 import type { ApiContext } from "./context.ts";
@@ -14,7 +15,9 @@ export const maxCodeAttempts = 5;
  * (docs/architecture/security.md, "Check order per endpoint").
  */
 export async function createRoom(request: Request, ctx: ApiContext): Promise<Response> {
-  // 1. CC-2.3: RL_PASSCODE, 5 per IP per minute, counts every attempt. Else 429 rate-limited.
+  // 1. RL_PASSCODE, 5 per IP per minute. It counts every attempt, not only wrong ones, because
+  //    counting only failures would mean checking the passcode before the limit.
+  if (await isRateLimited(ctx.env, "RL_PASSCODE", request)) return errorResponse("rate-limited");
 
   // 2. A JSON body under 1 KB that matches the schema. A missing passcode passes this step, so it
   //    still gets 401 below.
@@ -29,7 +32,8 @@ export async function createRoom(request: Request, ctx: ApiContext): Promise<Res
     return errorResponse("wrong-passcode");
   }
 
-  // 5. CC-2.3: RL_CREATE, 3 per IP per minute. Else 429 rate-limited.
+  // 5. RL_CREATE, 3 room creations per IP per minute.
+  if (await isRateLimited(ctx.env, "RL_CREATE", request)) return errorResponse("rate-limited");
 
   // 6. Create the room, picking another code when one is already in use.
   const secret = ctx.env.TICKET_SIGNING_SECRET;

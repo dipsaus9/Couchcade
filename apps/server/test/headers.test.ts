@@ -10,7 +10,7 @@ import {
 } from "../src/security/headers.ts";
 import { signTicket } from "../src/security/tickets.ts";
 import defaultWorker from "../src/worker.ts";
-import { createRoom, origin, TestSocket, upgradeRequest } from "./helpers.ts";
+import { clientHeaders, createRoom, origin, TestSocket, upgradeRequest } from "./helpers.ts";
 
 const secret = env.TICKET_SIGNING_SECRET;
 
@@ -35,7 +35,7 @@ const turnstile = "XXXX.DUMMY.TOKEN.XXXX";
 function post(path: string, body: unknown): Request {
   return new Request(`${origin}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Origin: origin },
+    headers: clientHeaders({ "Content-Type": "application/json", Origin: origin }),
     body: JSON.stringify(body),
   });
 }

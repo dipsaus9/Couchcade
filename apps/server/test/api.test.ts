@@ -12,6 +12,7 @@ import { passcodeMatches } from "../src/api/passcode.ts";
 import { signRejoinToken, signTicket } from "../src/security/tickets.ts";
 import defaultWorker, { createWorker, roomStub, signedTickets } from "../src/worker.ts";
 import {
+  clientHeaders,
   connectHost,
   createRoom,
   freshCode,
@@ -30,7 +31,7 @@ const turnstile = "XXXX.DUMMY.TOKEN.XXXX";
 function post(path: string, body: unknown, headers: HeadersInit = {}): Request {
   return new Request(`${origin}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Origin: origin, ...headers },
+    headers: clientHeaders({ "Content-Type": "application/json", Origin: origin, ...headers }),
     body: typeof body === "string" ? body : JSON.stringify(body),
   });
 }
@@ -274,6 +275,7 @@ describe("shared API checks", () => {
   it("accepts requests without an Origin, like the smoke test's", async () => {
     const request = new Request(`${origin}/api/rooms`, {
       method: "POST",
+      headers: clientHeaders(),
       body: JSON.stringify({ passcode, turnstile }),
     });
     expect((await call(request)).status).toBe(201);
