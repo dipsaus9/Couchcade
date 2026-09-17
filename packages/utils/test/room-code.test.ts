@@ -1,6 +1,8 @@
 import { assert, integer, property, string } from "fast-check";
 import { describe, expect, it } from "vitest";
+import type { Rng } from "../src/rng/index.ts";
 import { createRng } from "../src/rng/index.ts";
+import { BLOCKED_ROOM_CODES } from "../src/room-code/blocklist.ts";
 import {
   ROOM_CODE_ALPHABET,
   ROOM_CODE_LENGTH,
@@ -16,6 +18,20 @@ describe("ROOM_CODE_ALPHABET", () => {
     expect(ROOM_CODE_ALPHABET).not.toMatch(/[IO]/);
     expect(new Set(ROOM_CODE_ALPHABET).size).toBe(24);
     expect(ROOM_CODE_ALPHABET).toMatch(/^[A-Z]+$/);
+  });
+});
+
+describe("BLOCKED_ROOM_CODES", () => {
+  it("is a non-empty list of codes buildable from the room-code alphabet", () => {
+    expect(BLOCKED_ROOM_CODES.length).toBeGreaterThan(0);
+    for (const word of BLOCKED_ROOM_CODES) {
+      expect(word).toHaveLength(ROOM_CODE_LENGTH);
+      expect([...word].every((letter) => ROOM_CODE_ALPHABET.includes(letter))).toBe(true);
+    }
+  });
+
+  it("has no duplicate entries", () => {
+    expect(new Set(BLOCKED_ROOM_CODES).size).toBe(BLOCKED_ROOM_CODES.length);
   });
 });
 
@@ -47,6 +63,36 @@ describe("roomCode", () => {
         expect(roomCode(createRng(s))).toBe(roomCode(createRng(s)));
       }),
     );
+  });
+
+  it("redraws when the seeded path first lands on a blocked code", () => {
+    const blocked = BLOCKED_ROOM_CODES[0] as string;
+    const valid = "ABCD";
+    expect(BLOCKED_ROOM_CODES).not.toContain(valid);
+    const draws = [...blocked, ...valid].map((letter) => ROOM_CODE_ALPHABET.indexOf(letter));
+    let call = 0;
+    const rng: Pick<Rng, "int"> = { int: () => draws[call++] as number };
+    const code = roomCode(rng);
+    expect(code).toBe(valid);
+    expect(call).toBe(draws.length);
+  });
+
+  it("never returns a blocked code and always returns a valid one (property, seeded path)", () => {
+    assert(
+      property(seed, (s) => {
+        const code = roomCode(createRng(s));
+        expect(BLOCKED_ROOM_CODES).not.toContain(code);
+        expect(isRoomCode(code)).toBe(true);
+      }),
+    );
+  });
+
+  it("never returns a blocked code (crypto path, many draws)", () => {
+    for (let i = 0; i < 5000; i++) {
+      const code = roomCode();
+      expect(BLOCKED_ROOM_CODES).not.toContain(code);
+      expect(isRoomCode(code)).toBe(true);
+    }
   });
 });
 
