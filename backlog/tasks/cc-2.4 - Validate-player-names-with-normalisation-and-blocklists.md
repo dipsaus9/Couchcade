@@ -4,11 +4,12 @@ title: Validate player names with normalisation and blocklists
 status: To Do
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-16 12:27'
+updated_date: '2026-09-17 09:02'
 labels:
   - story
 dependencies:
   - CC-2.3
+  - CC-4.12
 references:
   - packages/utils/src/names/
   - apps/server/src/security/names.ts

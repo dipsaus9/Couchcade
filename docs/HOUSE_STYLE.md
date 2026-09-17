@@ -481,7 +481,7 @@ export const world = { width: 480, height: 270, maxColors: 16 } as const;
    - Raw hex, `rgb()` or `hsl()` values outside `@couchcade/theme`
    - `font-family` declarations outside `@couchcade/theme`
    - Sprite PNGs using colours outside the game's palette
-   - Sprite sheets whose frame sizes aren't multiples of the world grid
+   - Sprite sheets whose frame sizes aren't multiples of the 8 px world grid (owner, 2026-09-17)
 4. **Contrast tests.** Every text/background pairing in `theme` is checked against WCAG AA.
 5. **Credits check.** Entries in `games/*/CREDITS.md` are validated and collected into `docs/CREDITS.md`.
 6. **Review.** A new game or screen isn't done until it passes the checklist below.
