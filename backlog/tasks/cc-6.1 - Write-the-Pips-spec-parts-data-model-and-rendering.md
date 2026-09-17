@@ -1,10 +1,10 @@
 ---
 id: CC-6.1
 title: 'Write the Pips spec: parts, data model and rendering'
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-17 11:23'
+updated_date: '2026-09-17 15:12'
 labels:
   - story
   - owner-gate
@@ -29,7 +29,7 @@ Branch: CC-6.1/pips-spec
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 docs/architecture/pips.md defines parts, the profile data model, persistence on the phone and both render forms
-- [ ] #2 Owner approval is recorded in the task notes as "Approved by owner: <YYYY-MM-DD>" before the story is Done
+- [x] #2 Owner approval is recorded in the task notes as "Approved by owner: <YYYY-MM-DD>" before the story is Done
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -52,4 +52,13 @@ Found while writing (listed in the spec): the room ignores the join body's profi
 Open owner questions: 1) World Pip chest: 2x2 mark + 9x9 shape at feet (recommended) vs 5x5 chest shape; 2) random Pip button 'Shuffle' (recommended) since 'Surprise me' is the VIP random game.
 
 Review round 1: pass. AC1 met; AC2 pending the owner gate (expected). No scope violations. Advisory findings applied: only Quick Draw has a placeholder world-pip.ts on main (Target Range's is in CC-11.4, in flight), and a note that surprised World Pips keep 1px eyes. Advisory: record the owner's choices for open questions 1 and 2 in the spec on approval.
+
+Approved by owner: 2026-09-17
+Owner decisions: (1) World Pip shows a 2x2 Chalk chest mark with the 9x9 seat shape under the feet; (2) the random Pip button is 'Shuffle', 'Surprise me' stays the VIP's random game. Recorded in docs/architecture/pips.md; parts sheet artifact updated to show option A chosen.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added docs/architecture/pips.md, the approved Pips spec: parts with frozen index order (6 skin tones, 8 hairstyles, 6 hair colours; jersey from the seat), the PipProfile data model with validation, wire sizes and extension rules, randomPip and Shuffle, phone persistence in localStorage couchcade:player with send rules and privacy, the Interface Pip (theme-shared geometry, CcPip props, sizes, expressions) and the 16x24 World Pip pixel spec, Pips on the TV, accessibility, budgets, conflicts found and a story map. Owner approved on 2026-09-17 with a 2x2 World Pip chest mark plus the 9x9 shape at the feet, and 'Shuffle' for the random Pip button. Parts sheet: https://claude.ai/artifact/EhifwbxiX6GNRUFzJ9CUYa
+<!-- SECTION:FINAL_SUMMARY:END -->
