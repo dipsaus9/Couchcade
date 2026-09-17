@@ -91,6 +91,7 @@ Each game world picks one scene palette on top of the core colours. Pixel art ma
 |---|---|---|---|
 | **Alley** | Strike Night | `#E0A15E` `#B8743F` `#33397A` `#F4E3C1` | Warm wood lanes under a dusk ceiling |
 | **Desert** | Quick Draw | `#F1CF8B` `#E0A15E` `#8FD3F4` `#37B26C` | Sand, mesas and one lonely cactus |
+| **Range** | Target Range | `#7FD08A` `#23805A` `#B8743F` `#F2D27A` `#E2725B` | A mown village range with straw targets and a hedge |
 | **Track** | Pixel Derby | `#D8664B` `#FAFCFF` `#37B26C` `#6B7AA6` | Clay lanes, chalk lines, stadium seats |
 
 New games add a new scene palette to `@couchcade/theme` through review. They don't define colours locally.
@@ -439,6 +440,7 @@ export const players = [
 export const scenes = {
   alley:  ['#E0A15E', '#B8743F', '#33397A', '#F4E3C1'],
   desert: ['#F1CF8B', '#E0A15E', '#8FD3F4', '#37B26C'],
+  range:  ['#7FD08A', '#23805A', '#B8743F', '#F2D27A', '#E2725B'],
   track:  ['#D8664B', '#FAFCFF', '#37B26C', '#6B7AA6'],
 } as const;
 
