@@ -21,14 +21,12 @@ async function makeQuickDrawNeedMotion(host: Page): Promise<void> {
     const { registry } = (await import(/* @vite-ignore */ url)) as {
       registry: { games: Game[]; get(id: string): Game | undefined };
     };
-    const withMotion = (game: Game): Game =>
-      game.id === "quick-draw" ? { ...game, needsMotion: true } : game;
     const get = registry.get.bind(registry);
-    registry.games = registry.games.map(withMotion);
-    registry.get = (id) => {
-      const game = get(id);
-      return game === undefined ? undefined : withMotion(game);
-    };
+    registry.games = registry.games.map((game) =>
+      game.id === "quick-draw" ? { ...game, needsMotion: true } : game,
+    );
+    registry.get = (id) =>
+      id === "quick-draw" ? registry.games.find((g) => g.id === id) : get(id);
   });
 }
 
@@ -77,6 +75,8 @@ test("a phone that grants motion calibrates, a phone that denies it plays with t
   test.setTimeout(120_000);
 
   const code = await openRoom(host);
+  // Before any phone joins, so the TV has the wrapped registry from the start.
+  await makeQuickDrawNeedMotion(host);
   const [ana] = await phones(1, { motion: { permission: "granted" } });
   const [ben] = await phones(1, { motion: { permission: "denied" } });
   if (!ana || !ben) throw new Error("expected two phones");
@@ -84,7 +84,6 @@ test("a phone that grants motion calibrates, a phone that denies it plays with t
   await joinRoom(ana, code, "Ana");
   await joinRoom(ben, code, "Ben");
   await expect(host.getByRole("region", { name: "Players" }).getByText("2/8")).toBeVisible();
-  await makeQuickDrawNeedMotion(host);
 
   // Ana picks Quick Draw, which now needs motion. The countdown ends in the motion step.
   await ana.getByRole("button", { name: "Choose a game" }).tap();
