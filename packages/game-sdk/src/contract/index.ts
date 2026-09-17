@@ -115,8 +115,13 @@ export interface CouchcadeGame<
   /** null while the game is running. */
   outcome(state: TState): Outcome | null;
 
-  /** At the end of a round, 1 KB max (CC-3.5). */
+  /**
+   * What a refreshed TV resumes the next round from: points, round number and the RNG state. It
+   * only changes when a round ends, and stays within `maxGameSnapshotBytes` serialised
+   * (docs/architecture/session-flow.md, "Host refresh and deploy recovery").
+   */
   snapshot?(state: TState): JsonValue;
+  /** Resumes at the start of the round in `snapshot`, with game time back at 0 as after `init`. */
   restore?(players: readonly Player[], seed: number, snapshot: JsonValue): TState;
 
   /** `() => import("./host/scene").then((m) => m.default)` */
@@ -158,6 +163,13 @@ export const maxInputAgeMs = 500;
 
 /** Seats a game can have at most: slot 0 to 7. */
 export const maxPlayers = 8;
+
+/**
+ * Most bytes a game's serialised `snapshot` may take. The rest of the 1 KB `room:snapshot` frame
+ * holds the envelope, the in-game player ids, the game time and party progress
+ * (docs/architecture/session-flow.md, "What a snapshot holds").
+ */
+export const maxGameSnapshotBytes = 600;
 
 /** Longest game title, so it fits a menu card (session-flow design, CC-3.1). */
 export const maxTitleLength = 16;
