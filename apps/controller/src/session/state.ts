@@ -160,6 +160,9 @@ function onMessage(state: PhoneState, message: RelayToPhoneMessage): PhoneState 
     case "clock:pong":
       // Clock sync arrives with CC-1.14.
       return state;
+    case "rtc:answer":
+      // The WebRTC link's own runtime handles it directly (CC-3.19); it doesn't touch phone state.
+      return state;
   }
 }
 

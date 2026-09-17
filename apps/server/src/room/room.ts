@@ -25,6 +25,7 @@ import {
 } from "./lifecycle.ts";
 import { kickPlayer, lockRoom, refusalFor } from "./moderation.ts";
 import { arrivalOf, isSeatDue, seatExpiresAt } from "./reconnect.ts";
+import { answerTarget } from "./rtc.ts";
 import { defaultProfile, RoomStorage, type PlayerRecord, type RoomMeta } from "./storage.ts";
 import {
   hostTag,
@@ -362,6 +363,14 @@ export class Room extends Server {
         // One write per round (docs/architecture/session-flow.md, "When the host sends a snapshot").
         this.#storage.saveSnapshot(message.d, Date.now());
         return;
+      case "rtc:answer": {
+        // Signalling only: forwarded unopened, with `to` removed, no storage write
+        // (docs/architecture/realtime-link.md, "What the room does").
+        const { to, s, desc } = message.d;
+        const phone = answerTarget(this.#phones(), (p) => (p.state as PhoneSocketState).id, to);
+        if (phone) this.#send(phone, { t: "rtc:answer", d: { s, desc } });
+        return;
+      }
       default:
         return;
     }
@@ -385,6 +394,10 @@ export class Room extends Server {
         return;
       case "motion:status":
         this.#sendToHost({ t: "motion:status", d: message.d, from: state.id });
+        return;
+      case "rtc:offer":
+        // Only a seated player reaches here with this type (senders, @couchcade/protocol).
+        this.#sendToHost({ t: "rtc:offer", d: message.d, from: state.id });
         return;
       case "player:profile":
         connection.setState({ ...state, profile: message.d.profile });
