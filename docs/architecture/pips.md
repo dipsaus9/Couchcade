@@ -356,6 +356,7 @@ The sprite faces right: the face sits one pixel right of centre, the fringe and 
 | Sad | (6,9), (11,9) | (7,11) to (10,11) |
 | Blink (extra frame, any expression) | (5,9), (6,9) and (10,9), (11,9) | That expression's mouth |
 
+Surprised World Pips keep 1px eyes. The Interface Pip's bigger dots don't fit at 16×24, and the O mouth carries the expression.
 ### In a scene
 
 1. **Anchor.** A Pip standing at world position `(x, feetY)` has its top-left pixel at `(x − 8, feetY − 24)`. Depth sorts by `feetY`.
@@ -421,7 +422,7 @@ Approving the doc approves the proposed fixes. Each names who makes it.
 2. **CC-6.6 criterion 1** says the TV lobby renders Interface Pips "in Phaser". The lobby is a Vue screen, so it uses `CcPip`. Only the stage scoreboard needs Phaser. Reword through `backlog-plan` to "The TV lobby shows each player's Interface Pip".
 3. **CC-6.3 criterion 1** names the component `<Pip>`. The UI kit prefixes every component with `Cc`, so it is `CcPip`. CC-6.3's References also need `packages/theme/src/pips/` for the shared geometry.
 4. **Part counts live in protocol.** CC-1.8 put `pipPartCounts` in `@couchcade/protocol` because utils had no Pip module yet. CC-6.2 adds `pipParts` to utils and switches protocol to import it, so its References need `packages/protocol/src/shared/`.
-5. **Placeholder World Pips.** Quick Draw and Target Range each have a game-local `world-pip.ts`: short hair for everyone, and a sad face that falls back to the neutral smile. A **new story** after CC-6.4 (References `games/quick-draw/src/host/`, `games/target-range/src/host/`) swaps both for `buildWorldPip` and deletes the copies.
+5. **Placeholder World Pips.** Quick Draw has a game-local `games/quick-draw/src/host/world-pip.ts`: short hair for everyone, and a sad face that falls back to the neutral smile. Target Range's TV scene (CC-11.4, in progress) copies it, as target-range.md allows until CC-6.4 lands. A **new story** after CC-6.4 swaps every game-local copy for `buildWorldPip` and deletes them. Its References are the `src/host/` folders of the games that have a copy by then.
 6. **"Surprise me" means two things.** See [open question 2](#2-the-name-of-the-random-pip-button).
 7. **The canvas World Pip's ponytail** hangs on the right, which is the front once World Pips face right. This spec moves it to the back.
 
