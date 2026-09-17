@@ -493,6 +493,9 @@ importers:
 
   packages/protocol:
     dependencies:
+      '@couchcade/utils':
+        specifier: workspace:*
+        version: link:../utils
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -500,6 +503,9 @@ importers:
       '@couchcade/config':
         specifier: workspace:*
         version: link:../config
+      fast-check:
+        specifier: 'catalog:'
+        version: 4.10.0
       typescript:
         specifier: 'catalog:'
         version: 6.0.3

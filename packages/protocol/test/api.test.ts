@@ -56,7 +56,7 @@ describe.each(cases)("%s", (_name, schema, valid, invalid) => {
 describe("close codes", () => {
   it("keeps terminal codes apart from the codes clients reconnect after", () => {
     const terminal: number[] = Object.values(closeCodes);
-    expect(terminal).toEqual([4003, 4004, 4008, 4009, 4011]);
+    expect(terminal).toEqual([4003, 4004, 4008, 4009, 4011, 4012]);
     expect(reconnectCloseCodes.some((code) => terminal.includes(code))).toBe(false);
   });
 });

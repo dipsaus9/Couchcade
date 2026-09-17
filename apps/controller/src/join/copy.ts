@@ -23,6 +23,7 @@ const endReasonCopy: Record<EndReason, (code: string) => string> = {
   replaced: () => "You're playing in another tab now. Carry on there.",
   "seat-expired": (code) => `You were away too long and lost your spot in ${code}. Join again.`,
   "rejoin-refused": (code) => `Your spot in room ${code} is gone. Join again.`,
+  "room-full": () => joinFailureCopy["room-full"],
 };
 
 export function noticeCopy(notice: Notice): string {

@@ -9,10 +9,12 @@ import {
   seatCount,
   type HostToRelayMessage,
   type PhoneToRelayMessage,
+  type PlayerId,
   type RelayToHostMessage,
   type RelayToPhoneMessage,
 } from "@couchcade/protocol";
 import { Server, type Connection, type ConnectionContext, type WSMessage } from "partyserver";
+import { isRoomFull, memberCount, planPromotions, promotesIn, type Waiting } from "./audience.ts";
 import { fullBucket, takeToken } from "./flood.ts";
 import { readIdentity } from "./identity.ts";
 import {
@@ -49,7 +51,10 @@ export const internalPaths = {
 export interface RoomStatus {
   state: ReturnType<typeof roomState>;
   locked: boolean;
-  /** Open phone sockets, players and audience together. */
+  /**
+   * Phones in the room, players and audience together: every connected player, plus players who
+   * dropped and still hold their place (audience.ts, `memberCount`).
+   */
   phones: number;
 }
 
@@ -98,7 +103,7 @@ export class Room extends Server {
       const status: RoomStatus = {
         state: roomState(this.#facts(meta)),
         locked: meta.locked,
-        phones: [...this.#phones()].length,
+        phones: this.#memberCount(),
       };
       return Response.json(status);
     }
@@ -250,6 +255,14 @@ export class Room extends Server {
     // Back inside the seat window, or a second tab: the host already knows this player.
     const returning = arrival === "returning" && (previous !== undefined || record?.leftAt != null);
 
+    // The Worker's status check and this connect are separate calls, so two joins can both pass
+    // it. The room refuses a phone it has never seen once 16 phones are in. A phone that already
+    // has a place always gets back in.
+    if (arrival === "new" && isRoomFull(this.#memberCount(connection.id, reserved))) {
+      connection.close(closeCodes.roomFull, "Room is full");
+      return;
+    }
+
     const taken = new Set<number>();
     for (const phone of this.#phones()) {
       const state = phone.state as PhoneSocketState;
@@ -259,7 +272,8 @@ export class Room extends Server {
       if (seat.id !== id && seat.slot !== null) taken.add(seat.slot);
     }
     const wanted = (previous?.state as PhoneSocketState | undefined)?.slot ?? record?.slot ?? null;
-    // CC-3.10 caps the audience and promotes audience members to free seats.
+    // A seat that is free right now goes to this phone, even during a game: late joiners play from
+    // the next game (platform.md, "Join flow", steps 4 and 5).
     const slot = wanted !== null && !taken.has(wanted) ? wanted : lowestFreeSlot(taken, seatCount);
 
     const state: PhoneSocketState = {
@@ -283,8 +297,15 @@ export class Room extends Server {
     });
     this.#send(connection, { t: "room:host", d: { connected: this.#firstHost() !== undefined } });
     // A returning player's host re-sends their current view on player:reconnected.
-    if (returning) this.#sendToHost({ t: "player:reconnected", d: { id } });
-    else this.#sendToHost({ t: "player:joined", d: { player: you } });
+    if (returning) {
+      this.#sendToHost({ t: "player:reconnected", d: { id } });
+      // An audience member who came back to a free seat: the host still has them in the line.
+      if (slot !== null && record?.slot === null) {
+        this.#sendToHost({ t: "player:promoted", d: { id, slot } });
+      }
+    } else {
+      this.#sendToHost({ t: "player:joined", d: { player: you } });
+    }
   }
 
   // ---- Messages --------------------------------------------------------------------------------
@@ -310,7 +331,11 @@ export class Room extends Server {
       }
       case "room:phase": {
         const meta = this.#storage.readMeta();
-        if (meta && meta.phase !== message.d.phase) this.#storage.setPhase(message.d.phase);
+        if (meta && meta.phase !== message.d.phase) {
+          this.#storage.setPhase(message.d.phase);
+          // Seats that freed during a game go to the audience once it's over.
+          this.#promoteAudience();
+        }
         return;
       }
       case "room:kick":
@@ -323,6 +348,7 @@ export class Room extends Server {
           message.d.id,
           Date.now(),
         );
+        this.#promoteAudience();
         return;
       case "room:lock": {
         const meta = this.#storage.readMeta();
@@ -369,6 +395,7 @@ export class Room extends Server {
         // Leaving frees the seat at once. No seat window.
         this.#storage.releasePlayer(state.id, Date.now());
         this.#sendToHost({ t: "player:left", d: { id: state.id, reason: "left" } });
+        this.#promoteAudience();
         connection.close(1000, "Left the room");
         return;
     }
@@ -385,6 +412,7 @@ export class Room extends Server {
     } else {
       this.#storage.revokePlayer(state.id, now);
       this.#sendToHost({ t: "player:left", d: { id: state.id, reason: "kicked" } });
+      this.#promoteAudience();
     }
     connection.close(closeCodes.flooding, "Flooding");
   }
@@ -436,11 +464,12 @@ export class Room extends Server {
 
   /**
    * Releases every seat whose 2-minute window has run out and tells the host with
-   * `player:left { reason: "expired" }`. A later rejoin closes with 4011. Returns the seats that
-   * stay reserved.
+   * `player:left { reason: "expired" }`. A later rejoin closes with 4011. Freed seats go to the
+   * audience outside a game. Returns the seats that stay reserved.
    */
   #releaseDueSeats(now: number): PlayerRecord[] {
     const reserved: PlayerRecord[] = [];
+    let released = false;
     for (const record of this.#storage.readReservedPlayers()) {
       if (record.leftAt === null || !isSeatDue(record.leftAt, now)) {
         reserved.push(record);
@@ -448,8 +477,60 @@ export class Room extends Server {
       }
       this.#storage.releasePlayer(record.id, now);
       this.#sendToHost({ t: "player:left", d: { id: record.id, reason: "expired" } });
+      released = true;
     }
+    if (released) this.#promoteAudience();
     return reserved;
+  }
+
+  // ---- Audience --------------------------------------------------------------------------------
+
+  /**
+   * Phones in the room (audience.ts, `memberCount`): connected players and audience, plus dropped
+   * players who still hold their place. `exceptId` skips the socket that is connecting now.
+   */
+  #memberCount(
+    exceptId?: string,
+    reserved: readonly PlayerRecord[] = this.#storage.readReservedPlayers(),
+  ): number {
+    const connected: PhoneSocketState[] = [];
+    for (const phone of this.#phones()) {
+      if (phone.id !== exceptId) connected.push(phone.state as PhoneSocketState);
+    }
+    return memberCount(connected, reserved);
+  }
+
+  /**
+   * Gives every free seat to the connected audience member who waited longest
+   * (docs/architecture/session-flow.md, "Promotion"), unless a game is running. Each promotion is
+   * one `players` write and `player:promoted` to the host and that phone. Audience phones that are
+   * away keep their place in line but are skipped until they are back.
+   */
+  #promoteAudience(): void {
+    const meta = this.#storage.readMeta();
+    if (!meta || !promotesIn(meta.phase)) return;
+    const taken = new Set<number>();
+    const waiting = new Map<PlayerId, Waiting>();
+    for (const phone of this.#phones()) {
+      const state = phone.state as PhoneSocketState;
+      // A socket that is closing after a leave, kick or flood gave its seat up already.
+      if (this.#storage.readPlayer(state.id)?.released !== false) continue;
+      if (state.slot !== null) taken.add(state.slot);
+      else waiting.set(state.id, { id: state.id, joinedAt: state.joinedAt });
+    }
+    for (const seat of this.#storage.readReservedPlayers()) {
+      if (seat.slot !== null) taken.add(seat.slot);
+    }
+    for (const { id, slot } of planPromotions(taken, [...waiting.values()])) {
+      let promoted: PhoneSocketState | null = null;
+      for (const phone of this.#phonesById(id)) {
+        promoted = { ...(phone.state as PhoneSocketState), role: "player", slot };
+        phone.setState(promoted);
+        this.#send(phone, { t: "player:promoted", d: { id, slot } });
+      }
+      if (promoted) this.#storage.savePlayer(promoted);
+      this.#sendToHost({ t: "player:promoted", d: { id, slot } });
+    }
   }
 
   /** Closes every socket with 4004 and deletes everything the room stored. */

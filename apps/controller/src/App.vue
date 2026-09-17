@@ -8,6 +8,8 @@ import { enterMotionFullscreen, exitMotionFullscreen, phonePlatform } from "./mo
 import { createMotionSession } from "./motion/session.ts";
 import GameController from "./runtime/GameController.vue";
 import { showsGameController } from "./runtime/controller.ts";
+import { parseAudienceView } from "./screens/audience/audience-view.ts";
+import AudienceScreen from "./screens/audience/AudienceScreen.vue";
 import { parseCalibrationView } from "./screens/calibration/calibration-view.ts";
 import CalibrationScreen from "./screens/calibration/CalibrationScreen.vue";
 import JoinScreen from "./screens/join/JoinScreen.vue";
@@ -18,6 +20,8 @@ import { isVipLobby, parseMenuView } from "./screens/menu/menu-view.ts";
 import MenuScreen from "./screens/menu/MenuScreen.vue";
 import { parseResultsView } from "./screens/results/results-view.ts";
 import ResultsScreen from "./screens/results/ResultsScreen.vue";
+import { showsRoomFull } from "./screens/room-full/room-full.ts";
+import RoomFullScreen from "./screens/room-full/RoomFullScreen.vue";
 import { waitingCopy } from "./screens/waiting/copy.ts";
 import WaitingScreen from "./screens/waiting/WaitingScreen.vue";
 import { createTurnstile } from "./security/turnstile.ts";
@@ -28,6 +32,7 @@ const session = createPhoneSession({ turnstile: createTurnstile({ action: "join"
 const state = session.state;
 const screen = computed(() => screenOf(state.value));
 const kicked = computed(() => kickedFrom(state.value));
+const roomFull = computed(() => showsRoomFull(state.value));
 const menuView = computed(() =>
   state.value.status === "room" && state.value.view !== null && screen.value === "menu"
     ? parseMenuView(state.value.view.data)
@@ -76,6 +81,7 @@ onBeforeUnmount(() => {
 <template>
   <main class="app">
     <KickedScreen v-if="kicked !== null" :code="kicked" @leave="session.dismissNotice" />
+    <RoomFullScreen v-else-if="roomFull" @leave="session.dismissNotice" />
     <JoinScreen
       v-else-if="state.status === 'join'"
       :draft="state.draft"
@@ -92,6 +98,11 @@ onBeforeUnmount(() => {
       :online="state.online"
       :vip="isVipLobby(state.view)"
       @send="session.send"
+    />
+    <AudienceScreen
+      v-else-if="state.status === 'room' && screen === 'audience'"
+      :name="state.you.name"
+      :view="parseAudienceView(state.view)"
     />
     <MenuScreen v-else-if="menuView" :view="menuView" @send="session.send" />
     <ResultsScreen v-else-if="resultsView" :view="resultsView" @send="session.send" />
