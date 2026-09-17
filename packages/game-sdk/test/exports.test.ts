@@ -18,7 +18,8 @@ describe("package exports", () => {
   it("re-export the contract and the registry from the root", () => {
     expect(root.defineGame).toBe(contract.defineGame);
     expect(root.defineController).toBe(contract.defineController);
-    expect(root.createRegistry).toBe(registry.createRegistry);
+    expect(root.createGameMetaRegistry).toBe(registry.createGameMetaRegistry);
+    expect(root.createLazyGameRegistry).toBe(registry.createLazyGameRegistry);
     expect(root.createControllerRegistry).toBe(registry.createControllerRegistry);
   });
 

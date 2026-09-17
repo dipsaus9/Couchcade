@@ -39,5 +39,13 @@
     "gzip": true,
     "limit": "400 KB",
     "note": "Not a documented budget on its own (Phaser is folded into the 450 KB host platform JS total). Recorded here as an early-warning ceiling with headroom over the measured ~357.5 KB, so a Phaser version bump shows up as its own failure instead of only tripping the combined platform total. See CC-9.1 implementation notes."
+  },
+  {
+    "name": "Host per-game chunk",
+    "app": "host",
+    "kind": "per-game",
+    "gzip": true,
+    "limit": "60 KB",
+    "note": "Not a documented budget on its own. A game's src/index.ts (rules, physics included) now loads lazily (CC-3.25), so it lands in its own chunk instead of the 450 KB host platform JS total the same way its host/ scene chunk already did. Checked once per games/*/src/index.ts the host build actually emits a chunk for, discovered from the build output. Headroom over quick-draw's and target-range's measured 11.6 KB and 17.4 KB for a game with a heavier rules dependency, such as Strike Night's @couchcade/physics (Planck.js): CC-12.2 (not in this build) pushed the old, eager platform total up by about 32 KB before this story, so 60 KB leaves room for that plus growth."
   }
 ]

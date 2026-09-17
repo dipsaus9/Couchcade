@@ -1,6 +1,5 @@
 import { createRoomClock, type StoredDisplayLag } from "@couchcade/game-sdk/clock";
 import type { CouchcadeGame } from "@couchcade/game-sdk/contract";
-import { createRegistry } from "@couchcade/game-sdk/registry";
 import type { HostToRelayMessage, RelayToHostMessage } from "@couchcade/protocol";
 import { describe, expect, it } from "vitest";
 import { motionWaitMs } from "../../src/motion/motion-check.ts";
@@ -17,6 +16,8 @@ import type { GameStage } from "../../src/runtime/stage.ts";
 import {
   createVirtualTime,
   echoGame,
+  fakeGameRegistry,
+  fakeMetaRegistry,
   backAction,
   inputMessage,
   lobbyWith,
@@ -56,11 +57,9 @@ function setup({
     stop: (game) => stageLog.push(`stop ${game.id}`),
   };
   const clock = createRoomClock({ now: time.now, schedule: time.schedule });
-  const registry = createRegistry(
-    Object.fromEntries(games.map((game) => [`games/${game.id}/src/index.ts`, game])),
-  );
   const runtime = createHostRuntime({
-    registry,
+    metaRegistry: fakeMetaRegistry(games),
+    gameRegistry: fakeGameRegistry(games),
     stage,
     clock,
     send: (message) => sent.push(message),
@@ -228,7 +227,7 @@ describe("createHostRuntime", () => {
     expect(runtime.phase).toBe("menu");
   });
 
-  it("ignores picks of games that don't fit and menu actions while a game runs", () => {
+  it("ignores picks of games that don't fit and menu actions while a game runs", async () => {
     const tooFew = setup({ games: [echoGame({ min: 4 })] });
     tooFew.handle(startAction(tooFew.vip));
     tooFew.handle(pickAction(tooFew.vip, "echo"));
@@ -238,6 +237,7 @@ describe("createHostRuntime", () => {
 
     const busy = setup();
     busy.play();
+    await settle();
     const runner = busy.runtime.running?.runner;
     busy.handle(startAction(busy.vip));
     busy.handle(pickAction(busy.vip, "echo"));
@@ -249,8 +249,8 @@ describe("createHostRuntime", () => {
   it("ticks at a fixed 60 Hz once the scene has loaded", async () => {
     const { runtime, play, time } = setup();
     play();
-    time.advance(500);
-    expect(runtime.running?.runner.tick).toBe(0);
+    // The game's rules (CC-3.25) and its scene haven't loaded yet: nothing is running.
+    expect(runtime.running).toBeNull();
 
     await settle();
     time.advance(1001);
@@ -752,6 +752,7 @@ describe("motion step", () => {
     });
     const [a, b, c] = lobby.players.map((player) => player.id) as [string, string, string];
     play("swing");
+    await settle();
 
     expect(runtime.phase).toBe("motion-check");
     expect(runtime.running).toBeNull();
@@ -799,10 +800,11 @@ describe("motion step", () => {
     expect(stageLog).toEqual(["start swing 3"]);
   });
 
-  it("starts after 20 seconds with the phones that never answered on touch", () => {
+  it("starts after 20 seconds with the phones that never answered on touch", async () => {
     const { runtime, handle, play, lobby, time } = setup({ games: [motionGame()] });
     const [a, b, c] = lobby.players.map((player) => player.id) as [string, string, string];
     play("swing");
+    await settle();
     handle(motionStatus(a, "granted"));
     time.advance(motionWaitMs - 1);
     expect(runtime.phase).toBe("motion-check");
@@ -811,10 +813,11 @@ describe("motion step", () => {
     expect([...(runtime.running?.touchPlayers ?? [])]).toEqual([b, c]);
   });
 
-  it("starts at once when the last phone the step waited for leaves", () => {
+  it("starts at once when the last phone the step waited for leaves", async () => {
     const { runtime, handle, play, lobby } = setup({ games: [motionGame()] });
     const [a, b, c] = lobby.players.map((player) => player.id) as [string, string, string];
     play("swing");
+    await settle();
     handle(motionStatus(a, "granted"));
     handle(motionStatus(b, "granted"));
     const left = { ...lobby, players: lobby.players.filter((player) => player.id !== c) };
@@ -824,7 +827,7 @@ describe("motion step", () => {
     expect(runtime.running?.touchPlayers.size).toBe(0);
   });
 
-  it("goes back to the menu when too few players are left once the step ends", () => {
+  it("goes back to the menu when too few players are left once the step ends", async () => {
     const game = {
       ...echoGame({ id: "swing", min: 3 }),
       title: "Swing",
@@ -833,6 +836,7 @@ describe("motion step", () => {
     const { runtime, handle, play, lobby, time } = setup({ games: [game] });
     const [a, b, c] = lobby.players.map((player) => player.id) as [string, string, string];
     play("swing");
+    await settle();
     handle(motionStatus(b, "granted"));
     const left = { ...lobby, players: lobby.players.filter((player) => player.id !== c) };
     handle({ t: "player:left", d: { id: c, reason: "kicked" } }, left);
@@ -847,6 +851,7 @@ describe("motion step", () => {
     const { runtime, handle, play, lobby, time, ofType } = setup({ games: [motionGame()] });
     const ids = lobby.players.map((player) => player.id) as [string, string, string];
     play("swing");
+    await settle();
     for (const id of ids) handle(motionStatus(id, "granted"));
     await settle();
     expect(runtime.running?.touchPlayers.size).toBe(0);
@@ -860,6 +865,7 @@ describe("motion step", () => {
     time.advance(17);
     expect(runtime.phase).toBe("results");
     handle(playAgainAction(ids[0]));
+    await settle();
     expect(runtime.phase).toBe("motion-check");
     time.advance(667);
     expect(ofType("controller:state").at(-1)?.d.views[0]?.view.data).toEqual({

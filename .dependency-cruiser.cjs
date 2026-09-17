@@ -228,13 +228,21 @@ module.exports = {
     {
       name: "game-index-imports-only-shared-and-sdk",
       comment:
-        "games/<id>/src/index.ts statically imports only its shared/ and game-sdk. host/ loads through import().",
+        "games/<id>/src/index.ts statically imports only its shared/, its own meta.ts and game-sdk. host/ loads through import().",
       severity: "error",
       from: { path: "^games/([^/]+)/src/index\\.ts$" },
       to: {
-        pathNot: ["^games/$1/src/shared/", pkg("game-sdk")],
+        pathNot: ["^games/$1/src/shared/", "^games/$1/src/meta\\.ts$", pkg("game-sdk")],
         dependencyTypesNot: ["dynamic-import"],
       },
+    },
+    {
+      name: "game-meta-stays-light",
+      comment:
+        "games/<id>/src/meta.ts is eager-loaded on host boot next to every other game's (CC-3.25, apps/host/src/runtime/games.ts): it imports @couchcade/game-sdk only, for defineGameMeta and its types, never a heavier package, phaser or vue.",
+      severity: "error",
+      from: { path: "^games/[^/]+/src/meta\\.ts$" },
+      to: { path: ["^packages/", PHASER, VUE], pathNot: pkg("game-sdk") },
     },
     {
       name: "game-index-lazy-loads-only-host",
