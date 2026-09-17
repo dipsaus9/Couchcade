@@ -1,0 +1,19 @@
+{
+  "name": "@couchcade/budgets",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Enforces the phone and TV bundle size budgets from docs/architecture/platform.md by building apps/controller and apps/host with the Vite API and measuring gzip size, per games/*/ controller chunk included.",
+  "type": "module",
+  "scripts": {
+    "budgets": "node src/cli.ts",
+    "typecheck": "tsc",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@couchcade/config": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}
