@@ -23,7 +23,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        script: [check, "check:style", "check:deps", test, build]
+        script: [check, "check:style", "check:deps", test, build, budgets]
     steps:
       # Actions are pinned to full commit SHAs. Renovate keeps the SHA and version comment current.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
