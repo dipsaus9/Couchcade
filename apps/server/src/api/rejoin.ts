@@ -1,5 +1,6 @@
 import { rejoinRequestSchema, type RejoinResponse } from "@couchcade/protocol";
 import { isRoomCode } from "@couchcade/utils";
+import { isRateLimited } from "../security/rate-limits.ts";
 import { signTicket, verifyRejoinToken } from "../security/tickets.ts";
 import { readJsonObject } from "./body.ts";
 import type { ApiContext } from "./context.ts";
@@ -15,7 +16,8 @@ export async function rejoinRoom(
   code: string,
   ctx: ApiContext,
 ): Promise<Response> {
-  // 1. CC-2.3: RL_REJOIN, 30 per IP per minute. Else 429 rate-limited.
+  // 1. RL_REJOIN, 30 per IP per minute, enough for a TV and 8 phones reconnecting after a deploy.
+  if (await isRateLimited(ctx.env, "RL_REJOIN", request)) return errorResponse("rate-limited");
 
   // 2. Code format, body schema, signature, `k` is "rejoin" and `r` is this room. Else 401.
   if (!isRoomCode(code)) return errorResponse("invalid-token");

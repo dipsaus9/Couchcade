@@ -3,23 +3,27 @@ import { color, players as playerTokens, typeScale } from "@couchcade/theme";
 import { GameObjects } from "phaser";
 import type { Scene, Types } from "phaser";
 import { SHAPE_SIZE, drawPlayerShape, drawSlab, textStyle } from "../draw/index.ts";
-import { metrics, safeArea, tvPx } from "../layout/index.ts";
+import { metrics, safeArea } from "../layout/index.ts";
 import type { Rect } from "../layout/index.ts";
 
-/** Scoreboard measurements in world pixels, from the 1080p TV chip in the design canvas. */
+/** Scoreboard measurements in overlay pixels, from the 1080p TV chip in the design canvas. */
 export const scoreboardMetrics = {
-  /** Chip height (72px on the TV). */
-  chipHeight: Math.round(tvPx(72)),
-  /** Space before the shape (16px on the TV). */
-  padStart: Math.round(tvPx(16)),
-  /** Space after the name or score (24px on the TV). */
-  padEnd: Math.round(tvPx(24)),
-  /** Space between shape, name and score (12px on the TV). */
-  gap: Math.round(tvPx(12)),
-  /** Space between chips (16px on the TV). */
-  chipGap: Math.round(tvPx(16)),
-  /** How far the active player's chip lifts (8px on the TV). */
-  lift: Math.round(tvPx(8)),
+  /** Chip height. */
+  chipHeight: 72,
+  /** Space before the shape. */
+  padStart: 16,
+  /** Space after the name or score. */
+  padEnd: 24,
+  /** Space between shape, name and score. */
+  gap: 12,
+  /** Space between chips. */
+  chipGap: 16,
+  /** How far the active player's chip lifts. */
+  lift: 8,
+  /** One pixel of the player shape: as wide as the outline, so the shape's outline matches it. */
+  shapePixel: metrics.outline,
+  /** The drawn player shape, outline included (36px). */
+  shapeSize: SHAPE_SIZE * metrics.outline,
 } as const;
 
 export interface RoundCounter {
@@ -180,7 +184,7 @@ export class Scoreboard extends GameObjects.Container {
   #plan(seated: readonly (PlayerInfo & { slot: number })[], step: Compaction): Plan {
     const { padStart, padEnd, gap, chipGap, chipHeight } = scoreboardMetrics;
     const nameStyle = textStyle("body");
-    const scoreStyle = { ...textStyle("score"), fontSize: `${tvPx(step.scoreSize)}px` };
+    const scoreStyle = { ...textStyle("score"), fontSize: `${step.scoreSize}px` };
 
     let counter: Plan["counter"] = null;
     if (this.#round) {
@@ -204,7 +208,11 @@ export class Scoreboard extends GameObjects.Container {
           this.#width(player.name, nameStyle),
           this.#width(`${player.name.slice(0, 1)}${ELLIPSIS}`, nameStyle),
         ),
-        fixed: padStart + SHAPE_SIZE + (score ? gap + this.#width(score, scoreStyle) : 0) + padEnd,
+        fixed:
+          padStart +
+          scoreboardMetrics.shapeSize +
+          (score ? gap + this.#width(score, scoreStyle) : 0) +
+          padEnd,
       };
     });
 
@@ -260,7 +268,7 @@ export class Scoreboard extends GameObjects.Container {
   }
 
   #draw(plan: Plan): void {
-    const { chipHeight, padStart, padEnd, gap, lift } = scoreboardMetrics;
+    const { chipHeight, padStart, padEnd, gap, lift, shapePixel, shapeSize } = scoreboardMetrics;
     const top = safeArea.top + metrics.outline + lift;
     const centreY = top + chipHeight / 2;
     const text = (content: string, style: Types.GameObjects.Text.TextStyle, x: number) =>
@@ -283,11 +291,12 @@ export class Scoreboard extends GameObjects.Container {
         token.shape,
         token.color,
         shapeX,
-        y + Math.floor((chipHeight - SHAPE_SIZE) / 2),
+        y + Math.floor((chipHeight - shapeSize) / 2),
+        shapePixel,
       );
       this.add(graphics);
 
-      let x = shapeX + SHAPE_SIZE;
+      let x = shapeX + shapeSize;
       const liftBy = (object: GameObjects.Text) => object.setY(object.y - (top - y));
       if (chip.name) {
         const name = liftBy(text(chip.name, textStyle("body"), x + gap));

@@ -1,17 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { color, toPhaserColor, world } from "@couchcade/theme";
+import { color, toPhaserColor, typeScale, world } from "@couchcade/theme";
 import type { Hex } from "@couchcade/theme";
 import { tickMs } from "@couchcade/game-sdk/contract";
 import type { HostSceneData } from "@couchcade/game-sdk/contract";
 import { Callout, Scoreboard, StageScene } from "@couchcade/stage";
-import { AUTO, Game, GameObjects, Scale, Scenes } from "phaser";
+import { AUTO, Game, GameObjects, Scenes } from "phaser";
 import type { Display, Scene } from "phaser";
 import { getScenePalette } from "@couchcade/theme/scenes";
 import game from "../../src/index.ts";
 import { quickDrawCueEvent } from "../../src/host/cues.ts";
 import type { QuickDrawCue } from "../../src/host/cues.ts";
 import { pipSlots } from "../../src/host/layout.ts";
-import { InstructionPanel } from "../../src/host/overlays.ts";
+import { InstructionPanel, instructionPanelRect } from "../../src/host/overlays.ts";
 import QuickDrawScene from "../../src/host/scene.ts";
 import { sprites } from "../../src/host/sprites.ts";
 import { worldPipLook } from "../../src/host/world-pip.ts";
@@ -21,28 +21,57 @@ import type { BotPlan } from "./bots.ts";
 
 /**
  * Boots the scene the way the host stage does (apps/host/src/stage/boot.ts and runtime/stage.ts):
- * a 480×270 world with nearest-neighbour pixels and a whole-number zoom, the scene added under
- * the game id with `HostSceneData`. The test drives Phaser by hand, one game tick per frame.
+ * a canvas with nearest-neighbour pixels and the house style fonts loaded, the scene added under
+ * the game id with `HostSceneData`. The stage draws the 480×270 world at a whole-number zoom and
+ * the overlays at the canvas resolution. The test drives Phaser by hand, one game tick per frame.
+ * CI renders with a software GPU, so only the output resolution test pays for a 1080p canvas; the
+ * long runs use smaller canvases, which the stage fits the same way.
  */
 
-const zoom = 2;
+const tv = { width: 1920, height: 1080 } as const;
+/** Canvas pixels per world pixel on a 1080p TV. */
+const zoom = 4;
+/** A 960×540 canvas: the world at ×2. */
+const halfTv = { width: tv.width / 2, height: tv.height / 2 } as const;
 const desert = getScenePalette("desert").colors;
 let phaser: Game | null = null;
 let problems: unknown[] = [];
 
-async function bootStage(): Promise<Game> {
+let fonts: Promise<void> | null = null;
+
+/** The self-hosted fonts from packages/theme/fonts (CC-4.3), which the host loads before a scene. */
+function loadFonts(): Promise<void> {
+  fonts ??= (async () => {
+    const fredoka = new URL(
+      "../../../../packages/theme/fonts/fredoka/fredoka.woff2",
+      import.meta.url,
+    );
+    const pixelify = new URL(
+      "../../../../packages/theme/fonts/pixelify-sans/pixelify-sans.woff2",
+      import.meta.url,
+    );
+    const faces = [
+      new FontFace("Fredoka", `url(${fredoka.href})`, { weight: "500 700" }),
+      new FontFace("Pixelify Sans", `url(${pixelify.href})`, { weight: "700" }),
+    ];
+    for (const face of faces) document.fonts.add(await face.load());
+  })();
+  return fonts;
+}
+
+async function bootStage(canvas: { width: number; height: number }): Promise<Game> {
+  await loadFonts();
   const parent = document.createElement("div");
   document.body.append(parent);
   const stage = new Game({
     type: AUTO,
     parent,
-    width: world.width,
-    height: world.height,
+    width: canvas.width,
+    height: canvas.height,
     backgroundColor: color.ink,
     pixelArt: true,
     banner: false,
     audio: { noAudio: true },
-    scale: { mode: Scale.NONE, zoom },
   });
   if (!stage.isRunning) await new Promise((resolve) => stage.events.once("ready", resolve));
   // Frames run only when the test steps them.
@@ -61,9 +90,9 @@ async function startScene(
   players: number,
   seed: number,
   plan: BotPlan = mixedBots,
-  options: { reducedMotion?: boolean } = {},
+  options: { reducedMotion?: boolean; canvas?: { width: number; height: number } } = {},
 ): Promise<Run> {
-  const stage = await bootStage();
+  const stage = await bootStage(options.canvas ?? world);
   phaser = stage;
   const bots = botRoom(players, seed, plan);
   const data: HostSceneData<QuickDrawState> = {
@@ -155,6 +184,27 @@ function readPixel(stage: Game, x: number, y: number): Promise<number> {
   });
 }
 
+/** The RGBA pixels of a canvas area, read back after the next frame. */
+function readArea(stage: Game, area: { x: number; y: number; width: number; height: number }) {
+  return new Promise<Uint8ClampedArray>((resolve) => {
+    stage.renderer.snapshotArea(area.x, area.y, area.width, area.height, (snapshot) => {
+      const image = snapshot as HTMLImageElement;
+      const read = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = area.width;
+        canvas.height = area.height;
+        const context = canvas.getContext("2d", { willReadFrequently: true });
+        if (!context) throw new Error("No 2D context");
+        context.drawImage(image, 0, 0);
+        resolve(context.getImageData(0, 0, area.width, area.height).data);
+      };
+      if (image.complete) read();
+      else image.addEventListener("load", read, { once: true });
+    });
+    stage.step(1e6, tickMs);
+  });
+}
+
 const hex = (value: number) => `#${value.toString(16).toUpperCase().padStart(6, "0")}`;
 const expectPixel = async (stage: Game, x: number, y: number, expected: Hex) =>
   expect(hex(await readPixel(stage, x, y))).toBe(hex(toPhaserColor(expected)));
@@ -179,13 +229,13 @@ describe("Quick Draw TV scene", () => {
     expect(QuickDrawScene.prototype).toBeInstanceOf(StageScene);
   });
 
-  it("boots at 480×270 with integer scaling and renders one full round without errors", async () => {
-    const run = await startScene(2, 1);
+  it("renders the 480×270 world at a whole-number zoom and one full round without errors", async () => {
+    const run = await startScene(2, 1, mixedBots, { canvas: halfTv });
     const stage = phaser as Game;
-    expect(stage.canvas.width).toBe(world.width);
-    expect(stage.canvas.height).toBe(world.height);
-    expect(stage.scale.zoom).toBe(zoom);
-    expect(stage.canvas.style.width).toBe(`${world.width * zoom}px`);
+    const zoom = 2;
+    expect([stage.canvas.width, stage.canvas.height]).toEqual([halfTv.width, halfTv.height]);
+    expect(run.scene.cameras.main.zoom).toBe(zoom);
+    expect(run.scene.viewport).toMatchObject({ x: 0, y: 0, width: world.width * zoom });
 
     // Every sprite comes from games/quick-draw/assets.
     const missing = Object.values(sprites).filter((sprite) => !stage.textures.exists(sprite.key));
@@ -247,14 +297,14 @@ describe("Quick Draw TV scene", () => {
 
     // It really drew the world: sky above the mesas, sand on the roadside, the street tiles and
     // Player 1's World Pip in their seat colour.
-    await expectPixel(stage, 4, 40, color.sky);
-    await expectPixel(stage, 4, 120, desert[0] as Hex);
-    await expectPixel(stage, 4, 140, desert[1] as Hex);
+    await expectPixel(stage, 4 * zoom, 40 * zoom, color.sky);
+    await expectPixel(stage, 4 * zoom, 120 * zoom, desert[0] as Hex);
+    await expectPixel(stage, 4 * zoom, 140 * zoom, desert[1] as Hex);
     const [slot] = pipSlots(2);
     const player = run.scene.hostData?.players[0];
     if (!slot || !player) throw new Error("expected a Pip slot and a player");
     const jersey = worldPipLook(player.slot ?? 0, player.profile).jersey;
-    await expectPixel(stage, slot.x - 8 + 4, slot.feetY - 3, jersey);
+    await expectPixel(stage, (slot.x - 8 + 4) * zoom, (slot.feetY - 3) * zoom, jersey);
   });
 
   it(
@@ -287,6 +337,104 @@ describe("Quick Draw TV scene", () => {
       expect(seen).toContain("-.---");
       expect(seen).toContain("Only DRAW! counts");
       expect(run.cues.at(-1)).toEqual({ type: "over" });
+      expect(problems).toEqual([]);
+    },
+  );
+
+  it(
+    "draws the overlay text at the 1920×1080 output resolution, not scaled up from the world",
+    { timeout: 90_000 },
+    async () => {
+      const run = await startScene(4, 1, mixedBots, { canvas: tv });
+      const stage = phaser as Game;
+      const overlayCamera = run.scene.overlayCamera;
+      if (!overlayCamera) throw new Error("expected the overlay camera");
+      let state = run.frame();
+      while (!(state.phase === "result" && state.nowMs - state.phaseAtMs > 500))
+        state = run.frame();
+
+      // One overlay pixel is one canvas pixel, and glyphs rasterise at that resolution.
+      expect(overlayCamera.zoom).toBe(1);
+      const texts = shown(run.scene).filter(
+        (child): child is GameObjects.Text =>
+          child instanceof GameObjects.Text && child.text !== "",
+      );
+      expect(texts.map((text) => text.text)).toEqual(
+        expect.arrayContaining([
+          "Player 1 wins the round",
+          "0.243",
+          "0.301",
+          "FOUL!",
+          "-.---",
+          "BANG!",
+        ]),
+      );
+      const drawn = texts.map((text) => {
+        let root: GameObjects.GameObject = text;
+        while (root.parentContainer) root = root.parentContainer;
+        const matrix = text.getWorldTransformMatrix();
+        return {
+          text: text.text,
+          onOverlayCamera: text.willRender(overlayCamera),
+          onWorldCamera: root.willRender(run.scene.cameras.main),
+          resolution: [text.style.resolution, text.frame.source.resolution],
+          // Canvas pixels per text pixel, rotated tags included. A callout may still be scaling.
+          scale: text instanceof Callout ? 1 : Math.hypot(matrix.a, matrix.b) * overlayCamera.zoom,
+          // Nothing on the TV is smaller than 24px at 1080p (HOUSE_STYLE "Readable from the couch").
+          readable: Number.parseFloat(String(text.style.fontSize)) >= typeScale.small.tv,
+        };
+      });
+      expect(drawn).toEqual(
+        texts.map((text) => ({
+          text: text.text,
+          onOverlayCamera: true,
+          onWorldCamera: false,
+          resolution: [1, 1],
+          scale: expect.closeTo(1, 6),
+          readable: true,
+        })),
+      );
+
+      // The instruction line, read back from the canvas: glyph edges fall on single canvas pixels.
+      // Text drawn in the 480×270 world and scaled ×4 would fill every 4×4 block evenly.
+      const line = texts.find((text) => text.text === "Player 1 wins the round");
+      if (!line) throw new Error("expected the instruction line");
+      const bounds = line.getBounds();
+      const area = {
+        x: Math.floor(bounds.x / zoom) * zoom,
+        y: Math.floor(bounds.y / zoom) * zoom,
+        width: Math.ceil(bounds.width / zoom) * zoom,
+        height: Math.ceil(bounds.height / zoom) * zoom,
+      };
+      expect(area.y).toBeGreaterThanOrEqual(instructionPanelRect.y);
+      const pixels = await readArea(stage, area);
+      const dark = (x: number, y: number) => {
+        const i = (y * area.width + x) * 4;
+        return (pixels[i] ?? 255) + (pixels[i + 1] ?? 255) + (pixels[i + 2] ?? 255) < 3 * 128;
+      };
+      let inked = 0;
+      let mixed = 0;
+      let top = area.height;
+      let bottom = 0;
+      for (let by = 0; by < area.height; by += zoom) {
+        for (let bx = 0; bx < area.width; bx += zoom) {
+          let count = 0;
+          for (let y = by; y < by + zoom; y++) {
+            for (let x = bx; x < bx + zoom; x++) {
+              if (!dark(x, y)) continue;
+              count += 1;
+              top = Math.min(top, y);
+              bottom = Math.max(bottom, y);
+            }
+          }
+          if (count > 0) inked += 1;
+          if (count > 0 && count < zoom * zoom) mixed += 1;
+        }
+      }
+      expect(inked).toBeGreaterThan(100);
+      expect(mixed / inked).toBeGreaterThan(0.5);
+      // Cap height to descender of 32px Fredoka, in canvas pixels.
+      expect(bottom - top).toBeGreaterThanOrEqual(20);
       expect(problems).toEqual([]);
     },
   );

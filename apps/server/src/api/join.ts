@@ -6,6 +6,7 @@ import {
 } from "@couchcade/protocol";
 import { isRoomCode, roomCode } from "@couchcade/utils";
 import { internalPaths, type RoomStatus } from "../room/room.ts";
+import { isRateLimited } from "../security/rate-limits.ts";
 import { signRejoinToken, signTicket } from "../security/tickets.ts";
 import { readJsonObject } from "./body.ts";
 import type { ApiContext } from "./context.ts";
@@ -20,7 +21,8 @@ export const maxPhones = seatCount * 2;
  * endpoint").
  */
 export async function joinRoom(request: Request, code: string, ctx: ApiContext): Promise<Response> {
-  // 1. CC-2.3: RL_JOIN, 20 per IP per minute. Else 429 rate-limited.
+  // 1. RL_JOIN, 20 per IP per minute. Every phone at a party shares the home Wi-Fi address.
+  if (await isRateLimited(ctx.env, "RL_JOIN", request)) return errorResponse("rate-limited");
 
   // 2. A valid room code, then a JSON body under 1 KB that matches the schema.
   if (!isRoomCode(code)) return errorResponse("not-found");

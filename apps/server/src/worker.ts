@@ -4,6 +4,7 @@ import { errorResponse, handleApi } from "./api/index.ts";
 import { forwardHeaders, type SocketIdentity } from "./room/identity.ts";
 import type { Room } from "./room/room.ts";
 import { withSecurityHeaders } from "./security/headers.ts";
+import { isRateLimited } from "./security/rate-limits.ts";
 import { verifyTicket as verifyHmacTicket } from "./security/tickets.ts";
 
 export { Room } from "./room/room.ts";
@@ -13,7 +14,7 @@ declare global {
     /** Bindings from wrangler.jsonc, and secrets from `wrangler secret put` or `.dev.vars`. */
     interface Env {
       Room: DurableObjectNamespace<Room>;
-      /** Rate limits from docs/architecture/security.md, applied by CC-2.3. */
+      /** Rate limits from docs/architecture/security.md, applied in src/security/rate-limits.ts. */
       RL_PASSCODE: RateLimit;
       RL_CREATE: RateLimit;
       RL_JOIN: RateLimit;
@@ -112,7 +113,8 @@ async function connectSocket(
   if (url.searchParams.get("v") !== String(protocolVersion)) {
     return errorResponse("unsupported-version");
   }
-  // 4. CC-2.3: RL_UPGRADE per IP, else 429 rate-limited.
+  // 4. RL_UPGRADE, 30 per IP per minute.
+  if (await isRateLimited(env, "RL_UPGRADE", request)) return errorResponse("rate-limited");
   // 5. A valid ticket for this room.
   const identity = await verifyTicket(url.searchParams.get("ticket"), code, env);
   if (!identity) return errorResponse("invalid-ticket");

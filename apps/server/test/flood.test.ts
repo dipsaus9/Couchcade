@@ -8,6 +8,7 @@ import { RoomStorage } from "../src/room/storage.ts";
 import { signRejoinToken } from "../src/security/tickets.ts";
 import defaultWorker, { roomStub } from "../src/worker.ts";
 import {
+  clientHeaders,
   connect,
   connectHost,
   createRoom,
@@ -201,7 +202,7 @@ describe("flooding sockets", () => {
     const response = await defaultWorker.fetch(
       new Request(`${origin}/api/rooms/${code}/rejoin`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Origin: origin },
+        headers: clientHeaders({ "Content-Type": "application/json", Origin: origin }),
         body: JSON.stringify({ rejoinToken }),
       }),
       env,

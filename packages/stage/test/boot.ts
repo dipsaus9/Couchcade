@@ -1,10 +1,11 @@
 import type { HostSceneData } from "@couchcade/game-sdk/contract";
 import type { PlayerInfo } from "@couchcade/protocol";
-import { color, toPhaserColor, world } from "@couchcade/theme";
+import { color, toPhaserColor } from "@couchcade/theme";
 import type { Hex } from "@couchcade/theme";
 import { AUTO, Game, Scenes } from "phaser";
 import type { Display, Scene } from "phaser";
 import { afterEach, vi } from "vitest";
+import { overlayFrame } from "../src/layout/index.ts";
 import type { Rect } from "../src/layout/index.ts";
 
 const games: Game[] = [];
@@ -14,21 +15,46 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
+let fonts: Promise<void> | null = null;
+
 /**
- * Boots Phaser the way the host does (480×270, pixel art, Sky background) and starts `SceneClass`
- * with `data`. Resolves once the scene's `create` has run.
+ * Loads the self-hosted house style fonts (CC-4.3) from packages/theme/fonts, the files the host
+ * serves, so text measures and renders as on the TV instead of in a fallback font.
+ */
+export function loadFonts(): Promise<void> {
+  fonts ??= (async () => {
+    const fredoka = new URL("../../theme/fonts/fredoka/fredoka.woff2", import.meta.url);
+    const pixelify = new URL(
+      "../../theme/fonts/pixelify-sans/pixelify-sans.woff2",
+      import.meta.url,
+    );
+    const faces = [
+      new FontFace("Fredoka", `url(${fredoka.href})`, { weight: "500 700" }),
+      new FontFace("Pixelify Sans", `url(${pixelify.href})`, { weight: "700" }),
+    ];
+    for (const face of faces) document.fonts.add(await face.load());
+  })();
+  return fonts;
+}
+
+/**
+ * Boots Phaser the way the host does (pixel art, Sky background, the house style fonts loaded) on
+ * a canvas of `canvas` pixels, 1920×1080 unless given, and starts `SceneClass` with `data`.
+ * Resolves once the scene's `create` has run.
  */
 export async function boot<S extends Scene>(
   SceneClass: new () => S,
   data?: object,
+  canvas: { width: number; height: number } = overlayFrame,
 ): Promise<{ game: Game; scene: S }> {
+  await loadFonts();
   const parent = document.createElement("div");
   document.body.append(parent);
   const game = new Game({
     type: AUTO,
     parent,
-    width: world.width,
-    height: world.height,
+    width: canvas.width,
+    height: canvas.height,
     backgroundColor: color.sky,
     pixelArt: true,
     banner: false,
