@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CcButton } from "@couchcade/ui";
+import { CcButton, CcPlayerShape } from "@couchcade/ui";
 import { computed } from "vue";
 import type { Seat } from "./lobby-state.ts";
 import PlayerShape from "./PlayerShape.vue";
@@ -10,7 +10,6 @@ import PlayerShape from "./PlayerShape.vue";
 const props = defineProps<{ seat: Seat; isVip: boolean; canKick: boolean }>();
 defineEmits<{ kick: [id: string] }>();
 
-const colour = computed(() => `var(--cc-player-${props.seat.style.id})`);
 const status = computed(() => {
   const { player, slot } = props.seat;
   if (!player) return "Scan to join";
@@ -24,12 +23,14 @@ const status = computed(() => {
     class="seat"
     :class="{ empty: !seat.player, away: seat.player && !seat.player.connected }"
   >
-    <PlayerShape
+    <CcPlayerShape
+      v-if="seat.player"
       class="shape"
-      :shape="seat.style.shape"
-      :size="seat.player ? 96 : 72"
-      :style="{ fill: seat.player ? colour : 'var(--cc-sky)' }"
+      :player="seat.style.id"
+      :size="96"
+      screen="tv"
     />
+    <PlayerShape v-else class="shape" :shape="seat.style.shape" :size="72" />
     <p v-if="seat.player" class="name">{{ seat.player.name }}</p>
     <p v-else class="name small">Slot {{ seat.slot + 1 }}</p>
     <div class="foot">
@@ -80,6 +81,7 @@ const status = computed(() => {
   stroke: var(--cc-ink);
 }
 .empty .shape {
+  fill: var(--cc-sky);
   stroke: var(--cc-ink-20-on-sky);
 }
 .name,

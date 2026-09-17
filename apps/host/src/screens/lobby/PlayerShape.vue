@@ -1,9 +1,20 @@
 <script setup lang="ts">
 import type { PlayerShape } from "@couchcade/theme";
+import { computed } from "vue";
 
 // The eight player shapes from the approved platform screens canvas, on a 24-unit grid.
-// CC-4.7 swaps this for the stage and UI kit versions.
-defineProps<{ shape: PlayerShape; size: number }>();
+//
+// Every other host screen draws a player's shape with `@couchcade/ui`'s CcPlayerShape, which
+// looks the shape and colour up together from a player id. The lobby's empty seats need the
+// shape a slot will get without that slot's colour ("Empty slots show the shape the next player
+// will get", docs/design/platform-screens.md, "Join and lobby") -- CcPlayerShape's public API has
+// no colour override, so this stays local for that one case (SeatCard.vue).
+const props = defineProps<{ shape: PlayerShape; size: number }>();
+
+// A fixed 4px outline at any size (HOUSE_STYLE "outline": 4px on the TV, apps/host is TV-only),
+// matching CcPlayerShape's own formula so an empty seat's outline weight never looks out of step
+// with a seated player's next to it.
+const strokeWidth = computed(() => (4 * 28) / props.size);
 
 function polygon(points: number, radius: (i: number) => number, cy: number): string {
   const corners = Array.from({ length: points }, (_, i) => {
@@ -29,7 +40,7 @@ const paths: Record<PlayerShape, string> = {
 
 <template>
   <svg class="player-shape" :width="size" :height="size" viewBox="-2 -2 28 28" aria-hidden="true">
-    <path :d="paths[shape]" stroke-width="2.5" stroke-linejoin="round" />
+    <path :d="paths[shape]" :stroke-width="strokeWidth" stroke-linejoin="round" />
   </svg>
 </template>
 
