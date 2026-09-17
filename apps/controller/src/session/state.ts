@@ -20,7 +20,8 @@ export type EndReason =
   | "flooding"
   | "replaced"
   | "seat-expired"
-  | "rejoin-refused";
+  | "rejoin-refused"
+  | "room-full";
 
 /** A message on the join screen: why the last join failed or why the phone left a room. */
 export type Notice =
@@ -69,6 +70,8 @@ export type PhoneScreen =
   | "results"
   | "calibration"
   | "motion-permission"
+  | "audience"
+  | "next-game"
   | "waiting";
 
 /**
@@ -162,8 +165,15 @@ function onMessage(state: PhoneState, message: RelayToPhoneMessage): PhoneState 
 
 export function screenOf(state: PhoneState): PhoneScreen {
   if (state.status !== "room") return state.status;
+  // Audience phones watch, whatever the host last sent. Without the socket or the TV, the waiting
+  // screen says why.
+  if (state.role === "audience")
+    return state.online && state.hostConnected ? "audience" : "waiting";
   const { view, gameId, phase } = state;
   if (view === null) return phase === "lobby" ? "lobby" : "waiting";
+  // Seated but not in this game: a late joiner or promoted audience member. The host sends it with
+  // the running game's id, so it comes before the game controller.
+  if (view.screen === "next-game") return "next-game";
   if (gameId !== null) return "waiting";
   if (view.screen === "lobby") return "lobby";
   // Picking and playing again need the socket and the TV. Until both are back, the waiting screen
@@ -206,6 +216,7 @@ const endReasonByCloseCode: Record<number, EndReason> = {
   [closeCodes.flooding]: "flooding",
   [closeCodes.replaced]: "replaced",
   [closeCodes.seatExpired]: "seat-expired",
+  [closeCodes.roomFull]: "room-full",
 };
 
 /** The end reason for a close code, or null when the phone should reconnect. */

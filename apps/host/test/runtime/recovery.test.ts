@@ -342,9 +342,14 @@ describe("host runtime recovery", () => {
     // The relay is already in playing and keeps its snapshot.
     expect(ofType("room:phase")).toEqual([]);
     expect(ofType("room:snapshot")).toEqual([]);
-    // Every in-game phone gets its view.
+    // Every in-game phone gets its view, and the seated player who wasn't in the game waits for the
+    // next one (session-flow.md, "Recovery").
     const views = ofType("controller:state").flatMap((message) => message.d.views);
-    expect(views.flatMap((entry) => entry.to).toSorted()).toEqual([ids[0], ids[1]].toSorted());
+    expect(views.flatMap((entry) => entry.to).toSorted()).toEqual([...ids].toSorted());
+    expect(views.find((entry) => entry.to.includes(ids[2]))?.view).toEqual({
+      screen: "next-game",
+      data: null,
+    });
 
     // Game time starts at 0 again, like the game's restore.
     time.advance(1001);

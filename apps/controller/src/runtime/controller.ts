@@ -21,13 +21,16 @@ export type GameState = RoomState & { gameId: string; view: NonNullable<RoomStat
 /**
  * True when the phone shows the running game's controller: the host sent a view with a `gameId`,
  * and the socket and the TV are both there. Otherwise the platform screens take over
- * ("Connection lost", "Waiting for the TV").
+ * ("Connection lost", "Waiting for the TV"). Audience phones and seated players waiting for the
+ * next game (`next-game`) never get a controller.
  */
 export function showsGameController(state: PhoneState): state is GameState {
   return (
     state.status === "room" &&
+    state.role === "player" &&
     state.gameId !== null &&
     state.view !== null &&
+    state.view.screen !== "next-game" &&
     state.online &&
     state.hostConnected
   );

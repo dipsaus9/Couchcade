@@ -14,10 +14,12 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@couchcade/utils": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@couchcade/config": "workspace:*",
+    "fast-check": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:"
