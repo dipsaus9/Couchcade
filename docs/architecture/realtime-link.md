@@ -2,11 +2,11 @@
 
 This is the design for a direct connection between each phone and the TV laptop, so aiming, steering and other fast input no longer travel through Cloudflare. The room on Cloudflare only introduces the two devices. It answers the Target Range playtest of 17 September 2026: "The input is too laggy and there should be more events. The crosshair is often off." It applies to every future real-time game, not only Target Range.
 
-**For the owner.** Read [Decisions at a glance](#decisions-at-a-glance), [Why it feels laggy today](#why-it-feels-laggy-today) and [Questions for the owner](#questions-for-the-owner). That takes about 15 minutes. The rest is detail for the stories.
+**For the owner.** Read [Decisions at a glance](#decisions-at-a-glance), [Why it feels laggy today](#why-it-feels-laggy-today) and [Owner answers (2026-09-17)](#owner-answers-2026-09-17). That takes about 15 minutes. The rest is detail for the stories.
 
-**For agents.** This doc is a draft until the owner approves it. Once approved, everything after the owner sections is binding for the stories in [Proposed implementation stories](#proposed-implementation-stories). [platform.md](platform.md), [security.md](security.md), [session-flow.md](session-flow.md) and [motion.md](motion.md) stay binding until the amendment story changes them. This doc doesn't edit them. [Found while writing this doc](#found-while-writing-this-doc) lists every place they change. Where this doc and an approved doc disagree before that story lands, the approved doc wins.
+**For agents.** Everything after the owner sections is binding for the stories in [Implementation stories](#implementation-stories). [platform.md](platform.md), [security.md](security.md), [session-flow.md](session-flow.md) and [motion.md](motion.md) stay binding until the amendment story changes them. This doc doesn't edit them. [Found while writing this doc](#found-while-writing-this-doc) lists every place they change. Where this doc and an approved doc disagree before that story lands, the approved doc wins.
 
-Status: draft for owner approval (CC-3.12).
+Status: approved by the owner on 17 September 2026 (CC-3.12), with the [owner answers](#owner-answers-2026-09-17) of the same day. The owner chose no STUN server instead of the recommended Cloudflare STUN, so the link only uses local candidates.
 
 ---
 
@@ -15,7 +15,7 @@ Status: draft for owner approval (CC-3.12).
 - [Decisions at a glance](#decisions-at-a-glance)
 - [Owner decisions (2026-09-17)](#owner-decisions-2026-09-17)
 - [Why it feels laggy today](#why-it-feels-laggy-today)
-- [Questions for the owner](#questions-for-the-owner)
+- [Owner answers (2026-09-17)](#owner-answers-2026-09-17)
 - [Words used in this doc](#words-used-in-this-doc)
 - [Goals and non-goals](#goals-and-non-goals)
 - [Topology and authority](#topology-and-authority)
@@ -34,32 +34,32 @@ Status: draft for owner approval (CC-3.12).
 - [Rollout](#rollout)
 - [Risks](#risks)
 - [Found while writing this doc](#found-while-writing-this-doc)
-- [Proposed implementation stories](#proposed-implementation-stories)
+- [Implementation stories](#implementation-stories)
 - [Sources](#sources)
 
 ---
 
 ## Decisions at a glance
 
-Approving this doc approves these. Rows 1, 8, 9, 10 and 14 are [owner decisions](#owner-decisions-2026-09-17) from 17 September 2026. Rows 5, 7, 14 and 15 carry a [question](#questions-for-the-owner) with a recommended answer.
+The owner approved these on 17 September 2026. Rows 1, 8, 9, 10 and 14 are the [owner decisions](#owner-decisions-2026-09-17) the design started from. Rows 3, 5, 7, 14 and 15 were settled by the [owner answers](#owner-answers-2026-09-17) the same day.
 
 | # | Decision | In plain words |
 |---|---|---|
 | 1 | Phones talk straight to the TV laptop (owner) | Each seated phone opens a WebRTC data channel to the laptop that runs the game. On the same Wi-Fi a message takes a few milliseconds and costs nothing. |
 | 2 | The room only introduces them | The phone sends one "offer" and the TV one "answer" through the room on Cloudflare. That's 2 requests per phone per connection. After that the room isn't involved in input. |
-| 3 | Authority doesn't move | The room keeps joins, seats, presence, kicks, phases and snapshots. The TV keeps the game rules and scoring. Menus, turn-based input and phone screens stay on today's path. |
+| 3 | Authority doesn't move, and the link carries input only (owner) | The room keeps joins, seats, presence, kicks, phases and snapshots. The TV keeps the game rules and scoring. Menus, turn-based input and phone screens stay on today's path. |
 | 4 | Two channels per phone | A fast channel that may lose a message, for aim and tilt, where only the newest value matters. A reliable channel for shots, throws and taps, which must arrive exactly once. |
-| 5 | Streams at 30 messages a second, 60 when a game asks | Aim and tilt go out 30 times a second by default instead of 4. A game may ask for 60. |
+| 5 | Streams at 30 messages a second, 60 when a game asks (owner) | Aim and tilt go out 30 times a second by default instead of 4. A game may ask for 60. |
 | 6 | Link traffic is free, and the relay caps don't change | Nothing on the link reaches Cloudflare. The 4 per second phone cap stays for the relay path, because a night where every link fails must still fit the free budget. |
-| 7 | No TURN server, and Cloudflare's free STUN server | Phones on the same Wi-Fi as the laptop connect directly. Phones that can't (4G, guest Wi-Fi that blocks devices from each other) use today's path. No paid relay, no card. |
+| 7 | No STUN and no TURN server (owner) | The link only uses the local names the phone and the laptop find on the same Wi-Fi. Nothing about the link leaves the house. Phones on 4G, on guest Wi-Fi or on a network that keeps devices apart use today's path. No paid relay, no card. |
 | 8 | If the link fails, today's path takes over (owner) | Input goes through the room again at 4 messages a second. The phone packs its movement between messages, and the TV smooths and briefly predicts the crosshair instead of lagging a quarter second behind. |
 | 9 | The phone decides its own shot (owner) | A shot carries the aim and power the phone had when the player let go. The TV scores exactly that, so the arrow lands where the player aimed, whichever path it took. |
 | 10 | One capability for every game (owner) | Games use one input channel from the game SDK. They never know or care whether the link or the relay carried a message. |
 | 11 | Only seated players get a link | The room only forwards an offer from a seated player's ticketed socket, and the TV only answers players it knows. Audience phones get no link. |
 | 12 | The TV protects itself | Per-phone limits on the link. A phone that floods it is cut off the link and falls back to the relay, where the existing flood rules apply. |
 | 13 | The room clock stays the clock | Every input still carries room time. The link measures latency and refines each phone's clock, so while it is up phones skip their 30-second clock samples to the room. |
-| 14 | Same aim speed in every direction, tuned once (owner) | Today the crosshair moves a third faster sideways than up and down. Target Range gets one default speed for both, checked against recorded aim traces. There's no per-player setting. |
-| 15 | Behind a switch until proven | A spike measures the link on the owner's iPhone and laptop first. The link ships switched off, then turns on after the owner replays Target Range. |
+| 14 | Same aim speed in every direction (owner) | Today the crosshair moves a third faster sideways than up and down. Target Range moves 6 world pixels per degree both ways, the touch pad 1.5 world pixels per CSS pixel both ways, and aim is sent with 3 decimals. There's no per-player setting. |
+| 15 | Behind a switch until proven (owner) | A spike measures the link on the owner's iPhone and laptop first. The link ships switched off. It turns on by default after the spike, the E2E tests and the owner's replay of Target Range, with `?link=0` as the escape hatch. |
 
 ---
 
@@ -77,7 +77,7 @@ The owner set these after the Target Range playtest. This doc designs within the
 
 ## Why it feels laggy today
 
-From the approved docs and the code on `main`. The network numbers are estimates until the [latency spike](#proposed-implementation-stories) measures them on real devices.
+From the approved docs and the code on `main`. The network numbers are estimates until the [latency spike](#implementation-stories) (CC-3.13) measures them on real devices.
 
 ### Where the time goes
 
@@ -104,28 +104,16 @@ The link fixes 1 and 3 on the same Wi-Fi. Rule 2 and 3 of [The phone decides its
 
 ---
 
-## Questions for the owner
+## Owner answers (2026-09-17)
 
-Each has a recommended answer. Approving the doc as written accepts the recommendations.
+The draft asked six questions. The owner approved the doc on 17 September 2026 with these answers. Where an answer differs from the draft's recommendation, the doc follows the answer.
 
-1. **Which STUN server?** A STUN server tells a phone its public address, which helps when two devices on the same Wi-Fi can't find each other by local name.
-   - **Recommended: Cloudflare's free STUN server** (`stun.cloudflare.com`). It needs no account. Cloudflare already sees every guest's address, so no new company learns anything.
-   - Alternative: no STUN server at all. Nothing leaves the house for the link, but fewer phones connect directly on Wi-Fi that blocks local names. Google's STUN server is rejected: it would add a new third party.
-2. **No TURN server?** A TURN server relays the link when a direct connection is impossible, such as a phone on 4G.
-   - **Recommended: no TURN.** Those phones use today's path, which works and costs what it costs today. Cloudflare's TURN has a free allowance of 1,000 GB a month, but it's a pay-as-you-go product at $0.05 per GB after that, and this doc couldn't confirm it runs without a card. Metered's Open Relay gives 20 GB a month but needs an account with a new third party.
-   - Alternative: add Cloudflare TURN later, only if the spike shows guests on 4G often and it's confirmed to need no card.
-3. **How fast should streams go?**
-   - **Recommended: 30 per second by default, 60 when a game asks.** The phone still samples at 60 per second and the TV smooths between messages. 30 is half the Wi-Fi traffic and CPU on an old phone.
-   - Alternative: 60 per second for every game.
-4. **What does "more events" mean?** This doc reads it as more input updates per second, which the link gives.
-   - **Recommended: keep phone screens (`controller:state`) on the relay for now.** One path for what the phone shows keeps recovery simple.
-   - Alternative: also send phone screens and instant feedback (for example a buzz the moment your arrow hits) over the link. That's faster and saves up to 10,800 host requests a night, and it would be a follow-up story.
-5. **Target Range aim speed.**
-   - **Recommended: 6 world pixels per degree in both directions.** Up and down stays as it is. Sideways gets 25% slower, so the whole sideways range is ±33° instead of ±25°. The trace check in [Tuning](#tuning-target-ranges-aim-speed) confirms it before the replay.
-   - Alternatives: keep today's 8 and 6, or 5 per degree in both directions (calmer, ±40° sideways).
-6. **When does the link switch on?**
-   - **Recommended: after the spike, the E2E tests and one owner replay of Target Range with the switch on.** Until then production keeps today's path.
-   - Alternative: switch it on as soon as the E2E tests pass.
+1. **No STUN server (not the recommendation).** Connections use `iceServers: []`: only local host candidates, which browsers name with random mDNS names. Nothing about the link leaves the house. The draft recommended Cloudflare's free STUN server. Phones connect directly only on the same Wi-Fi as the laptop, and only when the network lets them find each other by local name. Everything else uses the relay path. See [Who connects directly](#who-connects-directly).
+2. **No TURN server.** Phones that can't connect directly use today's path. Cloudflare's TURN has a free allowance of 1,000 GB a month but is a pay-as-you-go product at $0.05 per GB after that, and Metered's Open Relay needs an account with a new third party. **Adding STUN or TURN later** stays a noted future option only. It needs a spike result showing it's needed and a new owner decision.
+3. **Streams at 30 per second by default, 60 when a game asks** (as recommended).
+4. **The link carries input only** (as recommended). Phone screens (`controller:state`) stay on the relay. Screens and instant feedback over the link are a follow-up idea in [Found while writing](#found-while-writing-this-doc), not part of this design.
+5. **Target Range aim speed: 6 world pixels per degree in both directions** (as recommended): ±33° sideways and ±15° up and down. The touch pad moves 1.5 world pixels per CSS pixel in both directions, and aim is sent with 3 decimals.
+6. **Rollout as recommended.** The link stays behind a switch until the spike, the E2E tests and the owner's replay of Target Range pass. Then it's on by default, with `?link=0` as the escape hatch.
 
 ---
 
@@ -141,9 +129,9 @@ Words from [platform.md](platform.md#words-used-in-this-doc) and [motion.md](mot
 | Stream | A continuous value where only the newest matters: aim, tilt. |
 | Event | A discrete action that must arrive once: shoot, throw, dash, lower. |
 | Signalling | The offer and answer that set up a link, carried by the room. |
-| ICE candidate | An address a device might be reached on: a local name, a public address from STUN, or one learned during the connection checks. |
+| ICE candidate | An address a device might be reached on. Here only a local one: an mDNS name, or an address learned during the connection checks (peer-reflexive). |
 | mDNS name | A random `….local` name browsers use instead of a device's local IP address, so web pages don't learn it. |
-| STUN | A server that tells a device its public address. Free, tiny, and never carries game traffic. |
+| STUN | A server that tells a device its public address. Not used (owner answer 1). |
 | TURN | A server that relays all link traffic when devices can't reach each other. Costs bandwidth. Not used. |
 | Playback delay | How far behind the room clock the TV draws a stream, so it can move smoothly between samples. |
 
@@ -156,20 +144,21 @@ Words from [platform.md](platform.md#words-used-in-this-doc) and [motion.md](mot
 1. Aim and tilt reach the TV in tens of milliseconds on the same Wi-Fi, at 30 to 60 updates a second.
 2. What the TV shows and what the TV scores agree: a shot lands where the crosshair was.
 3. When the link can't connect or breaks, the game keeps working on the relay path within a second, with a smooth crosshair.
-4. €0: no TURN, no new paid service, and the daily budget still fits when every link fails.
+4. €0: no STUN, no TURN, no new service, and the daily budget still fits when every link fails.
 5. One SDK capability. A game written for the link works on the relay path without a line of extra code.
-6. No new data kept, no new third party beyond Cloudflare, and nothing that lets one phone reach another phone.
+6. No new data kept, no server contacted outside the house for the link, and nothing that lets one phone reach another phone.
 
 ### Non-goals
 
 1. **Phone to phone.** Phones never connect to each other.
 2. **Moving authority.** The room stays the authority for the room, the host for the game. No game rules run on phones.
 3. **Replacing the WebSocket.** Every device keeps its socket to the room for joining, presence, screens, menus, turn-based input, snapshots and clock sync.
-4. **Screens over the link.** `controller:state` stays on the relay (question 4).
-5. **Internet play.** The link is for phones in the same room as the TV. Phones elsewhere use the relay path, as today.
+4. **Screens over the link.** `controller:state` stays on the relay (owner answer 4). A possible follow-up, see [Found while writing](#found-while-writing-this-doc).
+5. **Internet play.** The link is for phones on the same Wi-Fi as the TV. Phones elsewhere, or on 4G, use the relay path, as today.
 6. **Audio or video.** Data channels only. No camera or microphone permission is ever asked.
 7. **Raising the relay caps.** The 4 and 1.5 per second caps stay until the 20:1 billing ratio is confirmed (platform.md).
 8. **A per-player aim speed setting** (owner decision 5).
+9. **STUN or TURN.** No server helps a link connect (owner answers 1 and 2). Adding one later needs a spike result that shows it's needed and a new owner decision.
 
 ---
 
@@ -180,19 +169,16 @@ flowchart TB
   subgraph cf["Cloudflare Workers Free"]
     worker["Worker<br/>static files, API, ticket checks"]
     room["Room Durable Object<br/>presence, seats, screens<br/>forwards offers and answers"]
-    stun["Cloudflare STUN<br/>tells a device its public address"]
   end
   subgraph home["Living room Wi-Fi"]
     tv["Host app on the laptop<br/>runs the game"]
     p1["Phone, direct"]
-    p2["Phone on 4G or isolated Wi-Fi<br/>relay path"]
+    p2["Phone on 4G, guest Wi-Fi<br/>or a network that keeps devices apart<br/>relay path"]
   end
   p1 -->|"WebSocket: join, menus, offers"| room
   tv -->|"WebSocket: screens, answers, snapshots"| room
   p2 -->|"WebSocket: everything, input at 4 per second"| room
   p1 <-->|"WebRTC link: aim at 30 per second, shots, pings"| tv
-  p1 -.->|"once per connection"| stun
-  tv -.->|"once per connection"| stun
 ```
 
 ### Who decides what
@@ -209,6 +195,22 @@ flowchart TB
 | Room time | Room | WebSocket, refined over the link |
 | Who may open a link | Room (forwards only seated players) and host (answers only in-room players) | WebSocket |
 
+### Who connects directly
+
+With no STUN server (owner answer 1), a phone and the laptop can only reach each other by their local addresses. Each side offers a host candidate with a random mDNS name. The connection works when at least one side resolves the other's name on the local network. The other side then learns the real local address from the incoming connection checks, a peer-reflexive candidate ([IETF draft](https://www.ietf.org/archive/id/draft-ietf-mmusic-mdns-ice-candidates-03.html)). mDNS uses multicast, which some networks block ([BlogGeek.me](https://bloggeek.me/psa-mdns-and-local-ice-candidates-are-coming/)).
+
+| Where the phone is | Expected path |
+|---|---|
+| Same home Wi-Fi as the laptop, ordinary router | Direct |
+| Laptop on Ethernet, phone on the Wi-Fi of the same router | Usually direct. **Unverified**, the spike checks it if possible. |
+| Same Wi-Fi, but a mesh or router that blocks multicast | Relay |
+| Guest Wi-Fi, or any network with client isolation (devices can't see each other) | Relay |
+| 4G or 5G | Relay |
+| A VPN on the phone or the laptop | Relay |
+| Android Chrome on the same Wi-Fi | **Unverified**: direct if the laptop resolves the phone's name or the phone resolves the laptop's. The spike measures it. |
+
+The mDNS draft's own field test saw a small drop in connections when both sides used mDNS names, and more connections leaning on STUN ([IETF draft](https://www.ietf.org/archive/id/draft-ietf-mmusic-mdns-ice-candidates-03.html)). Those numbers come from WebRTC traffic across the internet, not from a phone next to a laptop at home, so they don't predict our rate. The spike measures how often a no-STUN link connects on the owner's Wi-Fi. Every phone that doesn't connect plays exactly as it does today, with the better smoothing.
+
 The phone's authority over its own input values isn't new. Platform.md already trusts `at` within 500 ms, and motion.md already sends the aim with the shot. The host still checks the phase, the volley, the player and every schema.
 
 ---
@@ -223,17 +225,14 @@ The phone offers and the host answers. The host never starts a connection and ne
 sequenceDiagram
   autonumber
   participant P as Phone
-  participant S as Cloudflare STUN
   participant R as Room
   participant H as Host app
   Note over P: seated, TV connected, link switch on
   P->>P: create connection and both channels, create offer
-  P->>S: binding request (free, not our budget)
-  Note over P: wait for candidates, at most 1,000 ms
+  Note over P: gather local candidates, at most 1,000 ms
   P->>R: rtc:offer with attempt id and compact description (1 request)
   R->>H: rtc:offer plus from = player id (free)
   Note over H: seated in-room player? close any older link for them
-  H->>S: binding request
   H->>R: rtc:answer to that player (1 request)
   R->>P: rtc:answer (free)
   P-->>H: connectivity checks, DTLS handshake over Wi-Fi
@@ -263,9 +262,9 @@ A full WebRTC session description with candidates is often over 1 KB, and the ro
 type LinkCandidate = [
   foundation: string,
   priority: number,
-  address: string,         // an mDNS name ("<uuid>.local") or an IP address
+  address: string,         // an mDNS name ("<uuid>.local"), or an IP address if a browser shows one
   port: number,
-  type: "host" | "srflx" | "prflx",
+  type: "host",            // no STUN, so no other type is ever gathered
 ];
 
 type LinkDescription = {
@@ -279,9 +278,9 @@ type LinkDescription = {
 Rules:
 
 1. The template is one `m=application 9 UDP/DTLS/SCTP webrtc-datachannel` section with `a=mid:0`, `a=sctp-port:5000` and `a=max-message-size:65536`. The offer uses `a=setup:actpass`, the answer `a=setup:active`.
-2. Only UDP candidates travel. TCP candidates are dropped. Host candidates go first, then server-reflexive, and the list stops at 6.
+2. Only UDP host candidates travel. TCP candidates are dropped, and the list stops at 6. With `iceServers: []` there are no server-reflexive or relay candidates to send.
 3. `raddr` and `rport` are never sent. Browsers already replace them with `0.0.0.0` for privacy.
-4. A typical offer is about 600 bytes with its envelope: 3 or 4 candidates at about 75 bytes each, plus 110 bytes of ufrag, password and fingerprint. A unit test encodes recorded descriptions from Chrome, Safari and Firefox and asserts every frame stays under 1,024 bytes. If the list doesn't fit, the encoder drops candidates from the end.
+4. A typical offer is about 350 bytes with its envelope: 1 or 2 host candidates at about 75 bytes each, plus 110 bytes of ufrag, password and fingerprint. A unit test encodes recorded descriptions from Chrome, Safari and Firefox and asserts every frame stays under 1,024 bytes. If the list doesn't fit, the encoder drops candidates from the end.
 5. The codec round trip is tested against those recordings. If a browser ever refuses a rebuilt description, that phone uses the relay path and the dev console says why. Nothing breaks.
 6. Candidates are gathered in one go, not trickled one by one. Trickling would cost 1 request per candidate.
 
@@ -319,7 +318,7 @@ Both channels are created on both sides before the offer, with `negotiated: true
 
 On `cc-stream` a lost message is never resent. The next one, a moment later, carries a newer value anyway. On `cc-events` a lost packet is resent, so a shot is never lost while the link stays up.
 
-Connection settings: `iceServers: [{ urls: "stun:stun.cloudflare.com:3478" }]` (question 1), `iceTransportPolicy: "all"`, `bundlePolicy: "max-bundle"`, `iceCandidatePoolSize: 0`. No certificate is stored between visits.
+Connection settings: `iceServers: []` (owner answer 1), `iceTransportPolicy: "all"`, `bundlePolicy: "max-bundle"`, `iceCandidatePoolSize: 0`. No certificate is stored between visits.
 
 ### Link messages
 
@@ -368,7 +367,7 @@ At 60 per second, 8 phones send about 480 messages of about 100 bytes a second, 
 | 6 phones direct, 2 on relay | 17,280 | 10,800 | about +80 signalling, −1,440 clock | 28,080 |
 | Every phone direct | 0 | 10,800 | about +80 signalling, −1,920 clock | 10,800 |
 
-The budget stops being the limit for real-time games on a normal night. It doesn't allow a second rule: nothing may assume the link is up.
+The budget stops being the limit for real-time games at home. It doesn't become a licence to spend: nothing may assume the link is up. With no STUN server (owner answer 1) the first row is the one to expect at other people's houses, on guest Wi-Fi and on 4G, and it fits today.
 
 ### TV-side limits on the link
 
@@ -386,7 +385,7 @@ The buckets refill from arrival times, with no timer. A cut-off phone isn't kick
 
 ### Proposed amendments to platform.md's budget rules
 
-For the amendment story. Not applied by this doc.
+For CC-3.14. Not applied by this doc.
 
 - Decision 14: "Phones send at most 4 messages per second **on the relay path**… Real-time input over the direct link (realtime-link.md) costs nothing."
 - Budget rule 4: "Phones send input **on the relay path** only when it changes… **Over the direct link, streams go at 30 or 60 per second and events at once (realtime-link.md).**"
@@ -419,9 +418,9 @@ The README promises no cookies, no analytics, and IPs only in memory. The link k
 
 | Who | Learns | Compared with today |
 |---|---|---|
-| The host laptop's browser | The phone's local IP address, from the connection checks, and its public address, from its STUN candidate | New. The host is trusted (security.md), and a direct link on the same Wi-Fi can't work without it. |
-| The room on Cloudflare | Candidates while forwarding them: mDNS names and the public address | It already sees the public address of every socket |
-| Cloudflare STUN | Each device's public address and port, once per connection | Cloudflare already sees it |
+| The host laptop's browser | The phone's local address on the home Wi-Fi, from the connection checks | New. The host is trusted (security.md), and a direct link can't work without it. |
+| The room on Cloudflare | The candidates it forwards: random mDNS names, no addresses | It already sees the public address of every socket |
+| Any server outside the house | Nothing. With `iceServers: []` the link contacts no server at all. | New in our favour |
 | Other phones | Nothing | Unchanged |
 
 Rules:
@@ -429,7 +428,7 @@ Rules:
 1. Browsers hide local addresses behind random mDNS names unless a page has camera or microphone permission ([IETF draft](https://www.ietf.org/archive/id/draft-ietf-mmusic-mdns-ice-candidates-03.html), [BlogGeek.me](https://bloggeek.me/psa-mdns-and-local-ice-candidates-are-coming/)). Couchcade never asks for either, so candidates carry names, not local IPs.
 2. Candidates, descriptions and link statistics are never stored, logged, sent to analytics or shown on the TV. Log lines about the link carry only the state and an error code. The amendment adds this to security.md's privacy rules.
 3. The dev readout shows the path and round-trip time, never an address.
-4. No new third party. The only server the link contacts besides our own is Cloudflare STUN.
+4. No new third party, and no server at all. With no STUN and no TURN the link only talks to the other device in the room (owner answers 1 and 2).
 5. CSP: the README's policy has no `webrtc` directive, so browsers allow data channels. `connect-src` doesn't govern ICE. CSP Level 3 defines a `webrtc` directive ([spec](https://w3c.github.io/webappsec-csp/)). CC-2.7's header test gains one assertion that the policy never sets `webrtc 'block'`.
 
 ---
@@ -441,7 +440,7 @@ RTCPeerConnection and data channels are in every browser Couchcade supports ([ca
 | Device | Role | Support | Notes |
 |---|---|---|---|
 | iPhone, Safari and every iOS browser (WebKit) | Phone | Since iOS 11 | The link closes when the screen locks or the player switches apps, like the socket. The phone offers again when it's visible. **Unverified:** whether iCloud Private Relay or Low Power Mode changes candidates or latency, and whether any local network prompt appears. The spike checks all three. |
-| Android, Chrome | Phone | Yes | **Unverified:** whether Chrome on Android resolves the laptop's mDNS name. When it doesn't, the laptop still learns the phone's address from its connection checks (a peer-reflexive candidate), or the STUN candidate works through the router. The spike checks it if a guest has an Android phone. |
+| Android, Chrome | Phone | Yes | **Unverified:** whether Chrome on Android resolves the laptop's mDNS name. It's enough that one side resolves the other: the side that receives the checks learns the address from them. If neither does, that phone uses the relay path. The spike checks it when a guest has an Android phone. |
 | Desktop Chrome | Host | Yes | The usual host, because casting to a Chromecast needs it. A cast tab is often in the background, where Chrome slows timers. The host side is event-driven: it answers offers and pings when they arrive and runs no link timers. |
 | Desktop Safari | Host | Since 11 | Same rules. |
 | Desktop Firefox | Host | Since 22 | Same rules. |
@@ -522,8 +521,8 @@ A deploy closes every socket but not the links, which never touch Cloudflare. Di
 ### A phone switches networks
 
 1. The phone leaves the Wi-Fi for 4G. Its local candidates are gone, pongs stop, and within 750 ms during a game the phone is `stale` and sends over the relay path.
-2. The socket reconnects on 4G (partysocket). After `room:welcome` the phone offers again with its 4G candidates.
-3. The link may connect through the router with the STUN candidate, or fail after 5 seconds and stay on relay. Both are fine.
+2. The socket reconnects on 4G (partysocket). After `room:welcome` the phone offers again with its new local candidates.
+3. On 4G those candidates are useless to the laptop, so the attempt fails after 5 seconds and the phone stays on the relay path. That's expected with no STUN and no TURN (owner answers 1 and 2).
 4. When the phone rejoins the Wi-Fi, the next trigger offers again.
 
 The phone doesn't call `restartIce()` ([MDN](https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/restartIce)). A fresh connection costs the same 2 requests and one code path is easier to test.
@@ -564,7 +563,7 @@ On `stale` or `relay` the phone takes its next relay sample at once and returns 
 | Link round trip, p50 and p90 | The last 20 pongs | Dev readout, spike results |
 | Jitter | p90 minus p50 of the round trip | Sets the playback delay |
 | Loss | Pings without a pong, per 100 | Dev readout, spike results |
-| Candidate pair | `getStats()`: whether the chosen pair is host, server-reflexive or peer-reflexive | Spike results only, never addresses |
+| Candidate pair | `getStats()`: whether the chosen pair is host or peer-reflexive | Spike results only, never addresses |
 | Input age on the TV | Room time when the host applies an input minus its `at`, p50 and p90 per phone | Dev readout, spike results |
 | Crosshair behind the hand | A 240 fps video of the phone and the TV together | Spike, by hand |
 
@@ -748,7 +747,7 @@ Owner decision 5: one default, no setting. The numbers today:
 
 ### The change
 
-1. Add one constant to `games/target-range/src/shared/constants.ts`: `aimPxPerDegree = 6` (question 5).
+1. Add one constant to `games/target-range/src/shared/constants.ts`: `aimPxPerDegree = 6` (owner answer 5).
 2. Derive the ranges from it: `yawRangeDeg = yawPx / aimPxPerDegree` (33.3°) and `pitchRangeDeg = pitchPx / aimPxPerDegree` (15°). Pass both to `createAimDetector({ yawRangeDeg, pitchRangeDeg })` in `games/target-range/src/controller/aim.ts`. The motion package defaults stay as they are for other games.
 3. Keep `yawPx` and `pitchPx`, so the arrow flight formulas and scoring don't change.
 4. Touch pad: the same idea, `padPxPerCssPx = 1.5` in both directions, so 267 CSS px of drag for the whole sideways range and 120 for up and down. Pass them to `createAimDrag`.
@@ -763,7 +762,7 @@ Before the replay, with the trace recorder (CC-5.9) on the owner's iPhone:
    - **Wobble while holding:** p90 distance from the mean crosshair position. Target: at most 3 px, between the far 10 ring (2.4 px) and the near 10 ring (3.6 px), so a steady hand can win a 10 without it being free.
    - **Reach:** degrees of turn from home to the edge of the target zone (±80 px sideways). Target: 10° to 20°, a wrist turn and not an arm swing.
    - **Release twitch:** aim change in the last 50 ms before release. Reported only, for rule 2 of [The phone decides its own shot](#the-phone-decides-its-own-shot).
-3. If the wobble is over 3 px, lower `aimPxPerDegree` by 0.5 and run again. If the reach is over 20°, raise it by 0.5. Stop at the first value that meets both.
+3. The owner set 6. If the wobble is over 3 px or the reach over 20°, the story records the numbers and asks the owner before changing the value.
 4. Record the traces, the numbers and the final value in the Target Range tuning story's notes. One number, one PR, then the owner replays.
 
 At 6 px per degree the far 10 ring is 0.4° across its radius and the target zone edge is 13° from home.
@@ -798,7 +797,7 @@ Playwright can't slow down a data channel with its network emulation, which only
 8. **E2E specs.**
 9. **Owner replay** of Target Range with `?link=1` on every phone. Feedback becomes stories.
 10. **Switch on in production.** `VITE_REALTIME_LINK` defaults to on. `?link=0` stays as the escape hatch, and setting the variable off in `deploy.yml` turns the link off for everyone on the next deploy.
-11. **Later:** skip relay clock samples while direct, and question 4 if the owner wants it.
+11. **Later:** skip relay clock samples while direct. Screens over the link, STUN or TURN each need a new owner decision.
 
 ---
 
@@ -807,7 +806,7 @@ Playwright can't slow down a data channel with its network emulation, which only
 | Risk | Likelihood | Effect | Mitigation |
 |---|---|---|---|
 | Guest Wi-Fi or a mesh network isolates devices from each other | Medium, at other people's houses | No link, today's path | Relay smoothing makes today's path better too. The dev readout shows why. |
-| mDNS names don't resolve on a network and the router doesn't loop back | Low to medium | No link for some phones | STUN candidate, peer-reflexive candidates, relay path |
+| Neither side resolves the other's mDNS name, because the network blocks multicast | Medium, and unmeasured until the spike | No link for those phones | One side resolving is enough, thanks to peer-reflexive candidates. Otherwise the relay path, which is today's behaviour. Adding STUN would help and needs a new owner decision. |
 | A browser update refuses rebuilt descriptions | Low | No link | E2E catches it in CI, relay path, `?link=0`, deploy switch |
 | iOS Safari changes how links survive locks or Private Relay | Low | More reconnects | Offers are cheap and limited, relay path |
 | Retry loops use the budget | Low | Requests | 10 attempts per phone per hour, host-side 5-second and 60-second ignores |
@@ -815,56 +814,58 @@ Playwright can't slow down a data channel with its network emulation, which only
 | Laptop CPU with 8 phones at 60 per second | Low | Frame drops | 480 small JSON frames a second is little. The E2E budget test watches frame time. |
 | Two paths double the test surface | Certain | Maintenance | One `InputChannel`, the fake link, games never branch |
 | Playwright WebKit has no WebRTC | Unknown | Less E2E coverage | WebKit asserts the relay path. Real iPhone coverage comes from the spike and the replay. |
-| Privacy: the host learns phone addresses | Certain when direct | Local and public IP on the host's browser | Host is trusted, nothing stored or logged, no new third party |
-| Cloudflare STUN is unavailable | Low | Fewer direct phones | Local candidates still work. Relay path. |
+| Privacy: the host learns phone addresses | Certain when direct | The phone's local address on the host's browser | Host is trusted, nothing stored or logged, nothing leaves the house |
+| No STUN means fewer phones connect directly than with one | Unknown until the spike | More phones on the relay path | The relay path is today's behaviour with better smoothing. The spike measures the rate, and adding STUN stays an owner decision. |
 
 ---
 
 ## Found while writing this doc
 
-None of these is changed by this doc. The amendment story makes the doc changes. The others are in the proposed stories.
+None of these is changed by this doc. CC-3.14 makes the doc changes. The others belong to the stories named in the last column.
 
 | # | Where | Finding | Action |
 |---|---|---|---|
-| 1 | target-range.md, "Arrow flight"; `packages/motion/src/gestures/aim.ts` | Yaw is 8 px per degree and pitch 6, so the crosshair moves a third faster sideways. The touch pad is 2 and 1.2 px per CSS px. | Target Range tuning (proposed story 10) |
-| 2 | `createAimOutput` in `packages/motion/src/gestures/aim.ts` | Aim is rounded to 2 decimals, 2 world px sideways, against a far 10 ring of 2.4 px | 3 decimals (story 9) |
-| 3 | `aimAt` in `packages/game-sdk/src/input/aim-playback.ts` | With a 250 ms playback delay and messages up to 250 ms apart plus network time, the newest sample is often older than the playback point, so the crosshair holds and then jumps | Relay playback with prediction (story 5) |
-| 4 | target-range.md, Fairness rule 1; `games/target-range/src/controller/aim.ts` | The shot uses `aim()` at `pointerup`, which includes the release twitch, while the TV shows aim from about half a second earlier | `input.last("aim")` and the crosshair snap (stories 9 and 10) |
-| 5 | platform.md, "How traffic flows" | "Nothing connects to the laptop or to a phone, so any network works" is no longer true for direct phones | Amendment (story 2) |
-| 6 | platform.md, decision 14, budget rules 4 and 6, message catalogue, cost table, clock sync step 5 | Relay-only wording, new messages, clock samples while direct | Amendment with the [proposed text](#proposed-amendments-to-platformmds-budget-rules) (story 2) |
-| 7 | TECH_STACK.md, "Peer-to-peer WebRTC" row and the fallback line in the budget section | Calls WebRTC "a later option". It's now the design. | Amendment (story 2) |
-| 8 | session-flow.md, "Real-time input batching" rules 5 to 7 | Every input goes through a 4 per second stream, and button mashing is sent as a count | Rules apply to the relay path. `InputChannel` wraps the stream. (story 2) |
-| 9 | motion.md, decisions 12 and 16, "Aim" sending rules, "Fitting the input budget" rules 1 and 4 | 4 per second, 250 ms trail, packing in the gesture sender, at most 4 samples | Direct rates, packing moves into the channel, up to 8 samples on the relay (story 2) |
-| 10 | security.md, threat table and "Privacy and logs" | No rows for links, and "IPs only as rate-limit keys in memory" doesn't cover candidates passing through | The [threat rows](#threats-and-defences) and privacy rule 2 (story 2) |
-| 11 | README CSP and CC-2.7 header tests | CSP Level 3 has a `webrtc` directive that could block links if anyone adds it | One header test assertion (story 3) |
-| 12 | target-range.md, "Budget check" and crosshair readability rule 5 | Assumes 4 messages a second and a 250 ms trail | Amendment (story 2) |
-| 13 | platform.md, clock sync | Direct phones can skip periodic relay clock samples, saving up to 120 requests per phone per hour | Story 12 |
-| 14 | CC-5.7 (tilt, To Do) | Its criteria send tilt through the 4 per second input stream with `set` | Amend CC-5.7 with `backlog-plan` to use `input.stream` once story 6 lands, or build it first and let story 9 cover tilt too |
-| 15 | platform.md, "Reconnects", deploys | Links survive a deploy, so direct phones keep playing while sockets reconnect | Noted in the amendment. No code. |
+| 1 | target-range.md, "Arrow flight"; `packages/motion/src/gestures/aim.ts` | Yaw is 8 px per degree and pitch 6, so the crosshair moves a third faster sideways. The touch pad is 2 and 1.2 px per CSS px. | CC-11.9 |
+| 2 | `createAimOutput` in `packages/motion/src/gestures/aim.ts` | Aim is rounded to 2 decimals, 2 world px sideways, against a far 10 ring of 2.4 px | CC-3.21 |
+| 3 | `aimAt` in `packages/game-sdk/src/input/aim-playback.ts` | With a 250 ms playback delay and messages up to 250 ms apart plus network time, the newest sample is often older than the playback point, so the crosshair holds and then jumps | CC-3.17 |
+| 4 | target-range.md, Fairness rule 1; `games/target-range/src/controller/aim.ts` | The shot uses `aim()` at `pointerup`, which includes the release twitch, while the TV shows aim from about half a second earlier | `input.last("aim")` and the crosshair snap (CC-3.21, CC-11.9) |
+| 5 | platform.md, "How traffic flows" | "Nothing connects to the laptop or to a phone, so any network works" is no longer true for direct phones | CC-3.14 |
+| 6 | platform.md, decision 14, budget rules 4 and 6, message catalogue, cost table, clock sync step 5 | Relay-only wording, new messages, clock samples while direct | CC-3.14, with the [proposed text](#proposed-amendments-to-platformmds-budget-rules) |
+| 7 | TECH_STACK.md, "Peer-to-peer WebRTC" row and the fallback line in the budget section | Calls WebRTC "a later option". It's now the design. | CC-3.14 |
+| 8 | session-flow.md, "Real-time input batching" rules 5 to 7 | Every input goes through a 4 per second stream, and button mashing is sent as a count | Rules apply to the relay path. `InputChannel` wraps the stream. CC-3.14. |
+| 9 | motion.md, decisions 12 and 16, "Aim" sending rules, "Fitting the input budget" rules 1 and 4 | 4 per second, 250 ms trail, packing in the gesture sender, at most 4 samples | Direct rates, packing moves into the channel, up to 8 samples on the relay. CC-3.14. |
+| 10 | security.md, threat table and "Privacy and logs" | No rows for links, and "IPs only as rate-limit keys in memory" doesn't cover candidates passing through | The [threat rows](#threats-and-defences) and privacy rule 2. CC-3.14. |
+| 11 | README CSP and CC-2.7 header tests | CSP Level 3 has a `webrtc` directive that could block links if anyone adds it | One header test assertion. CC-3.15. |
+| 12 | target-range.md, "Budget check" and crosshair readability rule 5 | Assumes 4 messages a second and a 250 ms trail | CC-3.14 |
+| 13 | platform.md, clock sync | Direct phones can skip periodic relay clock samples, saving up to 120 requests per phone per hour | CC-3.23 |
+| 14 | CC-5.7 (tilt, To Do) | Its criteria send tilt through the 4 per second input stream with `set` | Done on 2026-09-17: CC-5.7 now depends on CC-3.18 and its criterion 2 says `input.stream` |
+| 15 | This doc, owner answer 4 | Phone screens and instant feedback could also travel over the link, saving up to 10,800 host requests a night and buzzing the moment an arrow lands | A follow-up idea only. It needs a new owner decision, not a story yet. |
+| 16 | This doc, owner answers 1 and 2 | With no STUN and no TURN, a phone that can't find the laptop by its local name plays on the relay path | Accepted. CC-3.13 measures how often that happens, and adding STUN needs a new owner decision. |
+| 17 | platform.md, "Reconnects", deploys | Links survive a deploy, so direct phones keep playing while sockets reconnect | Noted in CC-3.14. No code. |
 
 ---
 
-## Proposed implementation stories
+## Implementation stories
 
-Ids are assigned when the owner approves and `backlog-plan` creates them on epic CC-3, except story 10 on CC-11. Every story depends on this doc's approval (CC-3.12).
+Created on 17 September 2026 with this doc's approval, on epic CC-3 except CC-11.9. Every story sits after CC-3.12.
 
-| # | Story | References | Depends on |
+| Id | Story | References | Depends on |
 |---|---|---|---|
-| 1 | **Spike: measure the direct link on an iPhone and a laptop.** A throwaway page in `spikes/realtime-link/`: a TV page and a phone page, signalling through the local Vite dev server, reached from the phone over a `cloudflared` quick tunnel. Records connect time, candidate pair type, link round trip p50 and p90 at 30 and 60 per second for 60 seconds, loss, compact and full description sizes, and the same round trip over the tunnel's WebSocket as a stand-in for the relay. Runs on the same Wi-Fi, on 4G, with iCloud Private Relay on and in Low Power Mode. Go or no-go with numbers. | `spikes/realtime-link/` | CC-3.12 |
-| 2 | **Amend the approved docs for the real-time link.** platform.md, security.md, session-flow.md, motion.md, TECH_STACK.md and target-range.md, from [Found while writing](#found-while-writing-this-doc) rows 5 to 12 and the proposed budget text. | `docs/architecture/platform.md`, `docs/architecture/security.md`, `docs/architecture/session-flow.md`, `docs/architecture/motion.md`, `docs/TECH_STACK.md`, `docs/games/target-range.md` | 1 |
-| 3 | **Add the link signalling messages to the protocol and the relay.** `rtc:offer`, `rtc:answer`, `link:ping`, `link:pong`, `input.d` fields `n`, `e` and `more`, relay forwarding with role and seat checks, the CSP header assertion. | `packages/protocol/src/messages/`, `apps/server/src/room/rtc.ts`, `apps/server/src/room/room.ts`, `apps/server/test/rtc.test.ts`, `apps/server/test/headers.test.ts` | 2 |
-| 4 | **Build the link core in the game SDK.** Description codec with recorded fixtures, link clock maths, token buckets, event de-duplication, the state machine, `createFakeLink`. | `packages/game-sdk/src/link/`, `packages/game-sdk/test/link/`, `packages/game-sdk/testing/fake-link.ts` | 2 |
-| 5 | **Add stream playback with prediction to the game SDK.** `addSample`, `createPlayback`, the trace replay test, `aimAt` as a wrapper. | `packages/game-sdk/src/input/playback.ts`, `packages/game-sdk/src/input/aim-playback.ts`, `packages/game-sdk/test/input/playback.test.ts` | 2 |
-| 6 | **Add the input channel and controller streams to the game contract.** `InputChannel`, `CouchcadeController.streams`, `HostSceneData.link`, relay packing of up to 8 samples in the input stream. | `packages/game-sdk/src/contract/index.ts`, `packages/game-sdk/src/input/channel.ts`, `packages/game-sdk/src/input/stream.ts` | 4 |
-| 7 | **Connect phones to the host over the link in the controller runtime.** Browser wiring, lifecycle, retries, the switch and `?link=`, the phone dev readout, passing `input` to controllers. | `apps/controller/src/runtime/link.ts`, `apps/controller/src/runtime/controller.ts`, `apps/controller/src/runtime/send.ts`, `apps/controller/src/runtime/GameController.vue` | 3, 4, 6 |
-| 8 | **Accept phone links on the host with TV-side limits.** Answering, closing on leave and kick, limits and cut-off, unpacking relay samples, per-player playback delay, the TV dev readout. | `apps/host/src/runtime/links.ts`, `apps/host/src/runtime/game-runner.ts`, `apps/host/src/runtime/host-runtime.ts` | 3, 4, 5, 6 |
-| 9 | **Send aim samples through the input channel.** `createAimSender` calls `input.stream` per sample, with 3 decimals. | `packages/motion/src/gestures/aim.ts` | 6 |
-| 10 | **Move Target Range to the input channel and tune its aim speed.** Single-sample aim input, `streams: { aim: { hz: 30 } }`, shot from `input.last("aim")`, crosshair snap and per-player playback delay in the scene, `aimPxPerDegree` and the pad gain with the trace check from [Tuning](#tuning-target-ranges-aim-speed). | `games/target-range/src/`, `games/target-range/test/` | 5, 6, 9 |
-| 11 | **Add E2E tests for the direct link and the fallback.** The three specs from [Testing](#testing), with the test hook. | `e2e/platform/realtime-link.spec.ts`, `e2e/src/link.ts` | 7, 8, 10 |
-| 12 | **Skip relay clock samples while a phone is direct.** Link offsets in the room clock, relay sample on `stale`. | `packages/game-sdk/src/clock/room-clock.ts`, `packages/game-sdk/test/clock/` | 4, 7 |
-| 13 | **Owner replay of Target Range on the link, then switch it on.** Replay with `?link=1`, record it, then default `VITE_REALTIME_LINK` to on. | `docs/playtests/target-range.md`, `apps/controller/src/runtime/link-switch.ts`, `apps/host/src/runtime/link-switch.ts` | 11 |
+| CC-3.13 | **Spike: measure the no-STUN direct link on an iPhone and a laptop.** A throwaway page in `spikes/realtime-link/`: a TV page and a phone page with `iceServers: []`, signalling through the local Vite dev server, reached from the phone over a `cloudflared` quick tunnel. Records whether it connects, the connect time, the candidate pair type, link round trip p50 and p90 at 30 and 60 per second for 60 seconds, loss, and compact and full description sizes. Runs on the same Wi-Fi, on 4G, with iCloud Private Relay on, in Low Power Mode, and on an Android phone when one is there. Go or no-go with numbers, including how often a no-STUN link connects. | `spikes/realtime-link/` | CC-3.12 |
+| CC-3.14 | **Amend the approved architecture docs for the real-time link.** platform.md, security.md, session-flow.md, motion.md, TECH_STACK.md and target-range.md, from [Found while writing](#found-while-writing-this-doc) rows 5 to 12 and the proposed budget text. | `docs/architecture/platform.md`, `docs/architecture/security.md`, `docs/architecture/session-flow.md`, `docs/architecture/motion.md`, `docs/TECH_STACK.md`, `docs/games/target-range.md` | CC-3.13 |
+| CC-3.15 | **Relay WebRTC signalling messages through the room.** `rtc:offer`, `rtc:answer`, `link:ping`, `link:pong`, `input.d` fields `n`, `e` and `more`, relay forwarding with role and seat checks, the CSP header assertion. | `packages/protocol/src/messages/`, `apps/server/src/room/rtc.ts`, `apps/server/src/room/room.ts`, `apps/server/test/rtc.test.ts`, `apps/server/test/headers.test.ts` | CC-3.14 |
+| CC-3.16 | **Build the WebRTC link core in `@couchcade/game-sdk/link`.** Description codec with recorded fixtures, link clock maths, token buckets, event de-duplication, the state machine, `createFakeLink`. | `packages/game-sdk/src/link/`, `packages/game-sdk/test/link/`, `packages/game-sdk/testing/fake-link.ts`, `packages/game-sdk/testing/index.ts` | CC-3.14 |
+| CC-3.17 | **Add stream playback with prediction to `@couchcade/game-sdk/input`.** `addSample`, `createPlayback`, the trace replay test, `aimAt` as a wrapper. | `packages/game-sdk/src/input/playback.ts`, `packages/game-sdk/src/input/aim-playback.ts`, `packages/game-sdk/src/input/index.ts`, `packages/game-sdk/test/input/playback.test.ts` | CC-3.14, CC-3.16 |
+| CC-3.18 | **Add the `InputChannel` to the game contract.** `InputChannel`, `CouchcadeController.streams`, `HostSceneData.link`, relay packing of up to 8 samples in the input stream. | `packages/game-sdk/src/contract/index.ts`, `packages/game-sdk/src/input/channel.ts`, `packages/game-sdk/src/input/stream.ts`, `packages/game-sdk/src/input/index.ts`, `packages/game-sdk/test/input/channel.test.ts` | CC-3.16, CC-3.17 |
+| CC-3.19 | **Connect phones to the host over the WebRTC link in the controller runtime.** Browser wiring, lifecycle, retries, the switch and `?link=`, the phone dev readout, passing `input` to controllers. | `apps/controller/src/runtime/link.ts`, `apps/controller/src/runtime/controller.ts`, `apps/controller/src/runtime/send.ts`, `apps/controller/src/runtime/GameController.vue`, `apps/controller/test/runtime/link.test.ts` | CC-3.15, CC-3.16, CC-3.18 |
+| CC-3.20 | **Accept phone links on the host with TV-side limits.** Answering, closing on leave and kick, limits and cut-off, unpacking relay samples, per-player playback delay, the TV dev readout. | `apps/host/src/runtime/links.ts`, `apps/host/src/runtime/game-runner.ts`, `apps/host/src/runtime/host-runtime.ts`, `apps/host/test/runtime/links.test.ts` | CC-3.15, CC-3.16, CC-3.17, CC-3.18 |
+| CC-3.21 | **Send aim samples through the input channel from `createAimSender`.** `createAimSender` calls `input.stream` per sample, with 3 decimals. | `packages/motion/src/gestures/aim.ts`, `packages/motion/test/aim/` | CC-3.18 |
+| CC-11.9 | **Move Target Range aim to the input channel at 6 px per degree.** Single-sample aim input, `streams: { aim: { hz: 30 } }`, shot from `input.last("aim")`, crosshair snap and per-player playback delay in the scene, `aimPxPerDegree` and the pad gain with the trace check from [Tuning](#tuning-target-ranges-aim-speed). | `games/target-range/src/`, `games/target-range/test/`, `e2e/games/target-range.spec.ts` | CC-3.17, CC-3.18, CC-3.21 |
+| CC-3.22 | **Add E2E tests for the direct link and the relay fallback.** The three specs from [Testing](#testing), with the test hook. | `e2e/platform/realtime-link.spec.ts`, `e2e/src/link.ts` | CC-3.19, CC-3.20, CC-11.9 |
+| CC-3.23 | **Skip periodic relay clock samples while a phone is on the direct link.** Link offsets in the room clock, relay sample on `stale`. | `packages/game-sdk/src/clock/room-clock.ts`, `packages/game-sdk/test/clock/room-clock.test.ts`, `apps/controller/src/runtime/link.ts` | CC-3.16, CC-3.19 |
+| CC-3.24 | **Owner replay: Target Range on the direct link, then switch the link on.** Replay with `?link=1`, record it, then default `VITE_REALTIME_LINK` to on. | `docs/playtests/target-range.md`, `apps/controller/src/runtime/link-switch.ts`, `apps/host/src/runtime/link-switch.ts` | CC-3.22, CC-11.7, CC-3.19, CC-3.20 |
 
-Stories 3 to 6 can run in parallel after story 2. Stories 7, 8 and 9 can run in parallel after that.
+CC-3.15 and CC-3.16 can run in parallel after CC-3.14, then CC-3.17, then CC-3.18, then CC-3.19, CC-3.20 and CC-3.21 in parallel. Stories that share files always carry the dependency edge that orders them: CC-3.17 before CC-3.18 (`input/index.ts`), CC-3.19 before CC-3.23 and CC-3.24, CC-3.20 before CC-3.24, and CC-11.7 before CC-3.24 (the playtest doc).
 
 ### The spike, step by step for the owner
 
@@ -875,8 +876,9 @@ About 20 minutes with the iPhone and the laptop on the same Wi-Fi.
 3. On the laptop, open that address with `/tv` at the end. On the iPhone, open it with `/phone`.
 4. Tap "Start" on the iPhone and move the phone around for 60 seconds. The TV page shows the path, the round trip and a dot that follows the phone.
 5. Tap "Copy results" on the iPhone and paste them into the chat.
-6. Repeat with Wi-Fi off on the iPhone (4G), with iCloud Private Relay on, and in Low Power Mode.
-7. Optional: film the phone screen and the TV together with a second phone in slow motion, so the story can count frames between the two dots.
+6. Repeat with Wi-Fi off on the iPhone (4G), where the link is expected to fail and the page should say so within 5 seconds, then with iCloud Private Relay on, and then in Low Power Mode.
+7. If a guest has an Android phone on the same Wi-Fi, run steps 3 to 5 on it too.
+8. Optional: film the phone screen and the TV together with a second phone in slow motion, so the story can count frames between the two dots.
 
 ---
 
@@ -898,8 +900,8 @@ Checked on 17 September 2026. Browser behaviour changes, so check again before r
 - Browser support: https://caniuse.com/rtcpeerconnection
 - CSP Level 3, `webrtc` directive: https://w3c.github.io/webappsec-csp/
 
-**STUN and TURN**
-- Cloudflare Realtime TURN and the STUN address `stun.cloudflare.com:3478`: https://developers.cloudflare.com/realtime/turn/
+**STUN and TURN (researched, neither is used)**
+- Cloudflare Realtime TURN, which also lists the STUN address `stun.cloudflare.com:3478`: https://developers.cloudflare.com/realtime/turn/
 - TURN free tier of 1,000 GB and 48-hour credentials: https://developers.cloudflare.com/realtime/turn/faq/
 - Realtime pricing, $0.05 per GB after the free tier: https://developers.cloudflare.com/realtime/pricing/
 - TURN credentials need an API token and a TURN key: https://developers.cloudflare.com/realtime/turn/generate-credentials/
