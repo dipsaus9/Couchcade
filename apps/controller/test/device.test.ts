@@ -28,7 +28,7 @@ describe("keepScreenAwake", () => {
     const request = vi.fn<WakeLockRequest>(async () => ({ release }));
     const { doc, show } = fakeDocument();
 
-    const stop = keepScreenAwake({ wakeLock: { request } }, doc);
+    const lock = keepScreenAwake({ wakeLock: { request } }, doc);
     await flush();
     expect(request).toHaveBeenCalledWith("screen");
 
@@ -36,8 +36,33 @@ describe("keepScreenAwake", () => {
     await flush();
     expect(request).toHaveBeenCalledTimes(2);
 
-    stop();
+    lock.release();
     expect(release).toHaveBeenCalled();
+  });
+
+  it("renews from a tap only when the browser let go of the lock, and never after release", async () => {
+    const held = { released: false, release: vi.fn<() => Promise<void>>(async () => {}) };
+    const request = vi.fn<WakeLockRequest>(async () => held);
+    const { doc } = fakeDocument();
+
+    const lock = keepScreenAwake({ wakeLock: { request } }, doc);
+    await flush();
+    lock.renew();
+    await flush();
+    expect(request).toHaveBeenCalledTimes(1);
+
+    // The page was hidden, so the browser released it.
+    held.released = true;
+    lock.renew();
+    lock.renew();
+    await flush();
+    expect(request).toHaveBeenCalledTimes(2);
+
+    lock.release();
+    held.released = true;
+    lock.renew();
+    await flush();
+    expect(request).toHaveBeenCalledTimes(2);
   });
 
   it("ignores a refused lock", async () => {
@@ -45,17 +70,17 @@ describe("keepScreenAwake", () => {
       throw new DOMException("Not allowed", "NotAllowedError");
     });
     const { doc } = fakeDocument();
-    const stop = keepScreenAwake({ wakeLock: { request } }, doc);
+    const lock = keepScreenAwake({ wakeLock: { request } }, doc);
     await flush();
     expect(request).toHaveBeenCalled();
-    expect(() => stop()).not.toThrow();
+    expect(() => lock.release()).not.toThrow();
   });
 
   it("does nothing on a browser without the Wake Lock API", async () => {
     const { doc, listeners } = fakeDocument();
-    const stop = keepScreenAwake({}, doc);
+    const lock = keepScreenAwake({}, doc);
     await flush();
-    stop();
+    lock.release();
     expect(listeners.size).toBe(0);
   });
 });

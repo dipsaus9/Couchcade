@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { roomClock } from "@couchcade/game-sdk/clock";
 import { onBeforeUnmount, ref } from "vue";
+import MotionStepScreen from "./motion/MotionStepScreen.vue";
 import { localNow } from "./runtime/timing.ts";
 import CalibrationScreen from "./screens/calibration/CalibrationScreen.vue";
 import LobbyScreen from "./screens/lobby/LobbyScreen.vue";
@@ -58,6 +59,11 @@ onBeforeUnmount(() => window.removeEventListener("resize", fit));
       :lobby="screen.lobby"
       :menu="screen.menu"
       :room-now="roomNow"
+    />
+    <MotionStepScreen
+      v-else-if="screen.name === 'motion'"
+      :lobby="screen.lobby"
+      :motion="screen.motion"
     />
     <ResultsScreen
       v-else-if="screen.name === 'results'"

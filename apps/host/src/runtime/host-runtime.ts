@@ -8,6 +8,8 @@ import type { RoomClock, StoredDisplayLag } from "@couchcade/game-sdk/clock";
 import type { CouchcadeGame, Outcome } from "@couchcade/game-sdk/contract";
 import type { GameRegistry } from "@couchcade/game-sdk/registry";
 import type { ControllerView, HostToRelayMessage, RelayToHostMessage } from "@couchcade/protocol";
+import { createMotionCheck, isTouch } from "../motion/motion-check.ts";
+import type { MotionCheck, MotionCheckPlayer } from "../motion/motion-check.ts";
 import { createCalibration } from "../screens/calibration/calibration.ts";
 import type {
   Calibration,
@@ -17,7 +19,7 @@ import type {
 } from "../screens/calibration/calibration.ts";
 import type { LobbyState } from "../screens/lobby/lobby-state.ts";
 import { seatedPlayers, vip } from "../screens/lobby/lobby-state.ts";
-import { createGameMenu } from "../screens/menu/menu.ts";
+import { createGameMenu, fits } from "../screens/menu/menu.ts";
 import type { Countdown, GameMenu, MenuGame } from "../screens/menu/menu.ts";
 import { createGameResults } from "../screens/results/results.ts";
 import type { GameResults, ResultsStanding } from "../screens/results/results.ts";
@@ -71,10 +73,22 @@ export const localDisplayLag: DisplayLagStore = {
 export interface RunningGame {
   readonly game: CouchcadeGame;
   readonly runner: GameRunner;
+  /**
+   * In-game players who play with touch: they said no, have no sensors or never answered the
+   * motion step, or their sensors stopped during the game. Always empty for a game without
+   * `needsMotion`.
+   */
+  readonly touchPlayers: ReadonlySet<string>;
 }
 
-/** The phases this runtime drives today. The motion check comes later. */
-export type HostPhase = "lobby" | "menu" | "calibration" | "playing" | "results";
+/** The phases this runtime drives today. */
+export type HostPhase = "lobby" | "menu" | "calibration" | "motion-check" | "playing" | "results";
+
+/** What the TV motion step draws. */
+export interface MotionScreenState {
+  game: CouchcadeGame;
+  players: MotionCheckPlayer[];
+}
 
 /** What the TV lag calibration screen draws. */
 export interface CalibrationScreenState {
@@ -110,6 +124,8 @@ export interface HostRuntime {
   readonly results: ResultsScreenState | null;
   /** The TV lag check while the phase is `calibration`, else null. */
   readonly calibration: CalibrationScreenState | null;
+  /** The motion step while the phase is `motion-check`, else null. */
+  readonly motion: MotionScreenState | null;
   /** The stored TV lag for the lobby's "Check TV lag" button, or null when never measured. */
   readonly displayLag: StoredDisplayLag | null;
   /** "Check TV lag" on the TV lobby starts the calibration. Does nothing outside the lobby. */
@@ -141,6 +157,10 @@ export interface HostRuntime {
  * From the lobby, "Check TV lag" on the laptop runs the TV lag calibration: the phones tap along
  * with a flash, the median offset is stored, and the lobby comes back. It is never forced before a
  * game. Skipping keeps the old value. Games get the stored value as `displayLagMs`.
+ *
+ * A game with `needsMotion` runs the motion step first (motion.md, "Permission, calibration and
+ * resume flow"): every seated phone shows the motion permission screen, and the game starts once
+ * every seated phone sent `motion:status`, or after 20 seconds.
  */
 export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
   const clock = options.clock ?? roomClock;
@@ -153,9 +173,12 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
 
   const views = createViewSync({ send: options.send, now, schedule, warn });
   let lobby: LobbyState | null = null;
-  let running: (RunningGame & { loop: FixedStepLoop }) | null = null;
+  let running: (RunningGame & { loop: FixedStepLoop; touchPlayers: Set<string> }) | null = null;
   let results: GameResults | null = null;
   let calibration: Calibration | null = null;
+  let motionCheck: MotionCheck | null = null;
+  /** Counts motion steps, so a phone asks again for "Play again". */
+  let motionSteps = 0;
   /** The phase last sent to the relay with `room:phase`. */
   let phase: HostPhase = "lobby";
 
@@ -166,10 +189,10 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
     schedule,
     random: options.random,
     onStart: (game) => {
-      if (lobby !== null && running === null) start(game, lobby);
+      if (lobby !== null && running === null) begin(game);
     },
     onChange: () => {
-      if (running !== null) return;
+      if (running !== null || motionCheck !== null) return;
       setPhase(menu.open ? "menu" : "lobby");
       showPlatformViews();
       options.onChange?.();
@@ -198,6 +221,10 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
    */
   function showPlatformViews(): void {
     if (lobby === null || running !== null) return;
+    if (motionCheck !== null) {
+      views.show(null, motionCheck.views());
+      return;
+    }
     if (calibration !== null) {
       views.show(null, calibration.views());
       return;
@@ -220,7 +247,44 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
     views.show(null, results.views());
   }
 
-  function start(game: CouchcadeGame, state: LobbyState): void {
+  /** Starts `game`, with the motion step first when it needs motion. */
+  function begin(game: CouchcadeGame): void {
+    if (lobby === null) return;
+    if (!game.needsMotion) {
+      start(game, lobby, new Set());
+      return;
+    }
+    menu.close(game.id);
+    results = null;
+    motionSteps += 1;
+    const check = createMotionCheck({
+      game,
+      step: motionSteps,
+      lobby: () => lobby,
+      schedule,
+      onDone: (touch) => {
+        if (motionCheck !== check) return;
+        motionCheck = null;
+        // Players may have left while the phones answered. Then the VIP picks again.
+        if (lobby !== null && fits(game, seatedPlayers(lobby).length)) {
+          start(game, lobby, new Set(touch));
+          return;
+        }
+        const leaderId = lobby === null ? undefined : vip(lobby)?.id;
+        if (leaderId !== undefined) menu.action(leaderId, { action: "start" });
+        setPhase(menu.open ? "menu" : "lobby");
+        showPlatformViews();
+        options.onChange?.();
+      },
+      onChange: () => options.onChange?.(),
+    });
+    motionCheck = check;
+    setPhase("motion-check");
+    showPlatformViews();
+    options.onChange?.();
+  }
+
+  function start(game: CouchcadeGame, state: LobbyState, touchPlayers: Set<string>): void {
     menu.close(game.id);
     results = null;
     // Read once per game, so a game sees one value from start to end.
@@ -239,7 +303,7 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
         else views.show(game.id, runner.views());
       },
     });
-    const current = { game, runner, loop };
+    const current = { game, runner, loop, touchPlayers };
     running = current;
 
     setPhase("playing");
@@ -286,7 +350,7 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
       lobby: () => lobby,
       onPlayAgain: (g) => {
         results = null;
-        if (lobby !== null) start(g, lobby);
+        begin(g);
       },
       onBackToMenu: () => {
         results = null;
@@ -334,6 +398,12 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
             startsAt: calibration.startsAt,
             measurement: calibration.measurement(),
           }
+        : null;
+    },
+
+    get motion() {
+      return phase === "motion-check" && motionCheck !== null
+        ? { game: motionCheck.game, players: motionCheck.players() }
         : null;
     },
 
@@ -395,8 +465,22 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
         case "calibration:tap":
           calibration?.tap(message.from, message.d);
           return;
+        case "motion:status":
+          if (motionCheck !== null) {
+            motionCheck.answer(message.from, message.d.status);
+          } else if (running !== null && running.game.needsMotion) {
+            // A phone whose sensors stopped during the game plays on with touch (motion.md flow
+            // rule 7). A phone can't switch back to motion mid-game.
+            const inGame = running.runner.players.some((player) => player.id === message.from);
+            if (inGame && isTouch(message.d.status) && !running.touchPlayers.has(message.from)) {
+              running.touchPlayers.add(message.from);
+              options.onChange?.();
+            }
+          }
+          return;
         case "ui:action":
-          if (running !== null) return;
+          // The motion step takes no platform actions: the game is already picked.
+          if (running !== null || motionCheck !== null) return;
           // During the TV lag check only the VIP's skip-calibration counts.
           if (calibration !== null) calibration.action(message.from, message.d);
           else if (phase === "results") results?.action(message.from, message.d);
@@ -421,7 +505,16 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
       // in this game" state may have changed. Phones that joined or came back get their view too.
       // While a game runs, its next tick sends the views.
       if (running !== null) return;
-      if (phase === "results") {
+      if (motionCheck !== null) {
+        // A player who left no longer holds the step up, which may start the game. Otherwise
+        // joiners and returning phones get the step too.
+        const check = motionCheck;
+        check.refresh();
+        if (motionCheck === check) {
+          showPlatformViews();
+          options.onChange?.();
+        }
+      } else if (phase === "results") {
         showResultsViews();
         options.onChange?.();
       } else {
@@ -438,6 +531,8 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
       menu.dispose();
       calibration?.dispose();
       calibration = null;
+      motionCheck?.dispose();
+      motionCheck = null;
       if (running) {
         running.loop.stop();
         options.stage.stop(running.game);
