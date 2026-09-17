@@ -2,13 +2,13 @@
 
 **Hold the ball, swing your arm, let go. Twist your wrist to hook it into the pins.**
 
-Couchcade's first swing game. The group takes turns on one warm wooden lane. The phone is the ball: pick a spot on the approach, hold the big button, swing your arm and let go. How hard you swing sets the speed, which way you swing sets the line, and a twist of the wrist hooks the ball late, like a real one. A match is 3 to 10 frames each, depending on how many people play, and lasts about 4 to 6 minutes for up to 5 players.
+Couchcade's first swing game. The group takes turns on one warm wooden lane. The phone is the ball: pick a spot on the approach, hold the big button, swing your arm and let go. How hard you swing sets the speed, which way you swing sets the line, and a twist of the wrist hooks the ball late, like a real one. Up to 4 players bowl a full 10-frame game each: about 4 minutes alone, 14 minutes with 4 players.
 
-**For the owner.** Read [At a glance](#at-a-glance) and [Open questions for the owner](#open-questions-for-the-owner) at the end. That takes about 5 minutes.
+**For the owner.** Read [At a glance](#at-a-glance) and [Owner decisions](#owner-decisions-2026-09-17) at the end. That takes about 5 minutes.
 
-**For agents.** Once approved, everything below is binding for CC-12.2 to CC-12.7. [platform.md](../architecture/platform.md), [motion.md](../architecture/motion.md), [session-flow.md](../architecture/session-flow.md), [HOUSE_STYLE.md](../HOUSE_STYLE.md) and [platform-screens.md](../design/platform-screens.md) still apply. Where this spec and a story disagree, stop and flag it.
+**For agents.** Everything below is binding for CC-12.2 to CC-12.7. [platform.md](../architecture/platform.md), [motion.md](../architecture/motion.md), [session-flow.md](../architecture/session-flow.md), [HOUSE_STYLE.md](../HOUSE_STYLE.md) and [platform-screens.md](../design/platform-screens.md) still apply. Where this spec and a story disagree, stop and flag it.
 
-Status: draft for owner approval (CC-12.1). The spec is written as if the owner takes every recommendation in the open questions.
+Status: approved by the owner on 2026-09-17 (CC-12.1), with the three decisions at the end.
 
 ---
 
@@ -29,7 +29,7 @@ Status: draft for owner approval (CC-12.1). The spec is written as if the owner 
 - [Scene palette: alley](#scene-palette-alley)
 - [CC0 asset shortlist](#cc0-asset-shortlist)
 - [Found while writing this spec](#found-while-writing-this-spec)
-- [Open questions for the owner](#open-questions-for-the-owner)
+- [Owner decisions (2026-09-17)](#owner-decisions-2026-09-17)
 
 ---
 
@@ -38,15 +38,15 @@ Status: draft for owner approval (CC-12.1). The spec is written as if the owner 
 | | |
 |---|---|
 | Pitch | A cosy bowling alley at night. One lane, the whole group on the bench, one bowler at a time. Everyone watches the ball roll and the pins fly. |
-| Players | 1 to 8, taking turns. More players means fewer frames each, so a match stays around 5 minutes. |
+| Players | 1 to 4, taking turns. One player can play alone for a high score. |
 | Phone | On your turn, drag the bar to pick where you stand. Hold the big ball button, swing your arm like a bowler and let go. Twist your wrist as you let go to hook the ball. Phones without a gyroscope, or players who pick touch, swipe up the button instead: a faster swipe rolls faster, a curved swipe hooks. |
 | TV | A 480×270 lane seen from behind the bowler, then a close shot of the pins as the ball arrives. Pins tumble, a pin map shows what's left, and STRIKE! or SPARE! pops when earned. |
-| Match | 10 frames for 1 player, 6 for 2, 5 for 3, 4 for 4, 3 for 5 to 8. Each frame is up to 2 rolls. |
+| Match | 10 frames each, whatever the player count. Each frame is up to 2 rolls. About 4 minutes for 1 player, 7 for 2, 10.5 for 3 and 14 for 4. |
 | Scoring | A strike is 30, a spare is 10 plus the first roll, any other frame is the pins knocked down. The score is final as soon as the frame ends. Most points wins, ties go to more strikes. |
 | Turn timer | 20 seconds to bowl. When it runs out the game rolls a gentle straight ball for you, so a dropped phone never stalls the lane. |
 | Skill | Where you stand, how straight you swing and how much you twist. Full speed comes at a firm swing, about 900 degrees a second. Swinging harder adds nothing. |
 | Fairness | Nothing moves while you line up, so Wi-Fi and TV lag never matter. The same swing always knocks down the same pins. There's no luck. |
-| Cost | About 200 requests for a 4-player match and 300 for an 8-player match. Only the bowler's phone sends anything. |
+| Cost | About 250 requests for a 2-player match and 500 for a 4-player match. Only the bowler's phone sends anything. |
 | Assets | CC0 sounds and music from Kenney and OpenGameArt, Kenney furniture for the seating area, recoloured to the existing `alley` palette. The lane, pins, ball and pinsetter are drawn from scratch. |
 
 ---
@@ -65,10 +65,9 @@ Strike Night copies how these games play, not their names, characters or art.
 
 What we don't take from the Nintendo games, and why:
 
-- **A separate aim-turning step.** Wii Sports turns the aim with A plus the D-pad. We have one big action per phone screen, so direction comes from the swing itself. See [open question 3](#open-questions-for-the-owner).
+- **A separate aim-turning step.** Wii Sports turns the aim with A plus the D-pad. We have one big action per phone screen, so direction comes from the swing itself. See [owner decision 3](#owner-decisions-2026-09-17).
 - **Timing the release for spin.** On the Wii, letting go early adds spin. Our spin is only the wrist twist, which `@couchcade/motion` already measures (motion.md, [Swing](../architecture/motion.md#swing-cc-54)). One rule is easier to learn.
-- **Full 10-frame games for 4 players.** At about 20 seconds a frame, a 10-frame game for 4 players takes about 14 minutes. Couchcade games are short, so frames scale with the player count. See [open question 2](#open-questions-for-the-owner).
-- **Traditional scoring with strike bonuses carried into later frames.** Party players can't follow pending bonuses, and short matches would need bonus rolls in the last frame. See [open question 1](#open-questions-for-the-owner).
+- **Traditional scoring with strike bonuses carried into later frames.** Party players can't follow pending bonuses, and the last frame would need up to 2 bonus rolls. See [owner decision 1](#owner-decisions-2026-09-17).
 
 Research on controls and physics:
 
@@ -81,24 +80,20 @@ Research on controls and physics:
 
 ## Rules and scoring
 
-1. **Players.** 1 to 8 seated players (`players: { min: 1, max: 8 }`). The game gets them at `init` and nobody joins mid-match.
-2. **Frames.** Fixed at `init` from the player count ([open question 2](#open-questions-for-the-owner)):
+1. **Players.** 1 to 4 seated players (`players: { min: 1, max: 4 }`), as in Switch Sports local play ([owner decision 2](#owner-decisions-2026-09-17)). The game gets them at `init` and nobody joins mid-match.
+2. **Frames.** Every player bowls 10 frames, whatever the player count ([owner decision 2](#owner-decisions-2026-09-17)):
 
-   | Players | Frames each | Typical match | Wait between your turns |
+   | Players | Typical match | Wait between your turns | Longest match |
    |---|---|---|---|
-   | 1 | 10 | about 3.8 min | none |
-   | 2 | 6 | about 4.3 min | about 20 s |
-   | 3 | 5 | about 5.3 min | about 40 s |
-   | 4 | 4 | about 5.6 min | about 1 min |
-   | 5 | 3 | about 5.2 min | about 1.3 min |
-   | 6 | 3 | about 6.2 min | about 1.7 min |
-   | 7 | 3 | about 7.2 min | about 2 min |
-   | 8 | 3 | about 8.2 min | about 2.3 min |
+   | 1 | about 3.8 min | none | about 11 min |
+   | 2 | about 7.2 min | about 20 s | about 21 min |
+   | 3 | about 10.5 min | about 40 s | about 32 min |
+   | 4 | about 14 min | about 1 min | about 42 min |
 
-   The times come from [Turn flow and timings](#turn-flow-and-timings): about 20 seconds per player per frame. Three frames is the floor: with fewer, one bad frame decides the match.
+   The times come from [Turn flow and timings](#turn-flow-and-timings): about 20 seconds per player per frame, plus 3 s of intro and the scorecard between frames (9 × 2.5 s and 4 s at the end). For 4 players that's 40 × 20 + 22.5 + 4 + 3 = 830 s. The longest match assumes every roll uses the whole timer, 62 s per player per frame.
 3. **Turn order.** Seat order. Frame 1 goes through every player, then frame 2, and so on. A frame is the bowler's roll 1 and, unless it was a strike, roll 2.
 4. **Rolls.** Roll 1 is at all 10 pins. After it, fallen pins are swept and the standing pins go back to their spots. Roll 2 is at the standing pins. A ball in the gutter knocks down nothing.
-5. **Frame score** (current frame scoring, [open question 1](#open-questions-for-the-owner)):
+5. **Frame score** (current frame scoring, [owner decision 1](#owner-decisions-2026-09-17)):
 
    | Frame | When | Score | Mark on the TV |
    |---|---|---|---|
@@ -106,7 +101,7 @@ Research on controls and physics:
    | Spare | Roll 2 knocks down every pin roll 1 left | 10 + roll 1's pins | `7 /` |
    | Open | Pins left after roll 2 | roll 1 + roll 2 | `7 2`, a gutter is `-` |
 
-   The score is final when the frame ends. There are no bonus rolls in the last frame. A perfect match is 30 × frames: 300 for 1 player, 90 for 5 to 8.
+   The score is final when the frame ends. There are no bonus rolls in the last frame. A perfect game is 10 strikes, 300 points.
 6. **Turn timer.** Every roll has 20,000 ms from the start of `lineup`. A `bowl` counts if its `atMs` is at or before the deadline. If nothing counts by 500 ms after the deadline, the game bowls for the player: their current position, `speed` 0.3, `angle` 0, `spin` 0. That's an auto-roll. It scores like any roll.
 7. **Away players.** A player whose last 2 rolls were auto-rolls is away. Their next rolls get 5,000 ms instead of 20,000. Any accepted input from them (`move`, `grip` or `bowl`) clears away, and that lineup's deadline moves to 15,000 ms after the input, never earlier than it was. A dropped phone then holds up each roll for about 5.5 s of lining up instead of 20.5 s.
 8. **Match end.** After the last player's last frame, or when no seated players remain.
@@ -130,7 +125,7 @@ stateDiagram-v2
 
 | Phase | Length | TV | Phone |
 |---|---|---|---|
-| `intro` | 3,000 ms | Approach shot. Title chip "Strike Night · 4 frames". Bottom panel: "Hold the ball, swing, let go". | Everyone `sn-watch`. The first bowler gets `sn-next`. |
+| `intro` | 3,000 ms | Approach shot. Title chip "Strike Night · 10 frames". Bottom panel: "Hold the ball, swing, let go". | Everyone `sn-watch`. The first bowler gets `sn-next`. |
 | `lineup` | Until a `bowl` is accepted. At most 20,000 ms plus the 500 ms wait (5,000 ms for an away player). | Approach shot. On roll 1, "Noor is up" in the bottom panel and the bowler's chip lifts. The bowler's Pip slides to each `move` and lifts the ball on `grip`. On roll 2, the pin map shows the standing pins. A clock chip counts down the last 5 seconds with a tick each second. | Bowler `sn-bowl`, next bowler `sn-next`, everyone else `sn-watch` |
 | `rolling` | From release until the pins settle. About 2 to 8 seconds, typically 4.5. | The ball rolls up the lane. When it passes 16 m the TV cuts to the pin shot. Pins tumble. | Bowler on the local "Ball away!" state, everyone else unchanged |
 | `result` | 1,500 ms, or 2,500 ms with a callout | The pin count pops over the deck ("9"). STRIKE!, SPARE! or TURKEY! when earned. After roll 1, the sweep bar clears the fallen pins. When the frame is over, its score pops on the bowler's chip. | Bowler `sn-result` |
@@ -232,9 +227,9 @@ Only the bowler's phone has controls. Every other phone shows a watch screen and
 
 | Screen | Big action | Status line | Hint | Cue |
 |---|---|---|---|---|
-| `sn-watch` | Chalk, "Watch the TV" | "Noor is bowling" | "Frame 2 of 4 · you have 34" | none |
+| `sn-watch` | Chalk, "Watch the TV" | "Noor is bowling" | "Frame 2 of 10 · you have 34" | none |
 | `sn-next` | Chalk, "Watch the TV" | "You're up next" | "Get ready to bowl" | none |
-| `sn-bowl`, roll 1 | Sunny, "Hold the ball" (touch: "Swipe up to bowl") | "Frame 2 of 4 · your turn" | "Drag the bar to move" ("Room to swing? Go for it" on the first turn of the match) | `your-turn` |
+| `sn-bowl`, roll 1 | Sunny, "Hold the ball" (touch: "Swipe up to bowl") | "Frame 2 of 10 · your turn" | "Drag the bar to move" ("Room to swing? Go for it" on the first turn of the match) | `your-turn` |
 | `sn-bowl`, roll 2 | Sunny, as above | "3 pins left" | "Drag the bar to move" | none |
 | gripping (local) | Sunny, pressed, "Swing, then let go" (touch: "Swipe up") | "Swing your arm" | "Twist to hook" | `press` |
 | no swing (local) | Sunny, "Hold the ball" | "Swing before you let go" (touch: "Swipe further up") | "Drag the bar to move" | none |
@@ -250,7 +245,7 @@ Only the bowler's phone has controls. Every other phone shows a watch screen and
 ```ts
 type StrikeNightView = {
   frame: number;              // 1 to frames: the frame being bowled
-  frames: number;             // 3 to 10
+  frames: number;             // always 10
   turn: number;               // echoed in move, grip and bowl
   roll: 1 | 2;                // the bowler's roll within the frame
   x: number;                  // this player's last position, −1 to 1
@@ -274,7 +269,7 @@ Three input types, all through one CC-3.6 input stream. `move` and `grip` are co
 ```ts
 import { z } from "zod/mini";
 
-const turn = z.int().check(z.gte(1), z.lte(64));
+const turn = z.int().check(z.gte(1), z.lte(80));
 const position = z.number().check(z.gte(-1), z.lte(1));
 
 export const inputSchema = z.discriminatedUnion("type", [
@@ -297,7 +292,7 @@ export const inputSchema = z.discriminatedUnion("type", [
 export type StrikeNightInput = z.infer<typeof inputSchema>;
 ```
 
-`turn` counts rolls from 1 for the whole match. The most rolls in a match are 8 players × 3 frames × 2 = 48, and 2 players × 6 × 2 = 24, so 64 is a safe cap.
+`turn` counts rolls from 1 for the whole match. The most rolls in a match are 4 players × 10 frames × 2 = 80, the cap.
 
 On the wire, with `at` added by the send helper and `from` by the relay:
 
@@ -330,7 +325,7 @@ Anything else is ignored, including a `bowl` that arrives after the auto-roll.
 | Players | World Pips. The bowler stands on the approach beside the ball's position, holding the ball at their side, and lifts it on `grip`. The Pip spec has no back view, so Pips face the couch as in Target Range. The other players sit on a bench at the lower left in seat order, and the next bowler stands at the end of the bench. |
 | Pins | Drawn upright: an 8×16 frame in the approach shot, 24×40 in the pin shot. A falling pin plays 3 tumble frames in the direction it's moving, then lies flat. Down pins stay on the deck until the sweep. |
 | Ball | Sky with a Chalk shine and an Ink outline, in 32×32, 16×16, 8×8 and 4×4 frames, the nearest to `0.216 × s`, with 4 roll frames at a rate that follows the speed. In the approach shot the ball is capped at 16×16, so a ball near the foul line never looks bigger than the 16×24 bowler. In the pin shot it is 32×32 against 20 px pins, the real size ratio. |
-| Overlays | From `@couchcade/stage`: scoreboard with player chips and totals, the round counter chip showing "Frame 2/4", callouts, room code panel. The bottom instruction panel and the clock chip follow Quick Draw's game-local panel until the stage package has one. The pin map and scorecard are game-local overlay drawings with stage helpers. |
+| Overlays | From `@couchcade/stage`: scoreboard with player chips and totals, the round counter chip showing "Frame 2/10", callouts, room code panel. The bottom instruction panel and the clock chip follow Quick Draw's game-local panel until the stage package has one. The pin map and scorecard are game-local overlay drawings with stage helpers. |
 | Callouts | `STRIKE!` for 10 on roll 1, `TURKEY!` instead for a player's third strike in a row, `SPARE!` for a spare. No callout for a gutter or a split, so nobody is singled out. |
 | Expressions | On `result`, the bowler's Pip looks happy after a strike or spare and surprised after a gutter. The bench is neutral. Nobody looks sad. |
 | Motion | Smooth ball movement, pin tumbles at 12 fps. `STRIKE!` and `TURKEY!` use the `celebrate` token with its 4 px shake, `SPARE!` the `ui` pop. Reduced motion: no shake, pins switch straight to lying without tumbling, callouts appear without scaling. |
@@ -345,7 +340,7 @@ Strike Night follows the CC-4.11 rule in platform.md, [TV rendering](../architec
 3. **Who's bowling.** The bowler's scoreboard chip lifts 8 px with the Sunny outline (HOUSE_STYLE scoreboard), their name is in the bottom panel, and their player shape (`drawPlayerShape`, 9×9) floats over their Pip. Colour is never the only cue.
 4. **Pin map.** A triangle of 10 circles, each 32 px across with a 3 px Ink outline, top right under the scoreboard. Standing pins are Chalk, down pins Ink at 20%. It shows during roll 2's `lineup` and during `result`. In the approach shot real pins are only 5 px wide (20 px at 1080p, under the 24 px minimum), so the map carries that information.
 5. **One focus at a time.** Only one ball moves. Callouts sit above the pin deck, between y = 40 and y = 95 in the world, never over the pins. The pin count and the callout never show together: the count comes first, the callout 400 ms later.
-6. **Scorecard.** At `frameEnd`, a Chalk panel lists players in seat order: shape, name (`body`), one cell per frame with its mark and score (`score` size digits), and the total. With 8 players and 3 frames, or 1 player and 10 frames, it fits inside the safe area without shrinking text below `small`.
+6. **Scorecard.** At `frameEnd`, a Chalk panel lists players in seat order: shape, name (`body`), one cell per frame with its mark and score (`score` size digits), and the total. With 4 players and 10 frames it fits inside the safe area without shrinking text below `small`.
 7. **Clear space.** The lane's approach and the bench stay above the bottom panel, and the pin deck in both shots stays below the scoreboard's 14%.
 
 ---
@@ -369,7 +364,7 @@ Strike Night follows the CC-4.11 rule in platform.md, [TV rendering](../architec
 | Seat expires mid-match | `onPlayerLeft` keeps the player's points and skips their remaining frames. With no seated players left, the match ends with placements. |
 | Late joiner | Gets a seat and waits on the platform `next-game` screen. They play from the next match. |
 | Audience | Sees the platform `audience` screen and can't send input. |
-| TV refresh or deploy mid-frame | The frame in progress is lost. `snapshot` stores `{ f, pts, st, sp, fr }` at each `frameEnd`: completed frames, totals, strikes, spares and frame scores, about 200 bytes for 8 players. It holds no positions (session-flow.md snapshot rule 4). `restore` resumes at the first bowler of the next frame, with every player back at `x = 0`. |
+| TV refresh or deploy mid-frame | The frame in progress is lost. `snapshot` stores `{ f, pts, st, sp, fr }` at each `frameEnd`: completed frames, totals, strikes, spares and frame scores, about 200 bytes for 4 players. It holds no positions (session-flow.md snapshot rule 4). `restore` resumes at the first bowler of the next frame, with every player back at `x = 0`. |
 | Bowl released just before the deadline | Counts if `atMs` is at or before the deadline. It arrives within the 500 ms wait. |
 | `bowl` from an earlier turn arrives late | Dropped, because `payload.turn` doesn't match. |
 | `move` or `grip` still pending when `bowl` goes out | `fire` goes first. The late `set` values arrive during `rolling` and are ignored. |
@@ -392,21 +387,21 @@ Caps from [platform.md](../architecture/platform.md#the-caps): phones at most 4 
 
 **Per player per frame.** With a strike on 1 roll in 5: 6 + 0.8 × 3 = 8.4 phone messages and 1.8 rolls, so 3.6 `controller:state`.
 
-| Per match | 4 players × 4 frames = 16 player-frames | 8 players × 3 frames = 24 player-frames |
+| Per match, 10 frames each | 2 players = 20 player-frames | 4 players = 40 player-frames |
 |---|---|---|
-| Phone input: 8.4 per player-frame | 134 | 202 |
-| `controller:state`: 2 per roll + 1 at the start | 2 × 28.8 + 1 = 59 | 2 × 43.2 + 1 = 87 |
-| `room:snapshot`: 1 at the start + 1 per frame | 5 | 4 |
+| Phone input: 8.4 per player-frame | 168 | 336 |
+| `controller:state`: 2 per roll + 1 at the start | 2 × 36 + 1 = 73 | 2 × 72 + 1 = 145 |
+| `room:snapshot`: 1 at the start + 1 per frame | 11 | 11 |
 | `room:phase` in and out | 2 | 2 |
-| `motion:status`: 1 per phone | 4 | 8 |
-| **Total** | **about 200 in about 5.6 min** | **about 300 in about 8.2 min** |
+| `motion:status`: 1 per phone | 2 | 4 |
+| **Total** | **about 250 in about 7.2 min** | **about 500 in about 14 min** |
 
 | Check | Strike Night | Cap | Fits |
 |---|---|---|---|
-| Messages per phone | At most 4 per second, and only while dragging the bar. An 8-player match averages 202 / 8 / 490 s = 0.05 per second per phone. | 4 per second | Yes. The input stream enforces it. |
-| Host `controller:state` | 87 in 490 s, about 0.18 per second. Sends are at least 1,500 ms apart. | 1.5 per second, 667 ms apart | Yes |
-| One hour of only Strike Night, 8 players, typical | 3,600 s / 490 s ≈ 7 matches, say 6 with menus. 6 × 300 = about 1,800 | platform.md plans 8 × 720 + 1,800 = 7,560 per hour for 8 phones in turn-based games | Yes, about a quarter |
-| One hour, worst case: every bowler drags the whole 20 s of every roll | A roll then takes 31 s and sends 20.5 × 4 + 2 = 84 messages. 3,600 / 31 ≈ 116 rolls × (84 + 2) = about 10,000 | One real-time phone for an hour is 14,400. platform.md's 8-phone real-time hour is about 123,000. | Yes |
+| Messages per phone | At most 4 per second, and only while dragging the bar. A 4-player match averages 336 / 4 / 830 s = 0.1 per second per phone. | 4 per second | Yes. The input stream enforces it. |
+| Host `controller:state` | 145 in 830 s, about 0.17 per second. Sends are at least 1,500 ms apart. | 1.5 per second, 667 ms apart | Yes |
+| One hour of only Strike Night, 4 players, typical | 3,600 s / 830 s ≈ 4.3 matches, say 4 with menus. 4 × 500 = about 2,000 | platform.md plans 4 × 720 + 1,800 = 4,680 per hour for 4 phones in turn-based games | Yes, under half |
+| One hour, worst case: every bowler drags the whole 20 s of every roll | A roll then takes 31 s and sends 20.5 × 4 + 2 = 84 messages. 3,600 / 31 ≈ 116 rolls × (84 + 2) = about 10,000 | One real-time phone for an hour is 14,400. platform.md's 4-phone real-time hour is about 64,000. | Yes |
 
 `realtime` is `true` because `onTick` drives the physics and the turn timer. For the budget Strike Night is a turn-based game, like Quick Draw.
 
@@ -499,30 +494,19 @@ None of these changes an approved decision.
 
 | # | Where | Finding | Action |
 |---|---|---|---|
-| 1 | README game table, CC-12 epic | Both say "1–4 in turns", the epic with "3–5 frames with more players". This spec proposes 1 to 8 players with 3 to 10 frames ([open question 2](#open-questions-for-the-owner)). | After approval, update the README row and the epic description with `backlog-plan` amend mode |
-| 2 | CC-12.5 criterion 1 | `packages/theme/src/scenes/strike-night.ts` already defines `alley`. | None. CC-12.5 keeps the file and checks the sprites against it. |
-| 3 | `@couchcade/stage` | No bottom instruction panel or clock chip yet. Quick Draw and Target Range built game-local ones. | CC-12.4 follows their pattern. A shared panel belongs in a stage story. |
-| 4 | CC-6.4 World Pips | Still To Do, and pips.md has no back view. | CC-12.4 uses a game-local `world-pip.ts` as pips.md fix 5 allows, and Pips face the couch |
-| 5 | session-flow.md physics rule 4 | Says contacts are pairs "touching after the step". CC-3.9 returns pairs that touched during the step, so a quick bounce isn't missed. | None for this game: contacts only drive sounds. The wording is a docs fix for whoever next edits session-flow.md. |
-| 6 | Top-down pins | A disc can't tip over, so plain circles gave 5% strikes in the prototype. | The falling pin rule in [Ball and pins](#ball-and-pins). CC-12.2 owns the tuning. |
-| 7 | Swing angle on real phones | Unverified until real traces exist (CC-5.9). | CC-12.3 records one bowling trace per platform before CC-12.7, and CC-12.2's `AIM_GAIN` is the knob |
+| 1 | CC-12.5 criterion 1 | `packages/theme/src/scenes/strike-night.ts` already defines `alley`. | None. CC-12.5 keeps the file and checks the sprites against it. |
+| 2 | `@couchcade/stage` | No bottom instruction panel or clock chip yet. Quick Draw and Target Range built game-local ones. | CC-12.4 follows their pattern. A shared panel belongs in a stage story. |
+| 3 | CC-6.4 World Pips | Still To Do, and pips.md has no back view. | CC-12.4 uses a game-local `world-pip.ts` as pips.md fix 5 allows, and Pips face the couch |
+| 4 | session-flow.md physics rule 4 | Says contacts are pairs "touching after the step". CC-3.9 returns pairs that touched during the step, so a quick bounce isn't missed. | None for this game: contacts only drive sounds. The wording is a docs fix for whoever next edits session-flow.md. |
+| 5 | Top-down pins | A disc can't tip over, so plain circles gave 5% strikes in the prototype. | The falling pin rule in [Ball and pins](#ball-and-pins). CC-12.2 owns the tuning. |
+| 6 | Swing angle on real phones | Unverified until real traces exist (CC-5.9). | CC-12.3 records one bowling trace per platform before CC-12.7, and CC-12.2's `AIM_GAIN` is the knob |
 
 ---
 
-## Open questions for the owner
+## Owner decisions (2026-09-17)
 
-Product forks only. Each has a recommendation, and the spec above is written as if the owner takes it.
+The owner approved the spec on 2026-09-17 and settled the three open questions. The spec above follows these answers.
 
-1. **Which scoring?**
-   - *Current frame scoring (recommended):* a strike is 30, a spare is 10 plus the first roll, an open frame is the pins. World Bowling uses it. The number on the TV is final the moment a frame ends, there are no bonus rolls in the last frame, and a perfect game is still 300.
-   - *Traditional scoring:* a strike is 10 plus the next 2 rolls, a spare 10 plus the next roll, and the last frame gets up to 2 bonus rolls. It's what every alley's screen shows and what bowlers know, but frames show a blank score until later rolls land, and in a 3-frame match the bonus rolls add almost a whole extra frame per strike.
-   - Recommendation: current frame scoring. Party players see their score straight away and short matches stay short.
-2. **How long is a match, and how many can play?**
-   - *Frames scale with players, 1 to 8 (recommended):* 10 frames for 1 player down to 3 frames for 5 to 8, so a match takes about 4 to 6 minutes for up to 5 players and 8 minutes for 8. With 8 players you wait about 2.3 minutes between turns.
-   - *Always 10 frames, 1 to 4 players, as the README says:* real bowling, but a 4-player match takes about 14 minutes and 5 or more can't play.
-   - *Scaled frames plus two lanes side by side for 5 to 8 players:* halves the wait, but the TV has to show two lanes and two balls at once, which is a much bigger scene and harder to read.
-   - Recommendation: scale the frames with 1 to 8 players. Revisit two lanes after the playtest if the 8-player wait feels long.
-3. **How does a player aim?**
-   - *Position plus the swing (recommended):* drag the bar to pick a spot, then the swing's direction nudges the line (±1.5°) and the twist hooks it. One control before the throw, and the phone keeps one big action.
-   - *Position plus an aim arrow, like Wii Sports:* a second drag turns an arrow on the TV before the swing, and the swing's direction is ignored. More precise and doesn't depend on how well phones measure the swing angle, but every roll takes longer and the phone needs a second control.
-   - Recommendation: position plus the swing. If CC-12.3's real traces show the angle is too noisy, the aim gain drops to 0 and the ball starts straight, with no redesign.
+1. **Current frame scoring.** A strike is 30, a spare is 10 plus the first roll, an open frame is the pins knocked down, as World Bowling scores it. The score on the TV is final the moment a frame ends, there are no bonus rolls in the last frame, and a perfect game is still 300. Traditional scoring, with strike and spare bonuses carried into later rolls, was rejected: party players can't follow scores that stay blank until later rolls land.
+2. **1 to 4 players, always 10 frames.** A full game of bowling, as the README says and as Switch Sports plays locally. A match takes about 4 minutes alone and 14 minutes with 4 players, and you wait about a minute between turns. Scaling frames down (3 to 10) to fit 8 players was rejected, and so was a two-lane TV layout for 5 to 8 players.
+3. **Aim with position plus the swing.** Drag the bar to pick a spot, then the swing's direction nudges the line (±1.5°) and the twist hooks it. One control before the throw, and the phone keeps one big action. A Wii-style aim arrow set before each throw was rejected because it adds a second control and time to every roll. If CC-12.3's real traces show the swing angle is too noisy, `AIM_GAIN` drops to 0 and the ball starts straight, with no redesign.
