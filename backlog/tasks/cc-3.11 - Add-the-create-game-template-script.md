@@ -4,7 +4,7 @@ title: Add the create-game template script
 status: Done
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-17 09:55'
+updated_date: '2026-09-17 10:11'
 labels:
   - story
 dependencies:
@@ -114,6 +114,25 @@ Implemented as tooling/create-game (new workspace package, owns the root create-
   separate README pass per session-flow.md conflict 6, out of this story's scope.
 - pnpm-lock.yaml changed only by adding tooling/create-game's own dependencies (48 lines); no
   catalog changes. Excluded from the reviewer diff/changed-path list per the worker brief.
+
+Round 2 review (block): a freshly generated game failed oxfmt --check because two template files
+(test/rules.test.ts, src/controller/Controller.vue) had lines over the 100-char printWidth. Fixed
+by reformatting both to match real oxfmt output, and added oxfmt --check + oxlint runs to
+generate-and-verify.test.ts so this can't regress silently.
+
+Round 3 review (block, scope): the fix above initially also added a
+`tooling/create-game/template/**` exclusion to the root .oxlintrc.json, .oxfmtrc.json and
+.dependency-cruiser.cjs - outside the story's declared References (tooling/create-game/). Tested
+directly and confirmed those exclusions were unnecessary: oxfmt --check and oxlint both pass the
+template folder as-is once its lines fit printWidth (oxlint emits one warning for a placeholder
+token's leading underscore, which is "suspicious" severity and doesn't fail the run), and
+dependency-cruiser's check:deps already resolves every @couchcade/* import from
+tooling/create-game's own linked node_modules and has no game-shaped rule that matches a path
+outside games/*. Reverted all three root config files; the change is now fully contained inside
+tooling/create-game/, matching References. Re-verified pnpm check, check:deps, test and build all
+green with the revert.
+
+Round 3 review: pass. Both acceptance criteria met, no scope violations, no findings.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
