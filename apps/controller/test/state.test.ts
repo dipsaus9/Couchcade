@@ -270,6 +270,24 @@ describe("results", () => {
   });
 });
 
+describe("calibration", () => {
+  const lobby = run(initialState(null, session), welcome());
+  const calibrationView = (data: JsonValue) =>
+    message({ t: "controller:state", d: { gameId: null, view: { screen: "calibration", data } } });
+
+  it("shows the tap button during the TV lag check", () => {
+    const view = inRoom(reduce(lobby, calibrationView({ vip: false, active: true })));
+    expect(screenOf(view)).toBe("calibration");
+  });
+
+  it("waits instead, offline, while the TV is away or on a malformed view", () => {
+    const view = inRoom(reduce(lobby, calibrationView({ vip: true, active: true })));
+    expect(screenOf({ ...view, online: false })).toBe("waiting");
+    expect(screenOf({ ...view, hostConnected: false })).toBe("waiting");
+    expect(screenOf(inRoom(reduce(lobby, calibrationView({ vip: true }))))).toBe("waiting");
+  });
+});
+
 describe("endReasonForClose", () => {
   it("ends the session on the relay's own close codes", () => {
     expect(endReasonForClose(4003)).toBe("kicked");

@@ -3,6 +3,8 @@ import { computed, onBeforeUnmount } from "vue";
 import RotateNotice from "./components/RotateNotice.vue";
 import GameController from "./runtime/GameController.vue";
 import { showsGameController } from "./runtime/controller.ts";
+import { parseCalibrationView } from "./screens/calibration/calibration-view.ts";
+import CalibrationScreen from "./screens/calibration/CalibrationScreen.vue";
 import JoinScreen from "./screens/join/JoinScreen.vue";
 import LobbyScreen from "./screens/lobby/LobbyScreen.vue";
 import { isVipLobby, parseMenuView } from "./screens/menu/menu-view.ts";
@@ -25,6 +27,11 @@ const menuView = computed(() =>
 const resultsView = computed(() =>
   state.value.status === "room" && state.value.view !== null && screen.value === "results"
     ? parseResultsView(state.value.view.data)
+    : null,
+);
+const calibrationView = computed(() =>
+  state.value.status === "room" && state.value.view !== null && screen.value === "calibration"
+    ? parseCalibrationView(state.value.view.data)
     : null,
 );
 
@@ -52,6 +59,7 @@ onBeforeUnmount(() => session.dispose());
     />
     <MenuScreen v-else-if="menuView" :view="menuView" @send="session.send" />
     <ResultsScreen v-else-if="resultsView" :view="resultsView" @send="session.send" />
+    <CalibrationScreen v-else-if="calibrationView" :view="calibrationView" @send="session.send" />
     <GameController
       v-else-if="showsGameController(state)"
       :state="state"
