@@ -10,7 +10,12 @@
  */
 import type { BigActionState } from "@couchcade/ui";
 import type { CueToken } from "@couchcade/protocol";
-import type { QuickDrawResultView, QuickDrawScreen, QuickDrawView } from "../shared/view.ts";
+import type {
+  PracticeView,
+  QuickDrawResultView,
+  QuickDrawScreen,
+  QuickDrawView,
+} from "../shared/view.ts";
 
 export interface QuickDrawPresentation {
   /** The big action's fill and interactivity. */
@@ -35,14 +40,48 @@ const roundStatus = (data: QuickDrawView): string =>
 /** `243` becomes `"0.243"`. Reaction times are always under a few seconds, so 3 decimals fit. */
 const secondsOf = (ms: number): string => (ms / 1000).toFixed(3);
 
+const pointsOf = (points: number): string => `${points} ${points === 1 ? "point" : "points"}`;
+
+/**
+ * Solo practice (docs/games/quick-draw.md, "Solo practice"): a valid time says whether it's a new
+ * best, and the match's last result shows the best and average times instead of the usual hint.
+ */
+function practicePresentation(
+  data: QuickDrawResultView,
+  practice: PracticeView,
+): Pick<QuickDrawPresentation, "statusLine" | "hint" | "cue"> {
+  const lines =
+    data.result === "won"
+      ? {
+          statusLine: practice.newBest
+            ? "New best!"
+            : `Your best is ${secondsOf(practice.bestMs ?? 0)} s`,
+          hint: `${secondsOf(data.ms ?? 0)} s · ${pointsOf(data.points)}`,
+          cue: "celebrate" as const,
+        }
+      : roundLines(data);
+  if (!practice.final || practice.bestMs === null || practice.averageMs === null) return lines;
+  return {
+    ...lines,
+    hint: `Best ${secondsOf(practice.bestMs)} s · average ${secondsOf(practice.averageMs)} s`,
+  };
+}
+
 function resultPresentation(
+  data: QuickDrawResultView,
+): Pick<QuickDrawPresentation, "statusLine" | "hint" | "cue"> {
+  return data.practice ? practicePresentation(data, data.practice) : roundLines(data);
+}
+
+/** A result with other players in the match (docs/games/quick-draw.md, "Phone controller"). */
+function roundLines(
   data: QuickDrawResultView,
 ): Pick<QuickDrawPresentation, "statusLine" | "hint" | "cue"> {
   switch (data.result) {
     case "won":
       return {
         statusLine: "You won the round!",
-        hint: `${secondsOf(data.ms ?? 0)} s · ${data.points} ${data.points === 1 ? "point" : "points"}`,
+        hint: `${secondsOf(data.ms ?? 0)} s · ${pointsOf(data.points)}`,
         cue: "celebrate",
       };
     case "lost":

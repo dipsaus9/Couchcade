@@ -73,12 +73,27 @@ export interface QuickDrawState {
   wordsShown: number;
   /** `rng` and `wordsShown` before this round's standoff was rolled, for `snapshot`. */
   roundStart: { rng: number; wordsShown: number };
+  /** Only in solo practice, a match started with one player (spec, "Solo practice"). */
+  practice?: Practice;
 }
 
-/** A new match: round 1's intro starts at game time 0. */
+/**
+ * Solo practice: one player against their own best time, which is `bestMs` on the player. This
+ * adds what the average and the "new best" line need.
+ */
+export interface Practice {
+  /** Sum of every valid reaction this match, in whole ms. */
+  totalMs: number;
+  /** How many valid reactions `totalMs` adds up. */
+  validTaps: number;
+  /** The last resolved round's valid reaction beat the best before it, or was the first. */
+  newBest: boolean;
+}
+
+/** A new match: round 1's intro starts at game time 0. One player gets solo practice. */
 export function init(players: readonly Player[], seed: number): QuickDrawState {
   const rng = createRng(seed).state;
-  return {
+  const state: QuickDrawState = {
     phase: "intro",
     round: 1,
     nowMs: 0,
@@ -100,6 +115,14 @@ export function init(players: readonly Player[], seed: number): QuickDrawState {
     wordsShown: 0,
     roundStart: { rng, wordsShown: 0 },
   };
+  return players.length === 1
+    ? { ...state, practice: { totalMs: 0, validTaps: 0, newBest: false } }
+    : state;
+}
+
+/** The average valid reaction in solo practice, in whole ms, or null before the first one. */
+export function averageMs(practice: Practice): number | null {
+  return practice.validTaps === 0 ? null : Math.round(practice.totalMs / practice.validTaps);
 }
 
 /** Players who still play: their seat hasn't expired. */

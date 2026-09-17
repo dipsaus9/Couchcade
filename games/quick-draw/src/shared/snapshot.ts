@@ -7,13 +7,15 @@ import type { QuickDrawState } from "./state.ts";
 
 /**
  * What a refreshed TV needs to resume at the next round's intro. `players` maps an id to
- * `[points, bestMs]`. Under 300 bytes for 8 players.
+ * `[points, bestMs]`. Under 300 bytes for 8 players. Solo practice adds `practice`:
+ * `[totalMs, validTaps]`, so the average survives a refresh.
  */
 const snapshotSchema = z.object({
   round: z.int().check(z.gte(1)),
   rng: z.int().check(z.gte(0)),
   words: z.int().check(z.gte(0)),
   players: z.record(z.string(), z.tuple([z.int().check(z.gte(0)), z.nullable(z.number())])),
+  practice: z.optional(z.tuple([z.int().check(z.gte(0)), z.int().check(z.gte(0))])),
 });
 
 export type QuickDrawSnapshot = z.infer<typeof snapshotSchema>;
@@ -33,6 +35,7 @@ export function snapshot(state: QuickDrawState): QuickDrawSnapshot {
     players: Object.fromEntries(
       state.players.map((player) => [player.id, [player.points, player.bestMs]]),
     ),
+    ...(state.practice ? { practice: [state.practice.totalMs, state.practice.validTaps] } : {}),
   };
 }
 
@@ -57,6 +60,11 @@ export function restore(players: readonly Player[], seed: number, data: JsonValu
       const [points, bestMs] = saved.players[player.id] ?? [0, null];
       return { ...player, points, bestMs };
     }),
+    ...(fresh.practice && saved.practice
+      ? {
+          practice: { totalMs: saved.practice[0], validTaps: saved.practice[1], newBest: false },
+        }
+      : {}),
   };
   const decided =
     saved.round > maxRounds || state.players.some((player) => player.points >= targetPoints);

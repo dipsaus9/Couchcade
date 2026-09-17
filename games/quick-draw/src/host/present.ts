@@ -1,7 +1,20 @@
 import { motion } from "@couchcade/theme";
 import { tickMs } from "@couchcade/game-sdk/contract";
-import { fakeWordShowMs, glintShowMs, introMs } from "../shared/index.ts";
-import type { Fake, Phase, QuickDrawPlayer, QuickDrawState, TapResult } from "../shared/index.ts";
+import {
+  averageMs,
+  fakeWordShowMs,
+  glintShowMs,
+  introMs,
+  isMatchDecided,
+} from "../shared/index.ts";
+import type {
+  Fake,
+  Phase,
+  Practice,
+  QuickDrawPlayer,
+  QuickDrawState,
+  TapResult,
+} from "../shared/index.ts";
 import { pipSlots } from "./layout.ts";
 import type { PipSlot } from "./layout.ts";
 
@@ -102,6 +115,7 @@ export function panelText(state: QuickDrawState): string {
     case "draw":
       return state.round === 1 ? "Wait for it…" : "Only DRAW! counts";
     case "result": {
+      if (state.practice) return practicePanel(state, state.practice);
       const names = state.players
         .filter((player) => state.winners.includes(player.id))
         .map((player) => player.name);
@@ -111,6 +125,26 @@ export function panelText(state: QuickDrawState): string {
     case "over":
       return "That's the match";
   }
+}
+
+/**
+ * The result panel in solo practice (spec, "Solo practice"): the time and whether it's a new best,
+ * and the best and average times on the match's last round.
+ */
+function practicePanel(state: QuickDrawState, practice: Practice): string {
+  const player = state.players[0];
+  const bestMs = player?.bestMs ?? null;
+  const average = averageMs(practice);
+  if (isMatchDecided(state) && bestMs !== null && average !== null) {
+    return `Best ${formatReaction(bestMs)} · average ${formatReaction(average)}`;
+  }
+  const result = player?.result;
+  if (result?.kind !== "valid" || result.ms === null || bestMs === null) {
+    return "No time this round";
+  }
+  return practice.newBest
+    ? `New best: ${formatReaction(result.ms)}`
+    : `${formatReaction(result.ms)}, best ${formatReaction(bestMs)}`;
 }
 
 function currentCallout(state: QuickDrawState): CalloutPresentation | null {
