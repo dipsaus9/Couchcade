@@ -4,11 +4,11 @@ title: Relay WebRTC signalling messages through the room
 status: To Do
 assignee: []
 created_date: '2026-09-17 17:50'
-updated_date: '2026-09-17 17:50'
+updated_date: '2026-09-17 20:28'
 labels:
   - story
 dependencies:
-  - CC-3.14
+  - CC-3.12
 references:
   - packages/protocol/src/messages/
   - packages/protocol/test/messages.test.ts
@@ -44,4 +44,6 @@ Branch: CC-3.15/rtc-signalling-relay
 
 <!-- SECTION:NOTES:BEGIN -->
 Verify: pnpm check, pnpm test, pnpm build.
+
+Dependency changed from CC-3.14 to CC-3.12 (orchestrator decision, 2026-09-17): CC-3.15 only needs the approved design doc (docs/architecture/realtime-link.md, Signalling section), not CC-3.14's doc-amendment edits to platform.md/security.md/etc. Waiting on CC-3.14 would also chain this story behind CC-3.13's owner-run spike for no reason -- the protocol schemas and room relay can be built and reviewed in parallel with the spike and the doc amendments. CC-3.14 itself is untouched and still depends on CC-3.13.
 <!-- SECTION:NOTES:END -->

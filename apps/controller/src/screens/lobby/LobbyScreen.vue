@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import type { PhoneToRelayMessage, PlayerInfo } from "@couchcade/protocol";
-import { CcButton } from "@couchcade/ui";
+import { players } from "@couchcade/theme";
+import { CcButton, CcPlayerChip } from "@couchcade/ui";
 import { computed } from "vue";
-import PlayerShape from "../../components/PlayerShape.vue";
 import { lookForSlot } from "../../session/look.ts";
 import { menuActions } from "../menu/menu-view.ts";
 
 // The phone in the lobby: its name, colour and shape (docs/design/platform-screens.md, "Lobby").
 // The VIP also gets "Choose a game" and "Surprise me" (CC-3.2). The Pip customiser (CC-6.5) comes
-// later; CC-4.8 restyles it.
+// later; built from the UI kit's CcPlayerChip, whose plain Sky circle is the audience look.
 
 const props = defineProps<{
   you: PlayerInfo;
@@ -22,19 +22,16 @@ const props = defineProps<{
 const emit = defineEmits<{ send: [message: PhoneToRelayMessage] }>();
 
 const look = computed(() => (props.role === "player" ? lookForSlot(props.you.slot) : null));
+// CcPlayerChip takes the theme's player id, not the look's colour/shape pair.
+const playerId = computed(() =>
+  props.role === "player" && props.you.slot !== null ? players[props.you.slot]?.id : undefined,
+);
 </script>
 
 <template>
   <section class="screen">
-    <div class="chip">
-      <PlayerShape
-        v-if="look"
-        :shape="look.shape"
-        :fill="look.fill"
-        :label="`${look.colourName} ${look.shape}`"
-      />
-      <span v-else class="audience-dot" aria-hidden="true" />
-      <span class="name">{{ you.name }}</span>
+    <div class="chip-row">
+      <CcPlayerChip :player="playerId" :name="you.name" />
       <span class="tag">{{ look ? look.seatLabel : "Audience" }}</span>
     </div>
 
@@ -71,35 +68,16 @@ const look = computed(() => (props.role === "player" ? lookForSlot(props.you.slo
   gap: var(--cc-space-6);
 }
 
-.chip {
+.chip-row {
   display: flex;
   align-items: center;
   gap: var(--cc-space-3);
-  min-height: var(--cc-touch-min);
-  padding: var(--cc-space-2) var(--cc-space-4) var(--cc-space-2) var(--cc-space-3);
-  background: var(--cc-chalk);
-  border: var(--cc-outline-phone) solid var(--cc-ink);
-  border-radius: var(--cc-radius-pill);
-  box-shadow: var(--cc-depth-panel);
-}
-
-.audience-dot {
-  width: var(--cc-space-7);
-  height: var(--cc-space-7);
-  background: var(--cc-sky);
-  border: var(--cc-outline-phone) solid var(--cc-ink);
-  border-radius: var(--cc-radius-pill);
-}
-
-.name {
-  font-size: var(--cc-text-body-phone);
-  font-weight: var(--cc-text-title-weight);
+  align-self: flex-start;
 }
 
 .tag {
-  margin-left: auto;
   padding: var(--cc-space-1) var(--cc-space-3);
-  background: var(--cc-sky);
+  background: var(--cc-chalk);
   border: var(--cc-outline-phone) solid var(--cc-ink);
   border-radius: var(--cc-radius-tag);
   font-size: var(--cc-text-small-phone);

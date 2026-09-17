@@ -8,7 +8,7 @@ updated_date: '2026-09-17 20:36'
 labels:
   - story
 dependencies:
-  - CC-3.14
+  - CC-3.12
 references:
   - packages/game-sdk/src/link/
   - packages/game-sdk/test/link/
@@ -88,6 +88,8 @@ input channel/relay packing (CC-3.17/18), and the actual RTCPeerConnection brows
 <!-- SECTION:NOTES:BEGIN -->
 Recorded descriptions: capture one offer and one answer per engine (Playwright Chromium and WebKit, a local Firefox) with iceServers [] and store them as fixtures.
 Verify: pnpm check, pnpm test, pnpm build.
+
+Dependency changed from CC-3.14 to CC-3.12 (orchestrator decision, 2026-09-17): the link core (description codec, clock maths, token buckets, event de-duplication, state machine, createFakeLink) is fully specified in the approved docs/architecture/realtime-link.md and doesn't need CC-3.14's doc-amendment edits to platform.md/security.md/etc. Waiting on CC-3.14 would also chain this story behind CC-3.13's owner-run spike for no reason -- the SDK link core can be built and reviewed in parallel with the spike and the doc amendments. CC-3.14 itself is untouched and still depends on CC-3.13.
 
 Recorded fixtures captured live: launched Playwright Chromium, Firefox and WebKit (installed
 firefox-1543 for this repo's pinned Playwright), created a negotiated cc-stream(0)/cc-events(1)
