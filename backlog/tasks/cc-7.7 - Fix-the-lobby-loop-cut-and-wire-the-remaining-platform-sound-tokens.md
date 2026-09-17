@@ -1,10 +1,10 @@
 ---
 id: CC-7.7
 title: Fix the lobby loop cut and wire the remaining platform sound tokens
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-09-17 21:57'
-updated_date: '2026-09-17 21:59'
+updated_date: '2026-09-17 22:10'
 labels:
   - story
 dependencies:
@@ -36,9 +36,9 @@ Branch: CC-7.7/lobby-loop-tokens
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 apps/host/public/audio/lobby-loop.ogg is recut from the original, uncut CC0 source at its measured real tempo (not 130 BPM), 8 or 9 bars (about 19.5 to 21.9 s)
-- [ ] #2 The recut loop's seam is verified programmatically: sample continuity and level at the join, plus a beat-grid check, with the method and result recorded in the task notes
-- [ ] #3 apps/host/CREDITS.md's lobby loop entry and notes state the corrected measured tempo and cut length, and docs/CREDITS.md is regenerated
+- [x] #1 apps/host/public/audio/lobby-loop.ogg is recut from the original, uncut CC0 source at its measured real tempo (not 130 BPM), 8 or 9 bars (about 19.5 to 21.9 s)
+- [x] #2 The recut loop's seam is verified programmatically: sample continuity and level at the join, plus a beat-grid check, with the method and result recorded in the task notes
+- [x] #3 apps/host/CREDITS.md's lobby loop entry and notes state the corrected measured tempo and cut length, and docs/CREDITS.md is regenerated
 - [ ] #4 The press token plays on every CcButton press on a TV (host) screen
 - [ ] #5 The press token plays on each menu countdown tick and on the VIP's card pick in MenuScreen.vue
 - [ ] #6 The scene token plays on every host phase change
@@ -55,4 +55,6 @@ Branch: CC-7.7/lobby-loop-tokens
 
 <!-- SECTION:NOTES:BEGIN -->
 Per-story Verify: pnpm check && pnpm test && pnpm check:style && pnpm check:deps && pnpm build (repo baseline). Docs/architecture/audio.md is an owner-approved doc (approved 17 September 2026) and is NOT in this story's References -- if its 'Lobby loop' shortlist table (130 BPM, 12 bars) turns out factually wrong once the real tempo is measured, record that as a follow-up for the owner rather than hand-editing the approved doc in this story. ffmpeg and aubio (aubioonset) are on PATH in this environment; aubio's own global 'tempo' command is unreliable here (CC-7.3's own CREDITS.md note: it read 101.46 BPM against the doc's claimed 130; this agent independently measured 110.29 BPM with aubio tempo and 22.154739 s file duration with ffprobe on the already-cut file) -- don't trust a single tempo command's raw output without cross-checking onset spacing. Budgets: 350 KB for the lobby loop, 500 KB total platform audio (docs/architecture/audio.md 'Loading, formats and size').
+
+Lobby loop recut evidence: re-downloaded the original 58.986s 'Adventure Begins Loop' from the Happy Chiptunes Collection zip (opengameart.org). Beat-grid fit (aubioonset onsets against a 16th-note grid, joint tempo+phase search maximizing sum(cos(2*pi*(t-phase)/T))) measured the real tempo at 97.494 BPM, not the doc's 130 BPM (docs/architecture/audio.md's 'Lobby loop' table is now known wrong -- flagged as an owner doc-correction follow-up, not edited here). Chose a 9-bar cut with a +-6ms sample-accurate search minimizing the sample-value/slope jump at the loop seam: cost 31.25 (0th percentile of 500 candidate points across the track, median ~7.85M) vs 19.0M for the original shipped cut. Re-encoding to lossy Vorbis (ffmpeg's native encoder, no libvorbis available here, same as CC-7.3 used -- Lavc63.1.101 vorbis) reintroduces some discontinuity at hard file edges, so the shipped file keeps ~0.53s of inert audio past endS and platform-sounds.ts now uses loop:{startS,endS} (0.030204s / 22.178821s) instead of loop:true, so Web Audio's own loopStart/loopEnd loop only the clean span -- post-encode seam jump measured at 41-of-32768 (~0.12% of full scale) vs 4303 in the original file. Full writeup in apps/host/CREDITS.md. Size: lobby-loop.ogg 252.3 KB (was 214.2 KB), platform total ~340.5 KB, both within budget (350 KB / 500 KB).
 <!-- SECTION:NOTES:END -->
