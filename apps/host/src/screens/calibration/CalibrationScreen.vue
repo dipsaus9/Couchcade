@@ -1,17 +1,16 @@
 <script setup lang="ts">
 import { seatCount } from "@couchcade/protocol";
 import { players as playerStyles } from "@couchcade/theme";
+import { CcButton, CcPanel, CcPlayerShape } from "@couchcade/ui";
 import { computed, onBeforeUnmount, onMounted, shallowRef } from "vue";
 import type { CalibrationScreenState } from "../../runtime/host-runtime.ts";
 import { seatedPlayers, type LobbyState } from "../lobby/lobby-state.ts";
-import PlayerShape from "../lobby/PlayerShape.vue";
 import { countingFlashes, practiceFlashes, type FlashFrame } from "./calibration.ts";
 
 // The TV lag check (docs/design/platform-screens.md, "TV lag calibration"; session-flow.md, "TV
 // lag calibration"): a Turf panel flashes on a steady beat, players tap along on their phones, and
 // each player's last tap shows in ms. The flash is a colour change at 1.3 per second, under the
-// 3 per second flash limit, so it stays on with reduced motion: it is the measurement. CC-4.7
-// restyles it.
+// 3 per second flash limit, so it stays on with reduced motion: it is the measurement.
 const props = defineProps<{
   lobby: LobbyState;
   calibration: CalibrationScreenState;
@@ -78,20 +77,20 @@ const lagSoFar = computed(() => props.calibration.measurement.lagMs);
 
     <main class="main">
       <div v-if="calibration.status === 'retry'" class="flash-wrap">
-        <div class="panel retry" role="status">
+        <CcPanel class="retry" screen="tv" v-bind="{ role: 'status' }">
           <p class="retry-title">Let's try that again</p>
           <p class="body">Tap along with the flash on your phone, in time, not after it.</p>
           <div class="actions">
-            <button class="button primary" type="button" @click="$emit('retry')">Try again</button>
-            <button class="button" type="button" @click="$emit('skip')">Skip</button>
+            <CcButton variant="primary" screen="tv" @press="$emit('retry')">Try again</CcButton>
+            <CcButton screen="tv" @press="$emit('skip')">Skip</CcButton>
           </div>
-        </div>
+        </CcPanel>
       </div>
       <div v-else class="flash-wrap">
-        <div class="panel flash" :class="{ lit }">
+        <CcPanel class="flash" screen="tv" :class="{ lit }">
           <span v-if="lit" class="callout">TAP!</span>
           <span v-else-if="beat === null" class="body">Get ready</span>
-        </div>
+        </CcPanel>
         <div class="dots">
           <span class="body">{{ practice ? "Practice" : "Flash" }}</span>
           <span v-for="(state, i) in dots" :key="i" class="dot" :class="state" />
@@ -99,26 +98,20 @@ const lagSoFar = computed(() => props.calibration.measurement.lagMs);
         </div>
       </div>
 
-      <section class="panel taps" aria-label="Last tap">
-        <span class="tab">Last tap</span>
+      <CcPanel class="taps" screen="tv" as="section" tab="Last tap">
         <ul class="chips">
           <li v-for="{ player, style, lastMs } in chips" :key="player.id" class="chip">
-            <PlayerShape
-              class="shape"
-              :shape="style.shape"
-              :size="32"
-              :style="{ fill: `var(--cc-player-${style.id})` }"
-            />
+            <CcPlayerShape class="shape" :player="style.id" :size="32" screen="tv" />
             <span class="name">{{ player.name }}</span>
             <span class="ms" :class="{ waiting: lastMs === null }">{{ lastMs ?? "--" }}</span>
             <span class="unit">{{ lastMs === null ? "" : "ms" }}</span>
           </li>
         </ul>
-      </section>
+      </CcPanel>
     </main>
 
     <footer class="foot">
-      <div class="panel hint">
+      <CcPanel class="hint" screen="tv">
         <div class="hint-text">
           <p class="body strong">Tap your big button in time with the flash, not after it</p>
           <p class="small">
@@ -128,12 +121,12 @@ const lagSoFar = computed(() => props.calibration.measurement.lagMs);
             players
           </p>
         </div>
-        <button class="button" type="button" @click="$emit('skip')">Skip</button>
-      </div>
-      <div class="panel code-panel">
+        <CcButton screen="tv" @press="$emit('skip')">Skip</CcButton>
+      </CcPanel>
+      <CcPanel class="code-panel" screen="tv">
         <p class="small">Room code</p>
         <p class="code">{{ lobby.code }}</p>
-      </div>
+      </CcPanel>
     </footer>
   </section>
 </template>
@@ -184,13 +177,6 @@ const lagSoFar = computed(() => props.calibration.measurement.lagMs);
   flex: 1;
   gap: var(--cc-space-6);
   min-height: 0;
-}
-.panel {
-  position: relative;
-  background: var(--cc-chalk);
-  border: var(--cc-outline-tv) solid var(--cc-ink);
-  border-radius: var(--cc-radius-panel);
-  box-shadow: var(--cc-depth-panel);
 }
 .flash-wrap {
   display: flex;
@@ -257,18 +243,7 @@ const lagSoFar = computed(() => props.calibration.measurement.lagMs);
   flex: none;
   flex-direction: column;
   width: 600px;
-  padding: var(--cc-space-7) var(--cc-space-6) var(--cc-space-6);
   box-sizing: border-box;
-}
-.tab {
-  position: absolute;
-  top: calc(-1 * var(--cc-space-5));
-  left: var(--cc-space-6);
-  padding: var(--cc-space-1) var(--cc-space-4);
-  background: var(--cc-sky);
-  border: var(--cc-outline-tv) solid var(--cc-ink);
-  border-radius: var(--cc-radius-tag);
-  font: 700 var(--cc-text-small-tv) var(--cc-text-body-font);
 }
 .chips {
   display: flex;
@@ -286,9 +261,6 @@ const lagSoFar = computed(() => props.calibration.measurement.lagMs);
   padding: 0 var(--cc-space-5) 0 var(--cc-space-3);
   border: var(--cc-outline-tv) solid var(--cc-ink);
   border-radius: var(--cc-radius-pill);
-}
-.shape {
-  stroke: var(--cc-ink);
 }
 .name {
   flex: 1;
@@ -310,7 +282,6 @@ const lagSoFar = computed(() => props.calibration.measurement.lagMs);
   align-items: center;
   justify-content: space-between;
   gap: var(--cc-space-5);
-  padding: var(--cc-space-5) var(--cc-space-6);
 }
 .hint-text {
   display: flex;
@@ -322,24 +293,5 @@ const lagSoFar = computed(() => props.calibration.measurement.lagMs);
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: var(--cc-space-5) var(--cc-space-6);
-}
-.button {
-  height: 88px;
-  padding: 0 var(--cc-space-6);
-  font: var(--cc-text-action-weight) var(--cc-text-action-tv) var(--cc-text-action-font);
-  color: var(--cc-ink);
-  background: var(--cc-chalk);
-  border: var(--cc-outline-tv) solid var(--cc-ink);
-  border-radius: var(--cc-radius-pill);
-  box-shadow: var(--cc-depth-rest);
-  cursor: pointer;
-}
-.button.primary {
-  background: var(--cc-sunny);
-}
-.button:focus-visible {
-  outline: var(--cc-focus-ring-width) solid var(--cc-sunny);
-  outline-offset: var(--cc-focus-ring-offset);
 }
 </style>
