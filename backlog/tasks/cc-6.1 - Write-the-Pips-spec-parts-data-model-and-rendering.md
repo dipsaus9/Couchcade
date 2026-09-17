@@ -4,7 +4,7 @@ title: 'Write the Pips spec: parts, data model and rendering'
 status: In Progress
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-17 11:22'
+updated_date: '2026-09-17 11:23'
 labels:
   - story
   - owner-gate
@@ -50,4 +50,6 @@ Parts sheet artifact (both forms, 8 example Pips, chest options): https://claude
 Verify: pnpm check, check:style, check:deps, test, build all green. pnpm budgets on main: controller 54.2/80 KB, host 412.8/450 KB.
 Found while writing (listed in the spec): the room ignores the join body's profile and seats everyone as {0,0,0} (new server story proposed); CC-6.6 AC#1 says Phaser but the TV lobby is Vue; CC-6.3 should be CcPip and needs packages/theme/src/pips/ in References; CC-6.2 needs packages/protocol/src/shared/ to move pipPartCounts to utils; Quick Draw and Target Range placeholder World Pips need a swap story after CC-6.4.
 Open owner questions: 1) World Pip chest: 2x2 mark + 9x9 shape at feet (recommended) vs 5x5 chest shape; 2) random Pip button 'Shuffle' (recommended) since 'Surprise me' is the VIP random game.
+
+Review round 1: pass. AC1 met; AC2 pending the owner gate (expected). No scope violations. Advisory findings applied: only Quick Draw has a placeholder world-pip.ts on main (Target Range's is in CC-11.4, in flight), and a note that surprised World Pips keep 1px eyes. Advisory: record the owner's choices for open questions 1 and 2 in the spec on approval.
 <!-- SECTION:NOTES:END -->
