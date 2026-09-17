@@ -147,7 +147,7 @@ stateDiagram-v2
 |---|---|---|---|
 | `intro` | 2,500 ms | Round chip lifts ("Round 2 · middle"), the target slides to its new spot, the flag shows the first wind. Bottom panel: "Point at the TV, pull down, let go" in round 1, the round name after that. | `tr-watch`. The draw button is off. |
 | `open` | Up to 10,000 ms | Crosshairs appear for players who are aiming. Arrows fly the moment each player shoots. The bottom panel shows "Arrow 2 of 3" and the wind, for example "Wind 2 to the right". A clock counts down in whole seconds from 10, with a tick sound for the last 3. | `tr-shoot`: pull to draw, let go to shoot |
-| `landing` | Until every arrow in the air has landed. When the clock ran out, also at least 500 ms after the close, for late messages. At most 1,121 ms, the slowest arrow. | Remaining arrows land. Crosshairs of players who didn't shoot disappear. | `tr-watch` |
+| `landing` | Until every arrow in the air has landed. When the clock ran out, also at least 500 ms after the close, for late messages. At most 1,121 ms, the slowest arrow. | Remaining arrows land. Crosshairs of players who didn't shoot disappear. | Still `tr-shoot`. A shot let go now reaches the host with `atMs` after the close and is `late`. |
 | `reveal` | 1,500 ms | Each arrow's points pop on its scoreboard chip. A `BULLSEYE!` callout if anyone hit a 10. Bottom panel: the best arrow, for example "Noor hit a 9". | `tr-watch` with the arrow's result |
 | `roundEnd` | 3,000 ms | Arrows are pulled from the target. Bottom panel: the leader, for example "Noor leads with 52". | `tr-watch` |
 
@@ -178,7 +178,7 @@ What that means for a player:
 - **The crosshair is where the phone points.** It doesn't show drop or wind. Arrows from earlier volleys stay in the target for the round, so each player sees how far off they were and corrects. See [question 3](#open-questions-for-the-owner).
 - Aim ranges are the `@couchcade/motion` defaults: ±25° of yaw is ±200 px and ±15° of pitch is ±90 px, so 1° is about 8 px on the TV world, and the near target's 10 ring (3.6 px) is about half a degree. CC-11.3 checks this against a recorded aim trace (motion.md, [Manual check](../architecture/motion.md#test-layers)) and may tune the two range numbers once, before the playtest.
 
-The crosshair's home, where `yaw = 0` and `pitch = 0`, is (240, 140) in the world. The target never sits there exactly, so a player who just holds still never scores a 10 by accident.
+The crosshair's home, where `yaw = 0` and `pitch = 0`, is (240, 140) in the world. A phone held still at full draw lands at (240, 140 + drop), plus wind. When the RNG puts the target centre within 6 px of that point, it rolls again, so nobody scores a 10 just by holding still.
 
 ---
 
@@ -200,7 +200,7 @@ The crosshair's home, where `yaw = 0` and `pitch = 0`, is (240, 140) in the worl
 
 - **Aim pad.** A pad above the big action. It works like a laptop touchpad (`createAimDrag`, 200 px across the whole yaw range, 150 px across pitch). A quiet "Centre" button under it calls `recentre()`. Aim streams while the pad is dragged or the draw button is held.
 - **Draw and shoot** work exactly like motion: pull down on the big action, let go. The draw does not recentre touch aim, so a player can aim first, then draw.
-- On `pointerdown` on the draw button, the controller resets the sender and sends the current aim, so the crosshair shows.
+- On `pointerdown` on the draw button or the pad, and whenever a volley opens, the controller resets the sender and sends the current aim, so the crosshair shows and no stale sample from an earlier volley goes out.
 - CC-11.3 fits the pad, the Centre button and the circle without scrolling. The circle may shrink below 85% of the width in touch mode, but not below 200 px.
 
 ### Screens
@@ -218,7 +218,7 @@ The crosshair's home, where `yaw = 0` and `pitch = 0`, is (240, 140) in the worl
 
 - Every line stays under 40 characters.
 - The shot state is local and immediate. After `pointerup` the button is off until the next `tr-shoot`, so a player can't shoot twice.
-- The host only sends views when they change: one `tr-shoot` batch when a volley opens, one `tr-watch` batch when it closes, and one when a round starts. If everyone shoots within 667 ms of the open, the host runtime merges the close into the next allowed send, as platform.md budget rule 5 says. Phones that already shot are on their local shot state anyway.
+- The host only sends views when they change: one `tr-shoot` batch when a volley opens, one `tr-watch` batch with every arrow's result when `reveal` starts (after the 500 ms wait, so late shots are known), and one when a round starts. If everyone shoots within 667 ms of the open, the host runtime merges the close into the next allowed send, as platform.md budget rule 5 says. Phones that already shot are on their local shot state anyway.
 - View data (`TView`), kept well under 1 KB:
 
 ```ts
@@ -275,7 +275,7 @@ On the wire, with `at` added by the send helper and `from` by the relay:
 { "t": "input", "d": { "type": "aim", "payload": { "aim": [[-200, 0.1, 0.2], [-133, 0.11, 0.21], [-67, 0.12, 0.2], [0, 0.13, 0.22]] }, "at": 1789571234567 } }
 ```
 
-Both are about 130 bytes, well inside the 1 KB cap and motion.md's 150-byte limit for aim inputs.
+Both inputs are under 150 bytes, about 150 once the relay adds its envelope. That is well inside the 1 KB cap and within motion.md's 150-byte limit for an aim input.
 
 What `onPlayerInput` does:
 
@@ -340,7 +340,7 @@ Up to 8 players aim at one target at once. The rules that keep that readable fro
 | TV refresh or deploy mid-round | The round in progress is lost. `snapshot` stores `{ r, pts, tens, rng }` at each round end, about 120 bytes for 8 players. `restore` resumes at the next round's `intro`. |
 | Shot released just as the clock hits 0 | Counts if `atMs` is at or before the close. It still arrives within the 500 ms wait. |
 | `shoot` from the previous volley arrives late | Dropped, because `payload.volley` doesn't match. |
-| Phone still on `tr-shoot` after the volley closed | Its shot reaches the host with `atMs` after the close, so it's `late`. The next `tr-watch` says "Too late for that one". |
+| Phone still on `tr-shoot` after the volley closed | Its shot reaches the host with `atMs` after the close, so it's `late`. The `tr-watch` sent at `reveal` says "Too late for that one". |
 | Phone not clock-synced yet | The controller keeps the draw button off until the clock module has a sample, as Quick Draw does. |
 | Motion stops mid-match (no samples for 2 s) | CC-5.10 switches the player to touch for the rest of the game. The next draw uses the pad. |
 | Page rotates on an iPhone without orientation lock | Motion maths uses the device frame, so aim keeps working (motion.md flow rule 8). The draw button stays centred. |
