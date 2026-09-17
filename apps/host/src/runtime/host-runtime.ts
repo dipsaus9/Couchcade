@@ -19,6 +19,7 @@ import type {
 } from "../screens/calibration/calibration.ts";
 import type { LobbyState } from "../screens/lobby/lobby-state.ts";
 import { seatedPlayers, vip } from "../screens/lobby/lobby-state.ts";
+import { joinUrl } from "../screens/lobby/join-url.ts";
 import { createGameMenu, fits } from "../screens/menu/menu.ts";
 import type { Countdown, GameMenu, MenuGame } from "../screens/menu/menu.ts";
 import { createGameResults } from "../screens/results/results.ts";
@@ -51,6 +52,11 @@ export interface HostRuntimeOptions {
   warn?: (message: string) => void;
   /** Where the calibrated TV lag lives. Defaults to the host's `localStorage`, through the SDK. */
   displayLag?: DisplayLagStore;
+  /**
+   * The site origin phones join on, for the join URL games show next to the room code. Defaults to
+   * `location.origin`.
+   */
+  origin?: string;
 }
 
 /** Reads and stores the calibrated TV lag (session-flow.md, "Storage and use"). */
@@ -170,6 +176,8 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
   const createSeed = options.createSeed ?? (() => crypto.getRandomValues(new Uint32Array(1))[0]!);
   const reducedMotion = options.reducedMotion ?? (() => false);
   const displayLag = options.displayLag ?? localDisplayLag;
+  const origin: string | undefined =
+    options.origin ?? (typeof location === "undefined" ? undefined : location.origin);
 
   const views = createViewSync({ send: options.send, now, schedule, warn });
   let lobby: LobbyState | null = null;
@@ -322,6 +330,8 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
         players: runner.players,
         displayLagMs,
         reducedMotion: reducedMotion(),
+        roomCode: state.code,
+        joinUrl: origin === undefined ? undefined : joinUrl(origin, state.code),
       })
       .then(
         () => {

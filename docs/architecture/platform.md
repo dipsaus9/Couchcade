@@ -535,6 +535,8 @@ export interface HostSceneData<TState> {
   players: readonly Player[];
   displayLagMs: number;
   reducedMotion: boolean;
+  roomCode?: string;     // the room code, so a scene can keep the room code panel on screen (CC-10.9)
+  joinUrl?: string;      // the URL a phone opens to join, such as https://couchcade.workers.dev/?room=BEAN
 }
 
 export interface ControllerProps<TView, TInput extends GameInput> {
