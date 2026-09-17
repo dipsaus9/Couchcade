@@ -2,7 +2,7 @@
   "name": "@couchcade/stage",
   "version": "0.0.0",
   "private": true,
-  "description": "TV overlays in Phaser: StageScene, scoreboard, callouts and the room code panel. Tier 3 kit: imports game-sdk, theme and protocol, plus phaser (TV only).",
+  "description": "TV overlays in Phaser: StageScene, scoreboard, callouts and the room code panel. Tier 3 kit: imports game-sdk, audio, theme and protocol, plus phaser (TV only).",
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -14,6 +14,7 @@
     "test": "playwright install chromium-headless-shell && vitest run"
   },
   "dependencies": {
+    "@couchcade/audio": "workspace:*",
     "@couchcade/game-sdk": "workspace:*",
     "@couchcade/protocol": "workspace:*",
     "@couchcade/theme": "workspace:*",

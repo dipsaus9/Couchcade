@@ -1,0 +1,23 @@
+{
+  "name": "@couchcade/audio",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Sound on the TV over the plain Web Audio API: house style sound tokens, game sound banks, music loops with crossfades, ducking and the autoplay unlock. Tier 2 core, host only (never on phones).",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@couchcade/config": "workspace:*",
+    "@couchcade/protocol": "workspace:*",
+    "@couchcade/theme": "workspace:*",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}

@@ -1,5 +1,6 @@
+import { audio } from "@couchcade/audio";
 import { color, font, motion } from "@couchcade/theme";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { vi } from "vitest";
 import { Callout, calloutStyle } from "../src/callout/index.ts";
 import { overlayFrame } from "../src/layout/index.ts";
@@ -7,6 +8,10 @@ import { StageScene } from "../src/scene/index.ts";
 import { boot, countColour, hostData } from "./boot.ts";
 
 describe("Callout", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("uses the house style callout treatment", async () => {
     const { scene } = await boot(StageScene);
     const callout = scene.addCallout("Draw!");
@@ -66,5 +71,35 @@ describe("Callout", () => {
     const callout = scene.addCallout("Tap!", { holdMs: 50 });
     await vi.waitFor(() => expect(callout.scene).toBeFalsy(), { timeout: 3_000 });
     expect(scene.overlay.list).not.toContain(callout);
+  });
+
+  it("ducks the music from play until its exit after holdMs", async () => {
+    const release = vi.fn<() => void>();
+    const duck = vi.spyOn(audio, "duck").mockReturnValue(release);
+    const { scene } = await boot(StageScene, hostData({ reducedMotion: true }));
+    const callout = scene.addCallout("Draw!", { holdMs: 50 });
+    expect(duck).toHaveBeenCalledOnce();
+    expect(duck).toHaveBeenCalledWith();
+    expect(release).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(release).toHaveBeenCalledOnce(), { timeout: 3_000 });
+    await vi.waitFor(() => expect(callout.scene).toBeFalsy(), { timeout: 3_000 });
+    expect(release).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the music ducked without holdMs until dismiss, and releases once when destroyed", async () => {
+    const release = vi.fn<() => void>();
+    const duck = vi.spyOn(audio, "duck").mockReturnValue(release);
+    const { scene } = await boot(StageScene);
+    const callout = scene.addCallout("Strike!");
+    callout.play();
+    expect(duck).toHaveBeenCalledOnce();
+    expect(release).not.toHaveBeenCalled();
+    callout.destroy();
+    expect(release).toHaveBeenCalledOnce();
+
+    const other = scene.addCallout("Spare!");
+    other.dismiss();
+    other.destroy();
+    expect(release).toHaveBeenCalledTimes(2);
   });
 });

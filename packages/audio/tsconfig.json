@@ -1,0 +1,8 @@
+{
+  "extends": "@couchcade/config/tsconfig/base.json",
+  "compilerOptions": {
+    // import.meta.env.DEV gates the dev warnings.
+    "types": ["vite/client"]
+  },
+  "include": ["src", "test", "vitest.config.ts"]
+}
