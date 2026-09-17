@@ -4,7 +4,7 @@ title: Relay WebRTC signalling messages through the room
 status: Done
 assignee: []
 created_date: '2026-09-17 17:50'
-updated_date: '2026-09-17 20:57'
+updated_date: '2026-09-17 21:00'
 labels:
   - story
 dependencies:
@@ -55,6 +55,8 @@ Verify: pnpm check, pnpm test, pnpm build.
 Dependency changed from CC-3.14 to CC-3.12 (orchestrator decision, 2026-09-17): CC-3.15 only needs the approved design doc (docs/architecture/realtime-link.md, Signalling section), not CC-3.14's doc-amendment edits to platform.md/security.md/etc. Waiting on CC-3.14 would also chain this story behind CC-3.13's owner-run spike for no reason -- the protocol schemas and room relay can be built and reviewed in parallel with the spike and the doc amendments. CC-3.14 itself is untouched and still depends on CC-3.13.
 
 Amended References to add apps/controller/src/session/state.ts: adding rtc:answer to RelayToPhoneMessage made its onMessage switch non-exhaustive (vue-tsc build failure). Added a one-line no-op case (real handling is CC-3.19's link runtime, out of this story's scope). Checked apps/host's two RelayToHostMessage switches (lobby-state.ts, host-runtime.ts): both already have default/break fallthroughs, so rtc:offer needed no change there.
+
+Reviewer verdict (dipsaus-ai:story-reviewer, model sonnet, round 1): pass. All 5 acceptance criteria met, no scope violations, no findings. The apps/controller/src/session/state.ts glue and packages/protocol/test/fixtures.ts edit were both judged in-scope.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
