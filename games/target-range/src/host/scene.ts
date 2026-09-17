@@ -3,6 +3,7 @@ import { StageScene, worldToOverlay } from "@couchcade/stage";
 import type { Callout, Scoreboard } from "@couchcade/stage";
 import { roundCount } from "../shared/index.ts";
 import type { Point, TargetRangeState } from "../shared/index.ts";
+import { loadSprites } from "./art.ts";
 import { cuesBetween, targetRangeCueEvent } from "./cues.ts";
 import { placeTagsBelow } from "./label-layout.ts";
 import { InstructionPanel, PointsTag, RoundResults, scoreboardBottom, tagGap } from "./overlays.ts";
@@ -54,6 +55,10 @@ export default class TargetRangeScene extends StageScene<TargetRangeState> {
     this.lastTarget = null;
     this.slideFrom = null;
     this.tags = [];
+  }
+
+  preload(): void {
+    loadSprites(this.load, this.textures);
   }
 
   create(): void {
