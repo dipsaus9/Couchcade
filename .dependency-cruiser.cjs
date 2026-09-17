@@ -261,8 +261,11 @@ module.exports = {
   options: {
     doNotFollow: { path: "(^|/)node_modules/" },
     // Build output and local state in our own folders. npm packages stay visible (their files often live in dist/).
+    // tooling/create-game/template/ holds placeholder source (__ID__, __TITLE__, ...) that's never
+    // run as-is; it's only real code once `pnpm create-game` renders it into games/<id>, which the
+    // tool's own test does and cruises for real (tooling/create-game/test/generate-and-verify.test.ts).
     exclude: {
-      path: "^((apps|games|packages|tooling)/[^/]+|e2e)/(dist|\\.wrangler|coverage|playwright-report|test-results)/",
+      path: "^((apps|games|packages|tooling)/[^/]+|e2e)/(dist|\\.wrangler|coverage|playwright-report|test-results)/|^tooling/create-game/template/",
     },
     // Type-only imports count: a package that imports types from a higher tier still points up.
     tsPreCompilationDeps: true,

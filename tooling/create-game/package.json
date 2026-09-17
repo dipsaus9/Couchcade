@@ -1,0 +1,29 @@
+{
+  "name": "@couchcade/create-game",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Scaffolds a new game package from tooling/create-game/template/ (docs/architecture/session-flow.md, \"Create-game template\"). Owns the root create-game script.",
+  "type": "module",
+  "scripts": {
+    "create-game": "node src/cli.ts",
+    "typecheck": "tsc",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@couchcade/config": "workspace:*",
+    "@couchcade/game-sdk": "workspace:*",
+    "@couchcade/protocol": "workspace:*",
+    "@couchcade/stage": "workspace:*",
+    "@couchcade/theme": "workspace:*",
+    "@couchcade/ui": "workspace:*",
+    "@couchcade/utils": "workspace:*",
+    "@types/node": "catalog:",
+    "phaser": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:",
+    "vue": "catalog:",
+    "vue-tsc": "catalog:",
+    "zod": "catalog:"
+  }
+}
