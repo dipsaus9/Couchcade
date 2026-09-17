@@ -7,6 +7,7 @@ import {
 } from "@couchcade/protocol";
 import type { JoinFailure } from "../join/api.ts";
 import type { JoinDraft } from "../join/form.ts";
+import { parseCalibrationView } from "../screens/calibration/calibration-view.ts";
 import { parseMenuView } from "../screens/menu/menu-view.ts";
 import { parseResultsView } from "../screens/results/results-view.ts";
 import type { StoredSession } from "./storage.ts";
@@ -57,7 +58,14 @@ export type PhoneEvent =
   | { type: "ended"; reason: EndReason };
 
 /** Which screen the phone shows. `showsGameController` decides about game controllers. */
-export type PhoneScreen = "join" | "connecting" | "lobby" | "menu" | "results" | "waiting";
+export type PhoneScreen =
+  | "join"
+  | "connecting"
+  | "lobby"
+  | "menu"
+  | "results"
+  | "calibration"
+  | "waiting";
 
 /**
  * The first state after the page loads. A stored session for the same room resumes it: a reload
@@ -159,6 +167,15 @@ export function screenOf(state: PhoneState): PhoneScreen {
     parseResultsView(view.data)
   ) {
     return "results";
+  }
+  // A tap only means something while the TV flashes, so the TV lag check needs both too.
+  if (
+    view.screen === "calibration" &&
+    state.online &&
+    state.hostConnected &&
+    parseCalibrationView(view.data)
+  ) {
+    return "calibration";
   }
   return "waiting";
 }
