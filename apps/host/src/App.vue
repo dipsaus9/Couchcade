@@ -10,7 +10,7 @@ import PasscodeScreen from "./screens/passcode/PasscodeScreen.vue";
 import ResultsScreen from "./screens/results/ResultsScreen.vue";
 import { useHostSession } from "./session/use-host-session.ts";
 
-const { screen, openRoom, endRoom, calibration } = useHostSession();
+const { screen, openRoom, endRoom, calibration, moderate } = useHostSession();
 const origin = window.location.origin;
 const roomNow = () => roomClock.toHostTime(localNow());
 const toRoomTime = (localTimestamp: number) => roomClock.toHostTime(localTimestamp);
@@ -44,6 +44,8 @@ onBeforeUnmount(() => window.removeEventListener("resize", fit));
       :display-lag="screen.displayLag"
       @end="endRoom"
       @check-tv-lag="calibration.start"
+      @kick="moderate.kick"
+      @lock="moderate.lock"
     />
     <CalibrationScreen
       v-else-if="screen.name === 'calibration'"

@@ -21,6 +21,7 @@ import {
   roomState,
   type LifecycleFacts,
 } from "./lifecycle.ts";
+import { kickPlayer, lockRoom, refusalFor } from "./moderation.ts";
 import { arrivalOf, isSeatDue, seatExpiresAt } from "./reconnect.ts";
 import { defaultProfile, RoomStorage, type PlayerRecord, type RoomMeta } from "./storage.ts";
 import {
@@ -233,9 +234,10 @@ export class Room extends Server {
     const previous = this.#phoneById(id, connection.id);
     const record = this.#storage.readPlayer(id);
 
-    // A revoked player is refused first. CC-2.6 (kicked, 4003) adds its check here.
-    if (record?.revoked) {
-      connection.close(closeCodes.flooding, "Flooding");
+    // Kicked (4003) and revoked (4008) players are refused before any seat check.
+    const refusal = refusalFor(record);
+    if (refusal) {
+      connection.close(refusal.code, refusal.reason);
       return;
     }
     const arrival = arrivalOf(record, now);
@@ -309,10 +311,26 @@ export class Room extends Server {
         if (meta && meta.phase !== message.d.phase) this.#storage.setPhase(message.d.phase);
         return;
       }
+      case "room:kick":
+        kickPlayer(
+          {
+            storage: this.#storage,
+            socketsOf: (id) => this.#phonesById(id),
+            sendToHost: (kicked) => this.#sendToHost(kicked),
+          },
+          message.d.id,
+          Date.now(),
+        );
+        return;
+      case "room:lock": {
+        const meta = this.#storage.readMeta();
+        if (meta) lockRoom(this.#storage, meta, message.d.locked);
+        return;
+      }
       case "room:end":
         await this.#closeRoom();
         return;
-      // room:kick and room:lock arrive with CC-2.6, room:snapshot with CC-3.5.
+      // room:snapshot arrives with CC-3.5.
       default:
         return;
     }
@@ -464,6 +482,13 @@ export class Room extends Server {
       }
     }
     return undefined;
+  }
+
+  /** Every open phone socket of one player. */
+  *#phonesById(id: string): Generator<Socket> {
+    for (const phone of this.#phones()) {
+      if ((phone.state as PhoneSocketState).id === id) yield phone;
+    }
   }
 
   #phoneById(id: string, exceptId: string): Socket | undefined {

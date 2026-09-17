@@ -15,12 +15,13 @@ const props = defineProps<{
   /** The stored TV lag, or null when this laptop never checked it. */
   displayLag: StoredDisplayLag | null;
 }>();
-defineEmits<{ end: []; checkTvLag: [] }>();
+defineEmits<{ end: []; checkTvLag: []; kick: [id: string]; lock: [locked: boolean] }>();
 
 const seatList = computed(() => seats(props.lobby));
 const playerCount = computed(() => seatedPlayers(props.lobby).length);
 const watching = computed(() => audience(props.lobby).length);
 const leader = computed(() => vip(props.lobby));
+const online = computed(() => props.connection === "open");
 const hint = computed(() =>
   leader.value ? `${leader.value.name} starts the game from their phone` : "Scan the code to join",
 );
@@ -34,13 +35,22 @@ const hint = computed(() =>
         {{ connection === "connecting" ? "Connecting…" : "Reconnecting…" }}
       </p>
       <p v-if="displayLag" class="body">TV lag {{ displayLag.ms }} ms</p>
-      <button
-        class="button"
-        type="button"
-        :disabled="connection !== 'open'"
-        @click="$emit('checkTvLag')"
-      >
+      <button class="button" type="button" :disabled="!online" @click="$emit('checkTvLag')">
         Check TV lag
+      </button>
+      <button
+        class="button lock"
+        type="button"
+        :aria-pressed="lobby.locked"
+        :disabled="!online"
+        @click="$emit('lock', !lobby.locked)"
+      >
+        <svg class="icon" viewBox="0 0 40 40" width="40" height="40" aria-hidden="true">
+          <path v-if="lobby.locked" d="M12 18 V13 a8 8 0 0 1 16 0 V18" />
+          <path v-else d="M12 18 V13 a8 8 0 0 1 16 0 V9" />
+          <rect x="7" y="18" width="26" height="18" rx="4" />
+        </svg>
+        Lock room
       </button>
       <button class="button" type="button" @click="$emit('end')">End room</button>
     </header>
@@ -50,6 +60,7 @@ const hint = computed(() =>
           <h1 class="title">Players</h1>
           <p class="count">{{ playerCount }}/{{ seatCount }}</p>
           <p v-if="watching > 0" class="body">{{ watching }} watching</p>
+          <p v-if="lobby.locked" class="locked" role="status">Room locked</p>
           <p class="body hint">{{ hint }}</p>
         </div>
         <div class="grid">
@@ -58,6 +69,8 @@ const hint = computed(() =>
             :key="seat.slot"
             :seat="seat"
             :is-vip="seat.player !== null && seat.player.id === leader?.id"
+            :can-kick="online"
+            @kick="$emit('kick', $event)"
           />
         </div>
       </section>
@@ -99,6 +112,37 @@ const hint = computed(() =>
   border-radius: var(--cc-radius-pill);
   box-shadow: var(--cc-depth-rest);
   cursor: pointer;
+}
+.button[aria-pressed="true"] {
+  background: var(--cc-sunny);
+}
+.lock {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--cc-space-3);
+}
+.icon {
+  fill: var(--cc-chalk);
+  stroke: var(--cc-ink);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.icon path {
+  fill: none;
+}
+.locked {
+  margin: 0;
+  padding: 0 var(--cc-space-3);
+  font: 700 var(--cc-text-small-tv) var(--cc-text-small-font);
+  color: var(--cc-chalk);
+  -webkit-text-stroke: 3px var(--cc-ink);
+  paint-order: stroke fill;
+  text-shadow: 0 3px 0 var(--cc-ink);
+  background: var(--cc-signal);
+  border: var(--cc-outline-tv) solid var(--cc-ink);
+  border-radius: var(--cc-radius-tag);
+  white-space: nowrap;
 }
 .button:disabled {
   color: var(--cc-ink-45);

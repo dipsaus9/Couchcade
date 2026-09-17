@@ -10,6 +10,7 @@ import {
   type PhoneState,
 } from "../src/session/state.ts";
 import type { StoredSession } from "../src/session/storage.ts";
+import { kickedFrom } from "../src/screens/kicked/kicked.ts";
 import { waitingCopy } from "../src/screens/waiting/copy.ts";
 
 const session: StoredSession = { code: "BEAN", playerId: "ABCDEFGH", rejoinToken: "r.sig" };
@@ -244,6 +245,24 @@ describe("lobby", () => {
       submitting: false,
       notice: { kind: "ended", reason: "kicked", code: "BEAN" },
     });
+  });
+
+  it("shows the Kicked screen after a kick, and an empty join form after Join another room", () => {
+    const kicked = reduce(lobby, { type: "ended", reason: "kicked" });
+    expect(kickedFrom(kicked)).toBe("BEAN");
+    expect(kickedFrom(lobby)).toBeNull();
+    expect(kickedFrom(reduce(lobby, { type: "ended", reason: "room-closed" }))).toBeNull();
+
+    const next = reduce(kicked, { type: "notice-dismissed" });
+    expect(next).toEqual({
+      status: "join",
+      draft: { code: "", name: "Sam", codeFromUrl: false },
+      submitting: false,
+      notice: null,
+    });
+    expect(kickedFrom(next)).toBeNull();
+    expect(reduce(next, { type: "notice-dismissed" })).toBe(next);
+    expect(reduce(lobby, { type: "notice-dismissed" })).toBe(lobby);
   });
 });
 

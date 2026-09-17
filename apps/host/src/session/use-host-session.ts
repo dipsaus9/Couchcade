@@ -17,7 +17,12 @@ import {
   type ResultsScreenState,
 } from "../runtime/host-runtime.ts";
 import { phaserStage } from "../runtime/stage.ts";
-import { applyRelayMessage, initialLobby, type LobbyState } from "../screens/lobby/lobby-state.ts";
+import {
+  applyRelayMessage,
+  initialLobby,
+  setLocked,
+  type LobbyState,
+} from "../screens/lobby/lobby-state.ts";
 import { clearSession, loadSession, saveSession, type StoredSession } from "./storage.ts";
 
 export type HostScreen =
@@ -59,6 +64,7 @@ export function useHostSession() {
   const screen = shallowRef<HostScreen>({ name: "passcode", notice: null });
   let relay: RelayConnection | null = null;
   let runtime: HostRuntime | null = null;
+  let moderation: Moderation | null = null;
 
   function enterRoom(session: StoredSession, ticket: string | null): void {
     relay?.close();
@@ -87,6 +93,19 @@ export function useHostSession() {
     };
     show();
 
+    // Kick and Lock room on the TV lobby (docs/architecture/security.md). The relay closes a kicked
+    // phone and answers with `player:left { reason: "kicked" }`. It doesn't echo a lock, so the
+    // lobby applies it here.
+    moderation = {
+      kick: (id) => relay?.send({ t: "room:kick", d: { id } }),
+      lock: (locked) => {
+        if (!relay) return;
+        relay.send({ t: "room:lock", d: { locked } });
+        lobby = setLocked(lobby, locked);
+        show();
+      },
+    };
+
     relay = connectRelay({
       code: session.code,
       rejoinToken: session.rejoinToken,
@@ -107,6 +126,7 @@ export function useHostSession() {
         relay = null;
         roomRuntime.dispose();
         runtime = null;
+        moderation = null;
         clearSession();
         screen.value = { name: "passcode", notice: endNotice(reason) };
       },
@@ -134,6 +154,12 @@ export function useHostSession() {
     frame: (roomTime: number) => runtime?.calibrationFrame(roomTime) ?? null,
   };
 
+  /** Kick a player, and lock or unlock the room, from the TV lobby. */
+  const moderate: Moderation = {
+    kick: (id) => moderation?.kick(id),
+    lock: (locked) => moderation?.lock(locked),
+  };
+
   /** Ends the room for everyone. The relay closes every socket with 4004. */
   function endRoom(): void {
     relay?.send({ t: "room:end", d: {} });
@@ -147,7 +173,12 @@ export function useHostSession() {
     relay?.close();
   });
 
-  return { screen, openRoom, endRoom, calibration };
+  return { screen, openRoom, endRoom, calibration, moderate };
+}
+
+interface Moderation {
+  kick(id: string): void;
+  lock(locked: boolean): void;
 }
 
 function createErrorCopy(code: string): string {

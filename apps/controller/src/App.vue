@@ -11,6 +11,8 @@ import { showsGameController } from "./runtime/controller.ts";
 import { parseCalibrationView } from "./screens/calibration/calibration-view.ts";
 import CalibrationScreen from "./screens/calibration/CalibrationScreen.vue";
 import JoinScreen from "./screens/join/JoinScreen.vue";
+import { kickedFrom } from "./screens/kicked/kicked.ts";
+import KickedScreen from "./screens/kicked/KickedScreen.vue";
 import LobbyScreen from "./screens/lobby/LobbyScreen.vue";
 import { isVipLobby, parseMenuView } from "./screens/menu/menu-view.ts";
 import MenuScreen from "./screens/menu/MenuScreen.vue";
@@ -24,6 +26,7 @@ import { screenOf } from "./session/state.ts";
 const session = createPhoneSession();
 const state = session.state;
 const screen = computed(() => screenOf(state.value));
+const kicked = computed(() => kickedFrom(state.value));
 const menuView = computed(() =>
   state.value.status === "room" && state.value.view !== null && screen.value === "menu"
     ? parseMenuView(state.value.view.data)
@@ -71,8 +74,9 @@ onBeforeUnmount(() => {
 
 <template>
   <main class="app">
+    <KickedScreen v-if="kicked !== null" :code="kicked" @leave="session.dismissNotice" />
     <JoinScreen
-      v-if="state.status === 'join'"
+      v-else-if="state.status === 'join'"
       :draft="state.draft"
       :submitting="state.submitting"
       :notice="state.notice"

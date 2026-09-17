@@ -6,6 +6,7 @@ import {
   initialLobby,
   seatedPlayers,
   seats,
+  setLocked,
   vip,
   type LobbyState,
 } from "../src/screens/lobby/lobby-state.ts";
@@ -167,5 +168,32 @@ describe("seated players, audience and VIP", () => {
     });
     expect(vip(away)?.id).toBe(noor.id);
     expect(vip(apply(initialLobby("BEAN"), joined(mees)))).toBeUndefined();
+  });
+});
+
+describe("Kick and Lock room", () => {
+  it("frees a kicked player's card, so the card's Kick button goes with them", () => {
+    const state = apply(initialLobby("BEAN"), welcome, joined(sam), joined(noor), {
+      t: "player:left",
+      d: { id: noor.id, reason: "kicked" },
+    });
+    expect(seats(state)[1]?.player).toBeNull();
+    expect(vip(state)?.id).toBe(sam.id);
+  });
+
+  it("locks and unlocks the room on the TV without touching the players", () => {
+    const open = apply(initialLobby("BEAN"), welcome, joined(sam));
+    const locked = setLocked(open, true);
+    expect(locked).toEqual({ ...open, locked: true });
+    expect(setLocked(locked, false)).toEqual(open);
+    // Nothing changed, so the TV doesn't redraw.
+    expect(setLocked(locked, true)).toBe(locked);
+    expect(open.locked).toBe(false);
+  });
+
+  it("keeps the lock through player messages until the next welcome says otherwise", () => {
+    const locked = setLocked(apply(initialLobby("BEAN"), welcome), true);
+    expect(apply(locked, joined(sam)).locked).toBe(true);
+    expect(apply(locked, welcome).locked).toBe(false);
   });
 });
