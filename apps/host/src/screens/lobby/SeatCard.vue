@@ -34,6 +34,8 @@ const status = computed(() => {
     <p v-else class="name small">Slot {{ seat.slot + 1 }}</p>
     <div class="foot">
       <p class="status" :class="{ tag: isVip && seat.player?.connected }">{{ status }}</p>
+      <!-- Screen readers hear "Kick Ana". The label falls through to the <button>; strict templates
+           only type-check declared props, so it is bound as an object. -->
       <CcButton
         v-if="seat.player"
         class="kick"
@@ -41,9 +43,10 @@ const status = computed(() => {
         screen="tv"
         small
         :disabled="!canKick"
+        v-bind="{ 'aria-label': `Kick ${seat.player.name}` }"
         @press="$emit('kick', seat.player.id)"
       >
-        Kick<span class="visually-hidden"> {{ seat.player.name }}</span>
+        Kick
       </CcButton>
     </div>
   </article>
@@ -103,15 +106,6 @@ const status = computed(() => {
   background: var(--cc-sky);
   border: var(--cc-outline-tv) solid var(--cc-ink);
   border-radius: var(--cc-radius-tag);
-}
-/* Screen readers hear "Kick Ana", the TV shows "Kick". */
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
 }
 /* The status and the Kick button share one spot, so the card never changes height. */
 .foot {
