@@ -64,6 +64,10 @@ describe("securityHeaders", () => {
   it("has no literal newline in the CSP value (a header value is one line)", () => {
     expect(contentSecurityPolicy).not.toContain("\n");
   });
+
+  it("never blocks webrtc, so data channels for the direct link are allowed (docs/architecture/realtime-link.md, 'Privacy', rule 5)", () => {
+    expect(contentSecurityPolicy).not.toContain("webrtc 'block'");
+  });
 });
 
 describe("buildHeadersFile", () => {
