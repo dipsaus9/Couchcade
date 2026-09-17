@@ -228,7 +228,7 @@ flowchart LR
 
 ### Ducking
 
-1. HOUSE_STYLE says music ducks by 50% during callouts. The duck gain goes to 0.5 (about -6 dB) with `setTargetAtTime` and a 50 ms ramp.
+1. HOUSE_STYLE says music ducks by 50% during callouts. The duck gain goes to 0.5 (about -6 dB) with a linear ramp over 50 ms (`linearRampToValueAtTime`).
 2. Stingers duck automatically for their buffer length. `Callout.play()` in `@couchcade/stage` ducks for the callout's entrance plus its hold. A game can duck by hand for a phase with `const release = audio.duck({ level })`, as Target Range does for "music quieter during `open`".
 3. Ducks are counted. The music comes back up only when the last duck is released, over 300 ms.
 4. A duck that lasts longer than 10 seconds releases on its own and logs a dev warning, so a forgotten release never leaves the music quiet for the whole night.
