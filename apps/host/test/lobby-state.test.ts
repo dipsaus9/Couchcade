@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   applyRelayMessage,
   audience,
+  audienceViews,
   initialLobby,
   seatedPlayers,
   seats,
@@ -154,6 +155,25 @@ describe("seated players, audience and VIP", () => {
     const state = apply(initialLobby("BEAN"), joined(sam), joined(mees), joined(noor));
     expect(seatedPlayers(state)).toEqual([sam, noor]);
     expect(audience(state)).toEqual([mees]);
+  });
+
+  it("gives each connected audience phone its place in line, skipping phones that are away", () => {
+    const tess = player("TESSTESS", null, 4000, false);
+    const lars = player("LARSLARS", null, 5000);
+    const state = apply(
+      initialLobby("BEAN"),
+      joined(sam),
+      joined(lars),
+      joined(tess),
+      joined(mees),
+    );
+    expect(audienceViews(state)).toEqual(
+      new Map([
+        [mees.id, { screen: "audience", data: { position: 1 } }],
+        [lars.id, { screen: "audience", data: { position: 2 } }],
+      ]),
+    );
+    expect(audienceViews(apply(initialLobby("BEAN"), joined(sam)))).toEqual(new Map());
   });
 
   it("makes the connected seated player who joined first the VIP", () => {

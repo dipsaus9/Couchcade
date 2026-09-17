@@ -470,6 +470,53 @@ describe("createHostRuntime", () => {
     expect(runtime.phase).toBe("menu");
   });
 
+  it("sends audience phones their place in line, and next-game to players who joined mid-game", async () => {
+    const { handle, runtime, vip, lobby, ofType, time } = setup();
+    const phone = (id: string, slot: number | null, connected = true) => ({
+      id,
+      name: "Mees",
+      slot,
+      profile: { skin: 0, hair: 0, hairColour: 0 },
+      joinedAt: 2_000_000_000_000,
+      connected,
+    });
+    /** The last view each phone was sent, with its game id. */
+    const latest = () => {
+      const byId = new Map<string, unknown>();
+      for (const { d } of ofType("controller:state")) {
+        for (const { to, view } of d.views) for (const id of to) byId.set(id, [d.gameId, view]);
+      }
+      return byId;
+    };
+    const line = (position: number) => ({ screen: "audience", data: { position } });
+
+    const first = phone("WAITAAAA", null);
+    const away = phone("WAITBBBB", null, false);
+    const second = phone("WAITCCCC", null);
+    const room = { ...lobby, players: [...lobby.players, first, away, second] };
+    handle({ t: "player:joined", d: { player: second } }, room);
+    expect(latest().get(first.id)).toEqual([null, line(1)]);
+    expect(latest().get(second.id)).toEqual([null, line(2)]);
+    expect(latest().has(away.id)).toBe(false);
+
+    // The line keeps its place through the menu and a game.
+    handle(startAction(vip), room);
+    handle(pickAction(vip, "echo"), room);
+    time.advance(countdownMs);
+    await settle();
+    expect(runtime.phase).toBe("playing");
+    expect(runtime.running?.runner.players).toHaveLength(3);
+
+    const late = phone("LATEAAAA", 3);
+    const withLate = { ...room, players: [...room.players, late] };
+    handle({ t: "player:joined", d: { player: late } }, withLate);
+    time.advance(1000);
+    const views = latest();
+    expect(views.get(late.id)).toEqual(["echo", { screen: "next-game", data: null }]);
+    expect(views.get(second.id)).toEqual(["echo", line(2)]);
+    expect(views.get(vip)).toEqual(["echo", { screen: "echo", data: { text: "" } }]);
+  });
+
   it("re-sends a reconnected phone its lobby view, even though it didn't change", () => {
     const { handle, second, lobby, ofType, time } = setup();
     handle({ t: "player:joined", d: { player: lobby.players[2]! } });

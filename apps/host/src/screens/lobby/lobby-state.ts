@@ -1,5 +1,6 @@
 import {
   seatCount,
+  type ControllerView,
   type PlayerInfo,
   type RelayToHostMessage,
   type RoomPhase,
@@ -90,6 +91,19 @@ export function seatedPlayers(state: LobbyState): PlayerInfo[] {
 /** Phones without a seat, in join order. */
 export function audience(state: LobbyState): PlayerInfo[] {
   return state.players.filter((player) => player.slot === null);
+}
+
+/**
+ * The `audience` view of every connected audience phone: `{ position }`, its place in the line for
+ * the next free seat, 1 for next (docs/architecture/session-flow.md, "Late joiners and audience").
+ * The relay seats the longest-waiting connected audience member first, so phones that are away
+ * don't count.
+ */
+export function audienceViews(state: LobbyState): Map<string, ControllerView> {
+  const line = audience(state).filter((player) => player.connected);
+  return new Map(
+    line.map((player, index) => [player.id, { screen: "audience", data: { position: index + 1 } }]),
+  );
 }
 
 /** The VIP: the connected seated player who joined first. Undefined when nobody qualifies. */
