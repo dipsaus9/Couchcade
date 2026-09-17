@@ -1,18 +1,21 @@
 import { shape, world } from "@couchcade/theme";
 
 /**
- * TV pixels (at 1080p) per world pixel. The TV shows the 480×270 world at ×4, so the overlays
- * are laid out in world pixels: every size in the house style and the design canvas is a 1080p
- * value, divided by this.
+ * The overlay layer's coordinate space: the 1080p TV frame of the house style and the design
+ * canvas. Every overlay size is a 1080p design value used as is, and the overlay camera scales
+ * the frame to the screen, so text is drawn at the screen's own resolution.
  */
-export const TV_PIXELS_PER_WORLD_PIXEL = 1080 / world.height;
+export const overlayFrame = { width: 1920, height: 1080 } as const;
 
-/** A 1080p TV size from the house style, in world pixels. May be fractional; round where drawn. */
-export function tvPx(px: number): number {
-  return px / TV_PIXELS_PER_WORLD_PIXEL;
+/** Overlay pixels per world pixel: the 480×270 world fills the 1920×1080 frame at ×4. */
+export const OVERLAY_PIXELS_PER_WORLD_PIXEL = overlayFrame.height / world.height;
+
+/** A world position (or size) in overlay pixels, to put an overlay on something in the world. */
+export function worldToOverlay(px: number): number {
+  return px * OVERLAY_PIXELS_PER_WORLD_PIXEL;
 }
 
-/** An axis-aligned rectangle in world pixels. */
+/** An axis-aligned rectangle. Overlays measure in overlay pixels, the world in world pixels. */
 export interface Rect {
   x: number;
   y: number;
@@ -21,34 +24,61 @@ export interface Rect {
 }
 
 /**
- * The TV safe area (`safe-tv`, 5% on every side), in whole world pixels and rounded inwards,
- * so anything inside it stays inside the 5% on the TV.
+ * The TV safe area (`safe-tv`, 5% on every side) in overlay pixels, rounded inwards: 96px left
+ * and right, 54px top and bottom, like the Vue screens' frame.
  */
 export const safeArea = (() => {
-  const insetX = Math.ceil(world.width * shape.safeTv);
-  const insetY = Math.ceil(world.height * shape.safeTv);
+  const insetX = Math.ceil(overlayFrame.width * shape.safeTv);
+  const insetY = Math.ceil(overlayFrame.height * shape.safeTv);
   return {
     left: insetX,
     top: insetY,
-    right: world.width - insetX,
-    bottom: world.height - insetY,
-    width: world.width - 2 * insetX,
-    height: world.height - 2 * insetY,
+    right: overlayFrame.width - insetX,
+    bottom: overlayFrame.height - insetY,
+    width: overlayFrame.width - 2 * insetX,
+    height: overlayFrame.height - 2 * insetY,
   } as const;
 })();
 
 /**
  * Depth of the overlay layer. Game world objects keep Phaser's default depth (0) or anything
- * below this, so the scoreboard, callouts and room code always draw on top.
+ * below this. The overlay has its own camera, so this only orders the display list.
  */
 export const OVERLAY_DEPTH = 1_000_000;
 
-/** Interface measurements shared by the overlays, in whole world pixels. */
+/** Interface measurements shared by the overlays, in overlay pixels (1080p TV values). */
 export const metrics = {
   /** `outline`: 4px on the TV. */
-  outline: Math.round(tvPx(shape.outline.tv)),
-  /** `depth-panel`: the hard Ink shadow under panels and chips (6px on the TV). */
-  depth: Math.round(tvPx(shape.depth.panel)),
-  /** `radius-panel` (20px on the TV). */
-  panelRadius: Math.round(tvPx(shape.radius.panel)),
+  outline: shape.outline.tv,
+  /** `depth-panel`: the hard Ink shadow under panels and chips. */
+  depth: shape.depth.panel,
+  /** `radius-panel`. */
+  panelRadius: shape.radius.panel,
 } as const;
+
+/** Where the stage draws on a canvas: the world's box, its zoom and the overlay's zoom. */
+export interface StageViewport extends Rect {
+  /** Screen pixels per world pixel: the largest whole number that fits, never below 1. */
+  worldZoom: number;
+  /** Screen pixels per overlay pixel: `worldZoom / 4`, so 1 on a 1920×1080 canvas. */
+  overlayZoom: number;
+}
+
+/**
+ * Fits the 480×270 world into a canvas at the largest whole-number zoom (×4 at 1080p, ×8 at 4K),
+ * centred, with the rest letterboxed (HOUSE_STYLE "Game worlds"). The overlay covers the same box.
+ */
+export function stageViewport(canvasWidth: number, canvasHeight: number): StageViewport {
+  const fit = Math.min(canvasWidth / world.width, canvasHeight / world.height);
+  const worldZoom = Math.max(1, Math.floor(fit));
+  const width = world.width * worldZoom;
+  const height = world.height * worldZoom;
+  return {
+    x: Math.floor((canvasWidth - width) / 2),
+    y: Math.floor((canvasHeight - height) / 2),
+    width,
+    height,
+    worldZoom,
+    overlayZoom: worldZoom / OVERLAY_PIXELS_PER_WORLD_PIXEL,
+  };
+}

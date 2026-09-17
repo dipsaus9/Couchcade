@@ -4,7 +4,7 @@ import { createPlayers } from "@couchcade/game-sdk/testing";
 import { world } from "@couchcade/theme";
 import { cuesBetween } from "../../src/host/cues.ts";
 import type { QuickDrawCue } from "../../src/host/cues.ts";
-import { safeArea } from "@couchcade/stage/layout";
+import { OVERLAY_PIXELS_PER_WORLD_PIXEL, safeArea } from "@couchcade/stage/layout";
 import { calloutAt, horizonY, pipSlots, street } from "../../src/host/layout.ts";
 import { crowShowMs, formatReaction, present } from "../../src/host/present.ts";
 import type { Presentation } from "../../src/host/present.ts";
@@ -57,10 +57,10 @@ describe("layout", () => {
   });
 
   it("keeps the street, the Pips and the callout between the scoreboard and the bottom panels", () => {
-    // The stage scoreboard is 18 world px high plus its lift, outline and shadow; the bottom row
-    // (instruction and room code panels) is the bottom 15% of the TV.
-    const scoreboardBottom = safeArea.top + 24;
-    const bottomRowTop = safeArea.bottom - 40;
+    // In world px. The stage scoreboard is 72 overlay px high plus its lift, outline and shadow;
+    // the bottom row (instruction and room code panels) is the bottom 15% of the TV.
+    const scoreboardBottom = (safeArea.top + 96) / OVERLAY_PIXELS_PER_WORLD_PIXEL;
+    const bottomRowTop = (safeArea.bottom - 160) / OVERLAY_PIXELS_PER_WORLD_PIXEL;
     expect(horizonY).toBeLessThanOrEqual(world.height / 3);
     expect(calloutAt.y - 25).toBeGreaterThan(scoreboardBottom);
     expect(street.top).toBeGreaterThan(horizonY);

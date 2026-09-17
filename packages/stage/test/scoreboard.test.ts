@@ -52,16 +52,19 @@ describe("Scoreboard", () => {
       ["daan", 4],
     ] as const) {
       const { bounds } = chip(scoreboard, id);
-      // The centre of the 9×9 shape carries the player's colour, Ink around it, Chalk around that.
-      const shapeX = bounds.x + scoreboardMetrics.padStart;
-      const shapeY = bounds.y + Math.floor((bounds.height - 9) / 2);
+      // The centre of the 36×36 shape carries the player's colour, Ink around it, Chalk around that.
+      const { padStart, shapeSize } = scoreboardMetrics;
+      const shapeX = bounds.x + padStart;
+      const shapeY = bounds.y + Math.floor((bounds.height - shapeSize) / 2);
       const token = playerTokens[slot];
-      expect(hex(await pixel(game, shapeX + 4, shapeY + 4)), `${id} shape`).toBe(
-        expectedColour(token.color),
-      );
-      expect(hex(await pixel(game, bounds.x + 2, bounds.y + bounds.height / 2)), `${id} fill`).toBe(
-        expectedColour(color.chalk),
-      );
+      expect(
+        hex(await pixel(game, shapeX + shapeSize / 2, shapeY + shapeSize / 2)),
+        `${id} shape`,
+      ).toBe(expectedColour(token.color));
+      expect(
+        hex(await pixel(game, bounds.x + metrics.outline + 2, bounds.y + bounds.height / 2)),
+        `${id} fill`,
+      ).toBe(expectedColour(color.chalk));
       expect(hex(await pixel(game, bounds.x, bounds.y + bounds.height / 2)), `${id} outline`).toBe(
         expectedColour(color.ink),
       );
@@ -85,7 +88,7 @@ describe("Scoreboard", () => {
     expect(scoreboard.chips.map((c) => c.name)).toEqual(["Sam", "Noor", "Jesse", "Lotte", "Daan"]);
   });
 
-  it("lifts the active player's chip by 8 TV pixels and rings it in Sunny", async () => {
+  it("lifts the active player's chip by 8 pixels and rings it in Sunny", async () => {
     const { game, scene } = await boot(StageScene);
     const scoreboard = scene.addScoreboard({ players: room, activePlayerId: "jesse" });
     const active = chip(scoreboard, "jesse");
@@ -126,9 +129,11 @@ describe("Scoreboard", () => {
     expect(scoreboard.chips).toHaveLength(8);
     for (const c of scoreboard.chips) {
       const slot = Number(c.playerId.slice(1));
-      const shapeX = c.bounds.x + scoreboardMetrics.padStart;
-      const shapeY = c.bounds.y + Math.floor((c.bounds.height - 9) / 2);
-      expect(hex(await pixel(game, shapeX + 4, shapeY + 4)), `${c.playerId} shape`).toBe(
+      const { padStart, shapeSize } = scoreboardMetrics;
+      const shapeX = c.bounds.x + padStart;
+      const shapeY = c.bounds.y + Math.floor((c.bounds.height - shapeSize) / 2);
+      const centre = shapeSize / 2;
+      expect(hex(await pixel(game, shapeX + centre, shapeY + centre)), `${c.playerId} shape`).toBe(
         expectedColour(playerTokens[slot]!.color),
       );
       expect(c.bounds.x).toBeGreaterThanOrEqual(safeArea.left + metrics.outline);
@@ -138,7 +143,7 @@ describe("Scoreboard", () => {
     }
     const bottom = Math.max(...scoreboard.chips.map((c) => c.bounds.y + c.bounds.height));
     // The scoreboard row is the top 14% of the screen.
-    expect(bottom + metrics.depth).toBeLessThanOrEqual(Math.floor(270 * 0.14));
+    expect(bottom + metrics.depth).toBeLessThanOrEqual(Math.floor(1080 * 0.14));
     const sorted = scoreboard.chips.map((c) => c.bounds).toSorted((a, b) => a.x - b.x);
     sorted.slice(1).forEach((b, i) => {
       const previous = sorted[i]!;

@@ -1,19 +1,19 @@
 import { GameObjects } from "phaser";
 import type { Scene } from "phaser";
 import { drawSlab, textStyle } from "../draw/index.ts";
-import { metrics, safeArea, tvPx } from "../layout/index.ts";
+import { metrics, safeArea } from "../layout/index.ts";
 import type { Rect } from "../layout/index.ts";
 
-/** Room code panel measurements in world pixels, from the 1080p TV footer in the design canvas. */
+/** Room code panel measurements in overlay pixels, from the 1080p TV footer in the design canvas. */
 export const roomCodeMetrics = {
-  /** Smallest panel width (420px on the TV). It grows for a long join URL. */
-  minWidth: Math.round(tvPx(420)),
-  /** Panel height (148px on the TV, the bottom 15% row). */
-  height: Math.round(tvPx(148)),
-  /** Space between the outline and the text (32px on the TV). */
-  padX: Math.round(tvPx(32)),
-  /** Space between the code and the URL (4px on the TV). */
-  gap: Math.round(tvPx(4)),
+  /** Smallest panel width. It grows for a long join URL. */
+  minWidth: 420,
+  /** Panel height (the bottom 15% row). */
+  height: 148,
+  /** Space between the outline and the text. */
+  padX: 32,
+  /** Space between the code and the URL. */
+  gap: 4,
 } as const;
 
 export interface RoomCodeOptions {

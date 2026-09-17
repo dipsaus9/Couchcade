@@ -1,15 +1,15 @@
 import { color, font, toPhaserColor, typeScale } from "@couchcade/theme";
 import type { Hex, PlayerShape, TypeRoleName } from "@couchcade/theme";
 import type { GameObjects, Types } from "phaser";
-import { metrics, tvPx } from "../layout/index.ts";
+import { metrics } from "../layout/index.ts";
 import type { Rect } from "../layout/index.ts";
 
 export interface SlabOptions {
   /** Fill colour. Defaults to Chalk. */
   fill?: Hex;
-  /** Corner radius in world pixels. `"pill"` rounds the short side fully. Defaults to `radius-panel`. */
+  /** Corner radius in overlay pixels. `"pill"` rounds the short side fully. Defaults to `radius-panel`. */
   radius?: number | "pill";
-  /** Hard Ink shadow straight down, in world pixels. Defaults to `depth-panel`. */
+  /** Hard Ink shadow straight down, in overlay pixels. Defaults to `depth-panel`. */
   depth?: number;
   /** A ring drawn outside the Ink outline, such as the Sunny highlight on the active chip. */
   ring?: Hex;
@@ -59,8 +59,8 @@ export function drawSlab(graphics: GameObjects.Graphics, rect: Rect, options: Sl
 }
 
 /**
- * The eight player shapes as 7×7 pixel masks. At the world's resolution a vector shape turns to
- * mush, so the stage draws them as pixel art with a 1px Ink outline, like World Pips.
+ * The eight player shapes as 7×7 pixel masks, drawn as pixel art with a one-pixel Ink outline like
+ * World Pips: at world resolution in the world, and with bigger pixels on the overlay.
  */
 export const shapeMasks = {
   circle: ["..###..", ".#####.", "#######", "#######", "#######", ".#####.", "..###.."],
@@ -73,12 +73,13 @@ export const shapeMasks = {
   plus: ["..###..", "..###..", "#######", "#######", "#######", "..###..", "..###.."],
 } as const satisfies Record<PlayerShape, readonly string[]>;
 
-/** Width and height of a drawn player shape: the 7×7 mask plus its 1px outline on each side. */
+/** Width and height of a drawn player shape in its own pixels: the 7×7 mask plus the outline. */
 export const SHAPE_SIZE = 9;
 
 /**
  * Draws a player shape with its top-left corner at (x, y), filled with the player's colour and
- * outlined in Ink. The outline is every pixel next to the mask (four neighbours).
+ * outlined in Ink. The outline is every pixel next to the mask (four neighbours). `pixel` is the
+ * size of one mask pixel: 1 in the world, `metrics.outline` on the overlay so the outline matches.
  */
 export function drawPlayerShape(
   graphics: GameObjects.Graphics,
@@ -86,6 +87,7 @@ export function drawPlayerShape(
   fill: Hex,
   x: number,
   y: number,
+  pixel = 1,
 ): void {
   const mask = shapeMasks[playerShape];
   const size = mask.length;
@@ -106,12 +108,14 @@ export function drawPlayerShape(
     }
   }
   graphics.fillStyle(toPhaserColor(color.ink));
-  for (const [col, row] of inkPixels) graphics.fillRect(x + 1 + col, y + 1 + row, 1, 1);
+  for (const [col, row] of inkPixels)
+    graphics.fillRect(x + (1 + col) * pixel, y + (1 + row) * pixel, pixel, pixel);
   graphics.fillStyle(toPhaserColor(fill));
-  for (const [col, row] of fillPixels) graphics.fillRect(x + 1 + col, y + 1 + row, 1, 1);
+  for (const [col, row] of fillPixels)
+    graphics.fillRect(x + (1 + col) * pixel, y + (1 + row) * pixel, pixel, pixel);
 }
 
-/** A Phaser text style for a house style type role at TV size, in world pixels. */
+/** A Phaser text style for a house style type role at its 1080p TV size, in overlay pixels. */
 export function textStyle(
   role: TypeRoleName,
   fill: Hex = color.ink,
@@ -119,7 +123,7 @@ export function textStyle(
   const { font: family, weight, tv } = typeScale[role];
   return {
     fontFamily: font[family],
-    fontSize: `${tvPx(tv)}px`,
+    fontSize: `${tv}px`,
     fontStyle: String(weight),
     color: fill,
   };
