@@ -162,16 +162,16 @@ const detail = computed(() =>
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: var(--cc-space-3);
-  overflow-y: auto;
+  min-height: 0;
 }
 .rows {
   display: flex;
   flex-direction: column;
   gap: var(--cc-space-3);
-  margin: var(--cc-space-3) 0 0;
+  margin: 0;
   padding: 0;
   list-style: none;
+  overflow-y: auto;
 }
 .row {
   display: flex;

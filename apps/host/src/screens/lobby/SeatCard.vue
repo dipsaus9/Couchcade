@@ -81,6 +81,7 @@ const status = computed(() => {
   stroke: var(--cc-ink);
 }
 .empty .shape {
+  fill: var(--cc-sky);
   stroke: var(--cc-ink-20-on-sky);
 }
 .name,
