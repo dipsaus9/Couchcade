@@ -38,7 +38,7 @@ Approving this doc approves these.
 
 | # | Decision | In plain words |
 |---|---|---|
-| 1 | Plain Web Audio API, no library | `@couchcade/audio` is about 300 lines over the browser's own `AudioContext`, with no third-party dependencies and an estimated 3 KB gzip. The host platform JS is at 413.1 KB of its 450 KB budget, so 37 KB is left. howler.js would take 8 KB of that and hasn't had a release since September 2023. |
+| 1 | Plain Web Audio API, no library | `@couchcade/audio` is about 300 lines over the browser's own `AudioContext`, with no third-party dependencies and an estimated 3 KB gzip. The host platform JS is at 413.7 KB of its 450 KB budget, so 36 KB is left. howler.js would take 8 KB of that and hasn't had a release since September 2023. |
 | 2 | Phaser stays silent | Phaser keeps `audio: { noAudio: true }`. The lobby, menu and results are Vue screens, so Phaser's sound manager can't be the one mixer. The page has exactly one `AudioContext`. |
 | 3 | Games play tokens and sound refs, never file paths | Platform moments use the six house style tokens: `press`, `ui`, `scene`, `your-turn`, `celebrate`, `foul`. A game declares its own sounds once in `src/host/sounds.ts` and plays them by name. Only that file knows a URL. |
 | 4 | Every sound names its visual | Each sound definition has a required `visual` field saying what the TV shows at the same moment. The type won't compile without it. That is how the epic's "every sound has a visual counterpart" is checked. |
@@ -87,7 +87,7 @@ Each has a recommendation. Approving the doc without comment takes all of them.
 
 ### Options compared
 
-The host platform JS measured 413.1 KB gzip of its 450 KB budget on 17 September 2026 (`pnpm budgets` on main after CC-11.4), so there are 37 KB left for everything CC-4 to CC-9 still adds.
+The host platform JS measured 413.7 KB gzip of its 450 KB budget on 17 September 2026 (`pnpm budgets` on main after CC-2.2), so there are 36 KB left for everything CC-4 to CC-9 still adds.
 
 | Option | Size (gzip) | Licence and upkeep | Fit | Verdict |
 |---|---|---|---|---|
