@@ -4,7 +4,7 @@ title: Add haptics on phones with an iOS no-op
 status: Done
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-17 21:27'
+updated_date: '2026-09-17 21:29'
 labels:
   - story
 dependencies:
@@ -55,6 +55,8 @@ Amended References per docs/architecture/audio.md Conflicts item 2 (doc rule, ow
 Accepted collision (orchestrator decision, 2026-09-17): CC-7.5's amended References (games/quick-draw/src/controller/haptics.ts, games/quick-draw/src/controller/Controller.vue, games/quick-draw/test/controller/haptics.test.ts, games/target-range/src/controller/haptics.ts, games/target-range/src/controller/Controller.vue) prefix-collide with CC-11.9's broad reference games/target-range/src/. CC-11.9 is not claimed (no branch/worktree) and is blocked behind CC-3.17, CC-3.18 and CC-3.21, all still To Do, so it cannot be dispatched tonight. Orchestrator will hold CC-11.9 until this story's PR merges. Proceeding with delivery on this basis; reviewer should treat the games/target-range/src/controller/ touches as in-scope and the collision as knowingly accepted, not an oversight.
 
 Reviewer round 1 flagged packages/ui/package.json (new @couchcade/protocol dependency needed for CueToken) and packages/ui/test/haptics/ (the new module's own test dir, a sibling of the declared packages/ui/src/haptics/, not a prefix match) as scope violations. Both are inherent to shipping packages/ui/src/haptics/ (a manifest edit for its one new import, and its own test directory), not new functional scope, so amended References to include them explicitly, matching the doc's own convention (audio.md Conflicts item 7) of amending References for a declared deliverable's necessary companion paths.
+
+Reviewer (dipsaus-ai:story-reviewer, model sonnet) round 2: pass. Both acceptance criteria met, no scope violations, no findings. (Round 1 blocked on packages/ui/package.json and packages/ui/test/haptics/ missing from References; fixed by amending References, see prior note.)
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
