@@ -223,7 +223,9 @@ export class Room extends Server {
     for (const record of this.#storage.readReservedPlayers()) {
       this.#send(connection, { t: "player:joined", d: { player: toPlayerInfo(record, false) } });
     }
-    // CC-3.5 sends the stored room:snapshot here.
+    // The last round snapshot, so a TV that reloaded mid-game resumes at the next round.
+    const snapshot = this.#storage.readSnapshot();
+    if (snapshot) this.#send(connection, { t: "room:snapshot", d: snapshot });
     if (!previous) this.#sendToPhones({ t: "room:host", d: { connected: true } });
   }
 
@@ -330,7 +332,10 @@ export class Room extends Server {
       case "room:end":
         await this.#closeRoom();
         return;
-      // room:snapshot arrives with CC-3.5.
+      case "room:snapshot":
+        // One write per round (docs/architecture/session-flow.md, "When the host sends a snapshot").
+        this.#storage.saveSnapshot(message.d, Date.now());
+        return;
       default:
         return;
     }

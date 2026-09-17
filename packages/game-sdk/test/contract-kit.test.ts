@@ -179,13 +179,15 @@ describe("gameContractChecks", () => {
     expect(failure(game, "onPlayerLeft is pure")?.message).toContain("changed its arguments");
   });
 
-  it("fails when a snapshot doesn't fit a 1 KB frame", () => {
-    const game = {
+  it("fails when a snapshot is over 600 bytes, and passes at 600", () => {
+    const sized = (bytes: number) => ({
       ...counter,
-      snapshot: () => ({ padding: "x".repeat(1024) }),
+      // `{"p":"…"}` is 8 bytes around the padding.
+      snapshot: () => ({ p: "x".repeat(bytes - 8) }),
       restore: (): Counter => ({ count: 0, log: [] }),
-    };
-    expect(failure(game, "snapshot fits a 1 KB frame")).toBeDefined();
+    });
+    expect(failure(sized(601), "snapshot fits 600 bytes")?.message).toContain("601 bytes");
+    expect(failure(sized(600), "snapshot fits 600 bytes")).toBeUndefined();
   });
 
   it("fails when no input can be derived and none is given", () => {
