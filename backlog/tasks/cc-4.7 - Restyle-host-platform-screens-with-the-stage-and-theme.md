@@ -1,10 +1,10 @@
 ---
 id: CC-4.7
 title: Restyle host platform screens with the stage and theme
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-16 12:28'
+updated_date: '2026-09-17 20:05'
 labels:
   - story
 dependencies:
@@ -31,12 +31,74 @@ Branch: CC-4.7/restyle-host-screens
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Every screen under apps/host/src/screens/ uses theme tokens and stage components only
-- [ ] #2 pnpm check:style passes for apps/host
+- [x] #1 Every screen under apps/host/src/screens/ uses theme tokens and stage components only
+- [x] #2 pnpm check:style passes for apps/host
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Restyle apps/host/src/screens/ to consistently use @couchcade/ui shared components (CcButton,
+CcPanel, CcPlayerChip, CcPlayerShape) plus theme tokens, replacing hand-duplicated button/panel/
+shape markup, per docs/design/platform-screens.md and HOUSE_STYLE.md. Scope is apps/host/src/screens/
+only (the story's declared References); packages/stage and games/quick-draw are untouched (another
+worker owns Quick Draw TV-text crispness there).
+
+Note on AC1 wording ("stage components"): apps/host's non-gameplay screens (lobby, menu, results,
+calibration, passcode) are Vue DOM overlays, not Phaser scenes -- @couchcade/stage only extends
+Phaser.Scene/GameObjects and is used exclusively by running games' TV overlays (confirmed via
+apps/host/src/App.vue: the Vue #app frame and the Phaser #stage canvas are separate layers, and
+the frame is emptied while a game runs). apps/host already imports @couchcade/ui (SeatCard.vue's
+CcButton, pre-existing) and PlayerShape.vue's own comment says "CC-4.7 swaps this for the stage and
+UI kit versions" -- so I'm reading "stage components" as shorthand for "the shared TV design-system
+components", i.e. @couchcade/ui, mirroring CC-4.8's "UI kit components only" for the controller.
+Recording this interpretation rather than blocking, since no Phaser-based alternative exists for
+Vue overlay screens.
+
+Per-file plan:
+- lobby/PlayerShape.vue: keep, narrowed to the one case CcPlayerShape's public API can't cover --
+  the lobby's empty-seat preview (design doc: "Empty slots show the shape the next player will
+  get", i.e. shape without the player's colour). Comment updated to explain why.
+- lobby/SeatCard.vue: CcPlayerShape for an occupied seat (fixes a stroke-weight bug: the old local
+  component scaled stroke with icon size instead of holding a fixed 3px/4px per HOUSE_STYLE); local
+  PlayerShape.vue stays for the empty-seat preview only. CcButton already used for Kick.
+- lobby/LobbyScreen.vue: CcPanel for the players section and JoinPanel; CcButton for Check TV lag /
+  Lock room (variant toggles quiet/primary with locked) / End room, keeping the inline lock icon in
+  the button's default slot.
+- lobby/JoinPanel.vue: CcPanel with tab="Join on your phone" replacing the hand-built tab/panel.
+- menu/MenuScreen.vue: CcPlayerShape for player chips (kept as light bespoke chips: CcPlayerChip's
+  fixed height/score slot doesn't match the compact players-in-header row); CcPanel for the two
+  footer panels.
+- results/ResultsScreen.vue: CcPlayerShape for podium and standings shapes (place-number rows stay
+  bespoke -- CcPlayerChip has no place-number slot); CcPanel for standings (tab="Points") and the
+  two footer panels.
+- calibration/CalibrationScreen.vue: CcPlayerShape for the "Last tap" chips; CcPanel for the taps
+  panel (tab="Last tap"), the flash/retry panel, and the two footer panels; CcButton for Try again /
+  Skip.
+- passcode/PasscodeScreen.vue: CcPanel (as="form") replacing the hand-built form panel; CcButton
+  (variant=primary, type=submit, block) for Open room.
+
+Everything stays screen="tv" (apps/host is TV-only). Verify: pnpm check && pnpm test, plus
+check:style for apps/host (AC2), plus manual 1920x1080 screenshots of every restyled screen for TV
+text-crispness review (owner priority per CC-4.11).
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 Verify: pnpm check && pnpm test
+
+Restyled every screen under apps/host/src/screens/ to consistently use @couchcade/ui (CcButton, CcPanel, CcPlayerShape) plus theme tokens, replacing hand-rolled duplicate button/panel/shape markup: LobbyScreen, JoinPanel, SeatCard (Kick already used CcButton), MenuScreen, ResultsScreen, CalibrationScreen, PasscodeScreen. lobby/PlayerShape.vue is kept, narrowed to the one case CcPlayerShape's public API can't cover: the lobby's empty-seat shape preview in Sky instead of the player's colour (design doc: "Empty slots show the shape the next player will get"). Fixed a stroke-weight bug along the way: the old local shape component scaled its outline with icon size; CcPlayerShape (and the updated PlayerShape.vue) hold a fixed 4px TV outline per HOUSE_STYLE regardless of size, which is a direct crispness win at 1080p. pnpm check, pnpm test (all 24 workspace projects), pnpm build and pnpm check:style all pass. pnpm check:deps also passes (no import-boundary changes).
+
+Verified visually: built a temporary (untracked, not committed, deleted before push) fixture harness that mounted each restyled screen with the design doc's example content (players Sam/Noor/Jesse/Lotte/Daan, audience Mees, room code BEAN) and screenshotted every one at native 1920x1080 with fonts loaded, for the TV-crispness review (CC-4.11 concern). Screenshot review caught two real bugs before push, both fixed and re-verified: (1) SeatCard.vue's empty-seat shape lost its Sky fill when split from the occupied-seat CcPlayerShape path (rendered solid black); (2) ResultsScreen.vue's CcPanel tab ("Points") was clipped by overflow-y:auto living on the same element as the tab -- moved the scroll to an inner .rows wrapper. Follow-up (not fixed, out of this story's scope: it's a grid vertical-alignment question, not a theme-tokens/shared-components one): the game menu's .grid leaves a large empty gap between the game cards and the footer when there's only one row of cards, because align-content:start is set on a flex:1 grid that still stretches to fill the column -- pre-existing behaviour, unchanged by this restyle.
+
+Reviewer (dipsaus-ai:story-reviewer, model sonnet, round 1): verdict pass. AC1 met -- verified CcPlayerShape's public API (packages/ui/src/components/CcPlayerShape.vue + index.ts) has no colour-override, confirming PlayerShape.vue's narrowing is real, not just claimed; all removed local CSS matches what CcPanel/CcButton/CcPlayerShape now supply; remaining bespoke elements (.tag, .dot, .card, .chip, .row, .tile) have no ui-kit equivalent and stay theme-token-driven. AC2 met -- ran pnpm check:style independently, clean. No scope violations, no findings. PR: https://github.com/dipsaus9/Couchcade/pull/117 (draft).
+
+CI on PR #117: all checks green (budgets, check, build, check:deps, check:style, test, e2e).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Restyled every screen under apps/host/src/screens/ (lobby, join panel, seat card, menu, results, calibration, passcode) to draw buttons, panels and player shapes through @couchcade/ui (CcButton, CcPanel, CcPlayerShape) and theme tokens instead of hand-rolled duplicates, per docs/design/platform-screens.md and HOUSE_STYLE.md. lobby/PlayerShape.vue stays, narrowed to the one case CcPlayerShape's public API can't cover: the lobby's empty-seat shape preview in Sky instead of the seat's future player colour. Fixed a stroke-weight bug along the way (outline now holds a fixed 4px on TV regardless of icon size, matching HOUSE_STYLE, instead of scaling with size). Verified with 1920x1080 screenshots of every screen (fixture harness, not committed), which caught and led to fixing two real bugs before push: an empty-seat shape that lost its fill, and a standings-panel tab that was clipped by the scroll container. pnpm check, pnpm test (all workspace projects), pnpm build, pnpm check:style and pnpm check:deps all pass.
+<!-- SECTION:FINAL_SUMMARY:END -->

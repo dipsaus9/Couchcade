@@ -1,15 +1,14 @@
 <script setup lang="ts">
 import { players as playerStyles } from "@couchcade/theme";
+import { CcPanel, CcPlayerShape } from "@couchcade/ui";
 import { computed } from "vue";
 import type { ResultsScreenState } from "../../runtime/host-runtime.ts";
 import { vip, type LobbyState } from "../lobby/lobby-state.ts";
-import PlayerShape from "../lobby/PlayerShape.vue";
 import { placeLabel } from "./results.ts";
 
 // The TV results screen (docs/design/platform-screens.md, "Results"; session-flow.md, "Results"):
 // the headline, a podium for places 1 to 3 and a standings chip per in-game player. Read-only: only
-// the VIP's phone has "Play again" and "Back to menu" (session-flow.md owner decisions). CC-4.7
-// restyles it with the stage and theme.
+// the VIP's phone has "Play again" and "Back to menu" (session-flow.md owner decisions).
 const props = defineProps<{ lobby: LobbyState; results: ResultsScreenState }>();
 
 const leader = computed(() => vip(props.lobby));
@@ -36,19 +35,18 @@ const detail = computed(() =>
           class="step"
           :class="`place-${entry.place}`"
         >
-          <PlayerShape
+          <CcPlayerShape
             class="shape"
-            :shape="styleFor(entry.player.slot).shape"
+            :player="styleFor(entry.player.slot).id"
             :size="40"
-            :style="{ fill: `var(--cc-player-${styleFor(entry.player.slot).id})` }"
+            screen="tv"
           />
           <p class="place">{{ placeLabel(entry.place) }}</p>
           <p class="name">{{ entry.player.name }}</p>
         </li>
       </ul>
 
-      <section class="panel standings">
-        <span class="tab">Points</span>
+      <CcPanel class="standings" screen="tv" as="section" tab="Points">
         <ul class="rows" aria-label="Standings">
           <li
             v-for="entry in results.standings"
@@ -57,30 +55,30 @@ const detail = computed(() =>
             :class="{ top: entry.place === 1 }"
           >
             <span class="place">{{ entry.place }}</span>
-            <PlayerShape
+            <CcPlayerShape
               class="shape"
-              :shape="styleFor(entry.player.slot).shape"
+              :player="styleFor(entry.player.slot).id"
               :size="28"
-              :style="{ fill: `var(--cc-player-${styleFor(entry.player.slot).id})` }"
+              screen="tv"
             />
             <span class="nm">{{ entry.player.name }}</span>
             <span v-if="entry.score !== undefined" class="sc">{{ entry.score }}</span>
           </li>
         </ul>
-      </section>
+      </CcPanel>
     </main>
 
     <footer class="foot">
-      <div class="panel" style="flex: 1">
+      <CcPanel class="panel" screen="tv" style="flex: 1">
         <p class="body">
           {{ leader ? `${leader.name} picks what's next` : "The VIP picks what's next" }}
         </p>
         <p class="small">{{ detail }}</p>
-      </div>
-      <div class="panel code-panel">
+      </CcPanel>
+      <CcPanel class="panel code-panel" screen="tv">
         <p class="small">Room code</p>
         <p class="code">{{ lobby.code }}</p>
-      </div>
+      </CcPanel>
     </footer>
   </section>
 </template>
@@ -160,41 +158,20 @@ const detail = computed(() =>
 .step .name {
   font: var(--cc-text-action-weight) var(--cc-text-action-tv) var(--cc-text-action-font);
 }
-.shape {
-  stroke: var(--cc-ink);
-}
-.panel {
-  background: var(--cc-chalk);
-  border: var(--cc-outline-tv) solid var(--cc-ink);
-  border-radius: var(--cc-radius-panel);
-  box-shadow: var(--cc-depth-panel);
-}
 .standings {
-  position: relative;
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: var(--cc-space-3);
-  padding: var(--cc-space-5);
-  overflow-y: auto;
-}
-.tab {
-  position: absolute;
-  top: calc(-1 * var(--cc-space-4));
-  left: var(--cc-space-5);
-  padding: 0 var(--cc-space-3);
-  background: var(--cc-sky);
-  border: var(--cc-outline-tv) solid var(--cc-ink);
-  border-radius: var(--cc-radius-tag);
-  font: 700 var(--cc-text-small-tv) var(--cc-text-small-font);
+  min-height: 0;
 }
 .rows {
   display: flex;
   flex-direction: column;
   gap: var(--cc-space-3);
-  margin: var(--cc-space-3) 0 0;
+  margin: 0;
   padding: 0;
   list-style: none;
+  overflow-y: auto;
 }
 .row {
   display: flex;
@@ -229,7 +206,6 @@ const detail = computed(() =>
   flex-direction: column;
   justify-content: center;
   gap: var(--cc-space-1);
-  padding: var(--cc-space-5) var(--cc-space-6);
 }
 .code-panel {
   align-items: center;

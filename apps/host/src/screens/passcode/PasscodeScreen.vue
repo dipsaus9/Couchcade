@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import { CcButton, CcPanel } from "@couchcade/ui";
 import { ref } from "vue";
 
-// The host passcode screen. Plain on purpose: CC-4.7 restyles every host screen.
+// The host passcode screen. Not in the approved platform-screens canvas (docs/design/
+// platform-screens.md, "Not in this canvas" -- CC-1.11); follows the same panel/button patterns.
 const props = defineProps<{
   notice: string | null;
   /** Opens a room. Resolves to error copy, or null when the room is open. */
@@ -22,11 +24,20 @@ async function submit(): Promise<void> {
   error.value = await props.openRoom(typed);
   busy.value = false;
 }
+
+// CcPanel's `as="form"` renders a native <form>, but the strict template checker only knows the
+// component's own declared props -- an event listener needs the v-bind escape hatch, same as an
+// unmodelled attribute (see SeatCard.vue's aria-label). The submit event still lands on the
+// native element through Vue's normal attribute fallthrough.
+function onSubmit(event: Event): void {
+  event.preventDefault();
+  void submit();
+}
 </script>
 
 <template>
   <main class="passcode">
-    <form class="panel" @submit.prevent="submit">
+    <CcPanel class="panel" screen="tv" as="form" v-bind="{ onSubmit }">
       <h1 class="title">Open a room</h1>
       <p v-if="notice" class="notice">{{ notice }}</p>
       <label class="label" for="host-passcode">Host passcode</label>
@@ -40,10 +51,16 @@ async function submit(): Promise<void> {
         required
       />
       <p v-if="error" class="error" role="alert">{{ error }}</p>
-      <button class="button" type="submit" :disabled="busy || passcode === ''">
+      <CcButton
+        variant="primary"
+        screen="tv"
+        type="submit"
+        block
+        :disabled="busy || passcode === ''"
+      >
         {{ busy ? "Opening…" : "Open room" }}
-      </button>
-    </form>
+      </CcButton>
+    </CcPanel>
   </main>
 </template>
 
@@ -58,11 +75,6 @@ async function submit(): Promise<void> {
   flex-direction: column;
   gap: var(--cc-space-5);
   width: 880px;
-  padding: var(--cc-space-8);
-  background: var(--cc-chalk);
-  border: var(--cc-outline-tv) solid var(--cc-ink);
-  border-radius: var(--cc-radius-panel);
-  box-shadow: var(--cc-depth-panel);
 }
 .title {
   margin: 0;
@@ -85,25 +97,7 @@ async function submit(): Promise<void> {
   border: var(--cc-outline-tv) solid var(--cc-ink);
   border-radius: var(--cc-radius-panel);
 }
-.button {
-  height: 88px;
-  font: var(--cc-text-action-weight) var(--cc-text-action-tv) var(--cc-text-action-font);
-  color: var(--cc-ink);
-  background: var(--cc-sunny);
-  border: var(--cc-outline-tv) solid var(--cc-ink);
-  border-radius: var(--cc-radius-pill);
-  box-shadow: var(--cc-depth-rest);
-  cursor: pointer;
-}
-.button:disabled {
-  color: var(--cc-ink-45);
-  background: var(--cc-chalk);
-  border-color: var(--cc-ink-20);
-  box-shadow: none;
-  cursor: default;
-}
-.field:focus-visible,
-.button:focus-visible {
+.field:focus-visible {
   outline: var(--cc-focus-ring-width) solid var(--cc-sunny);
   outline-offset: var(--cc-focus-ring-offset);
 }
