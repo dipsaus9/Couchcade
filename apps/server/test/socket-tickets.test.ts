@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { signRejoinToken, signTicket } from "../src/security/tickets.ts";
 import defaultWorker from "../src/worker.ts";
 import {
+  clientHeaders,
   createRoom,
   freshCode,
   origin,
@@ -47,7 +48,7 @@ describe("socket upgrades with signed tickets", () => {
       const request =
         ticket === null
           ? new Request(`${origin}/ws/${code}?v=1`, {
-              headers: { Upgrade: "websocket", Origin: origin },
+              headers: clientHeaders({ Upgrade: "websocket", Origin: origin }),
             })
           : upgradeRequest(code, ticket);
       const { response, rooms } = await upgrade(request);
@@ -64,7 +65,7 @@ describe("socket upgrades with signed tickets", () => {
       expect({ status: response.status, rooms }).toEqual({ status: 403, rooms: [] });
     }
     const bare = new Request(`${origin}/ws/${code}?v=1&ticket=${ticket}`, {
-      headers: { Upgrade: "websocket" },
+      headers: clientHeaders({ Upgrade: "websocket" }),
     });
     const { response, rooms } = await upgrade(bare);
     expect({ status: response.status, rooms }).toEqual({ status: 403, rooms: [] });

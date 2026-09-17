@@ -13,6 +13,7 @@ import {
   type CalibrationScreenState,
   type HostRuntime,
   type MenuScreenState,
+  type MotionScreenState,
   type ResultsScreenState,
 } from "../runtime/host-runtime.ts";
 import { phaserStage } from "../runtime/stage.ts";
@@ -40,6 +41,8 @@ export type HostScreen =
       connection: ConnectionStatus;
       calibration: CalibrationScreenState;
     }
+  /** Before a motion game: every phone enables motion or picks touch. */
+  | { name: "motion"; lobby: LobbyState; connection: ConnectionStatus; motion: MotionScreenState }
   /** The VIP picks a game on their phone. */
   | { name: "menu"; lobby: LobbyState; connection: ConnectionStatus; menu: MenuScreenState }
   /** A game runs. The TV shows the stage with the game's scene. */
@@ -80,7 +83,9 @@ export function useHostSession() {
       const menu = roomRuntime.menu;
       const results = roomRuntime.results;
       const calibration = roomRuntime.calibration;
+      const motion = roomRuntime.motion;
       if (menu) screen.value = { name: "menu", lobby, connection, menu };
+      else if (motion) screen.value = { name: "motion", lobby, connection, motion };
       else if (results) screen.value = { name: "results", lobby, connection, results };
       else if (calibration) screen.value = { name: "calibration", lobby, connection, calibration };
       else if (roomRuntime.running) screen.value = { name: "playing", lobby, connection };

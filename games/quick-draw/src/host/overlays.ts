@@ -1,7 +1,7 @@
 import { color, typeScale } from "@couchcade/theme";
 import type { Hex } from "@couchcade/theme";
 import { drawSlab, textStyle } from "@couchcade/stage/draw";
-import { metrics, safeArea, tvPx } from "@couchcade/stage/layout";
+import { metrics, safeArea, worldToOverlay } from "@couchcade/stage/layout";
 import { roomCodeMetrics } from "@couchcade/stage/room-code";
 import { GameObjects } from "phaser";
 import type { Scene, Types } from "phaser";
@@ -11,21 +11,22 @@ import type { PipLabel } from "./present.ts";
  * Quick Draw's small overlays, built from the stage's drawing primitives so they share the
  * scoreboard's outline, shadow and type (HOUSE_STYLE "Overlays: only from @couchcade/stage"):
  * the time or FOUL! tag over a Pip, the BANG! on a winner's flag, and the bottom instruction
- * panel. They go on the stage's overlay layer, above the world.
+ * panel. They go on the stage's overlay layer, above the world, and measure in overlay pixels
+ * (1080p TV pixels).
  */
 
-/** Numbers over the Pips: Pixelify Sans at the `body` size (32px on the TV, 8 world px). */
+/** Numbers over the Pips: Pixelify Sans at the `body` size (32px on the TV). */
 const tagText = (fill: Hex): Types.GameObjects.Text.TextStyle => ({
   ...textStyle("score", fill),
-  fontSize: `${tvPx(typeScale.body.tv)}px`,
+  fontSize: `${typeScale.body.tv}px`,
 });
 
-const tagPadX = Math.round(tvPx(12));
+const tagPadX = 12;
 
 /**
  * A pill over a Pip: a time in Ink on Chalk, or FOUL! in Chalk with an Ink outline on Signal
  * (HOUSE_STYLE "Colour": Chalk text on Signal needs the outline). Its origin is its bottom
- * centre, so it sits on top of the Pip's head.
+ * centre, so it sits on top of the Pip's head. `show` takes overlay pixels.
  */
 export class PipTag extends GameObjects.Container {
   #key: string | null = null;
@@ -46,7 +47,7 @@ export class PipTag extends GameObjects.Container {
     if (label === null) return;
     const key = `${label.tone}:${label.text}`;
     if (key !== this.#key) this.#build(label, key);
-    this.setPosition(x + label.offsetX, bottom);
+    this.setPosition(x + worldToOverlay(label.offsetX), bottom);
   }
 
   #build(label: PipLabel, key: string): void {
@@ -78,6 +79,9 @@ export class PipTag extends GameObjects.Container {
   }
 }
 
+/** The hard Ink shadow under BANG! (4px on the TV). */
+const bangShadow = metrics.outline;
+
 /** BANG! on a winner's flag: a small callout, Sunny with an Ink stroke and a hard Ink shadow. */
 export function bangText(scene: Scene): GameObjects.Text {
   return scene.make
@@ -86,10 +90,18 @@ export function bangText(scene: Scene): GameObjects.Text {
         text: "BANG!",
         style: {
           ...textStyle("score", color.sunny),
-          fontSize: `${tvPx(typeScale.action.tv)}px`,
+          fontSize: `${typeScale.action.tv}px`,
           stroke: color.ink,
           strokeThickness: metrics.outline * 2,
-          shadow: { offsetX: 0, offsetY: 1, color: color.ink, blur: 0, stroke: true, fill: true },
+          shadow: {
+            offsetX: 0,
+            offsetY: bangShadow,
+            color: color.ink,
+            blur: 0,
+            stroke: true,
+            fill: true,
+          },
+          padding: { bottom: bangShadow },
         },
       },
       false,
@@ -101,7 +113,7 @@ export function bangText(scene: Scene): GameObjects.Text {
 
 /** The instruction panel's box: the bottom row of the safe area, left of the room code panel. */
 export const instructionPanelRect = (() => {
-  const gap = Math.round(tvPx(24));
+  const gap = 24;
   const y = safeArea.bottom - metrics.depth - roomCodeMetrics.height;
   return {
     x: safeArea.left,
@@ -127,7 +139,7 @@ export class InstructionPanel extends GameObjects.Container {
     this.#line = scene.make
       .text({ text: "", style: textStyle("body") }, false)
       .setOrigin(0, 0.5)
-      .setPosition(rect.x + Math.round(tvPx(32)), rect.y + rect.height / 2);
+      .setPosition(rect.x + 32, rect.y + rect.height / 2);
     this.add([slab, this.#line]);
   }
 

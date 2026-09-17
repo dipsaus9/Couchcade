@@ -1,10 +1,10 @@
-import { color, motion, world } from "@couchcade/theme";
+import { color, motion } from "@couchcade/theme";
 import { GameObjects, Math as PhaserMath } from "phaser";
-import type { Scene, Time, Tweens } from "phaser";
+import type { Cameras, Scene, Time, Tweens } from "phaser";
 import { textStyle } from "../draw/index.ts";
-import { metrics, tvPx } from "../layout/index.ts";
+import { OVERLAY_PIXELS_PER_WORLD_PIXEL, metrics, overlayFrame } from "../layout/index.ts";
 
-/** The callout treatment (HOUSE_STYLE "Callout treatment"), in world pixels. */
+/** The callout treatment (HOUSE_STYLE "Callout treatment"), in overlay pixels. */
 export const calloutStyle = {
   /** Rotated −4°. */
   angle: -4,
@@ -14,8 +14,8 @@ export const calloutStyle = {
    */
   strokeThickness: metrics.outline * 2,
   /** The hard Ink shadow straight down (5px on the TV). */
-  shadowOffset: Math.max(1, Math.round(tvPx(5))),
-  /** The `celebrate` screen shake (4px on the TV). */
+  shadowOffset: 5,
+  /** The `celebrate` screen shake: the world moves by up to one world pixel (4px on the TV). */
   shake: metrics.outline,
 } as const;
 
@@ -26,7 +26,7 @@ export const calloutStyle = {
 const phaserEase: Record<string, string> = { pop: "Back.Out" };
 
 export interface CalloutOptions {
-  /** Centre of the callout. Defaults to the centre of the world. */
+  /** Centre of the callout in overlay pixels. Defaults to the centre of the screen. */
   x?: number;
   y?: number;
   /** Fade in without scaling or shaking (HOUSE_STYLE "Reduced motion"). */
@@ -50,21 +50,27 @@ export class Callout extends GameObjects.Text {
   #timer: Time.TimerEvent | null = null;
 
   constructor(scene: Scene, text: string, options: CalloutOptions = {}) {
-    super(scene, options.x ?? world.width / 2, options.y ?? world.height / 2, text.toUpperCase(), {
-      ...textStyle("callout", color.sunny),
-      stroke: color.ink,
-      strokeThickness: calloutStyle.strokeThickness,
-      shadow: {
-        offsetX: 0,
-        offsetY: calloutStyle.shadowOffset,
-        color: color.ink,
-        blur: 0,
-        stroke: true,
-        fill: true,
+    super(
+      scene,
+      options.x ?? overlayFrame.width / 2,
+      options.y ?? overlayFrame.height / 2,
+      text.toUpperCase(),
+      {
+        ...textStyle("callout", color.sunny),
+        stroke: color.ink,
+        strokeThickness: calloutStyle.strokeThickness,
+        shadow: {
+          offsetX: 0,
+          offsetY: calloutStyle.shadowOffset,
+          color: color.ink,
+          blur: 0,
+          stroke: true,
+          fill: true,
+        },
+        // Room for the shadow below the letters.
+        padding: { bottom: calloutStyle.shadowOffset },
       },
-      // Room for the shadow below the letters.
-      padding: { bottom: calloutStyle.shadowOffset },
-    });
+    );
     this.reducedMotion = options.reducedMotion ?? false;
     this.#shake = options.shake ?? true;
     this.#holdMs = options.holdMs;
@@ -101,13 +107,7 @@ export class Callout extends GameObjects.Text {
         ease: phaserEase[motion.celebrate.ease] ?? "Back.Out",
       });
       if (this.#shake) {
-        cameras.main.shake(
-          motion.celebrate.ms,
-          new PhaserMath.Vector2(
-            calloutStyle.shake / world.width,
-            calloutStyle.shake / world.height,
-          ),
-        );
+        cameras.main.shake(motion.celebrate.ms, shakeIntensity(cameras.main));
       }
     }
     if (this.#holdMs !== undefined) {
@@ -133,4 +133,16 @@ export class Callout extends GameObjects.Text {
       onComplete: () => this.destroy(),
     });
   }
+}
+
+/**
+ * The shake intensity that moves `camera` (the world camera) by up to one world pixel, 4px on a
+ * 1080p TV. Phaser multiplies the intensity by the camera's size and zoom to get world pixels.
+ */
+export function shakeIntensity(camera: Cameras.Scene2D.Camera): PhaserMath.Vector2 {
+  const worldPixels = calloutStyle.shake / OVERLAY_PIXELS_PER_WORLD_PIXEL;
+  return new PhaserMath.Vector2(
+    worldPixels / (camera.width * camera.zoom),
+    worldPixels / (camera.height * camera.zoom),
+  );
 }

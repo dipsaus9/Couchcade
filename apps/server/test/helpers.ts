@@ -35,9 +35,28 @@ export async function createRoom(code = freshCode()): Promise<string> {
   return code;
 }
 
+let clientCounter = 0;
+
+/**
+ * Headers with a `CF-Connecting-IP` no other request used, unless one is set. Every rate limit is
+ * per IP, so without it unrelated tests would share one bucket and get 429s
+ * (docs/architecture/security.md, "Rate limits": in local tests, pass the header explicitly).
+ */
+export function clientHeaders(init?: HeadersInit): Headers {
+  const headers = new Headers(init);
+  if (!headers.has("CF-Connecting-IP")) {
+    clientCounter++;
+    headers.set(
+      "CF-Connecting-IP",
+      `10.${(clientCounter >> 16) & 255}.${(clientCounter >> 8) & 255}.${clientCounter & 255}`,
+    );
+  }
+  return headers;
+}
+
 export function upgradeRequest(code: string, ticket: string, init: RequestInit = {}): Request {
   const url = `${origin}/ws/${code}?v=1&ticket=${encodeURIComponent(ticket)}`;
-  const headers = new Headers(init.headers);
+  const headers = clientHeaders(init.headers);
   headers.set("Upgrade", "websocket");
   if (!headers.has("Origin")) headers.set("Origin", origin);
   return new Request(url, { ...init, headers });

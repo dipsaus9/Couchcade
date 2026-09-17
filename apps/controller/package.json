@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@couchcade/game-sdk": "workspace:*",
+    "@couchcade/motion": "workspace:*",
     "@couchcade/protocol": "workspace:*",
     "@couchcade/theme": "workspace:*",
     "@couchcade/ui": "workspace:*",

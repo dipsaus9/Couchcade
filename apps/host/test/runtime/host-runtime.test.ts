@@ -3,6 +3,7 @@ import type { CouchcadeGame } from "@couchcade/game-sdk/contract";
 import { createRegistry } from "@couchcade/game-sdk/registry";
 import type { HostToRelayMessage, RelayToHostMessage } from "@couchcade/protocol";
 import { describe, expect, it } from "vitest";
+import { motionWaitMs } from "../../src/motion/motion-check.ts";
 import { countdownMs } from "../../src/screens/menu/menu.ts";
 import { createHostRuntime, type DisplayLagStore } from "../../src/runtime/host-runtime.ts";
 import {
@@ -690,5 +691,147 @@ describe("TV lag calibration", () => {
     runtime.checkTvLag();
     expect(runtime.phase).toBe("menu");
     expect(ofType("room:phase").map((message) => message.d.phase)).toEqual(["menu"]);
+  });
+});
+
+const motionStatus = (
+  from: string,
+  status: "granted" | "denied" | "unsupported",
+): RelayToHostMessage => ({ t: "motion:status", from, d: { status } });
+
+const motionGame = () =>
+  ({ ...echoGame({ id: "swing" }), title: "Swing", needsMotion: true }) as CouchcadeGame;
+
+describe("motion step", () => {
+  it("runs the motion step before a game that needs motion, then starts it once every phone answered", async () => {
+    const { runtime, handle, play, lobby, ofType, time, stageLog, changes } = setup({
+      games: [motionGame()],
+    });
+    const [a, b, c] = lobby.players.map((player) => player.id) as [string, string, string];
+    play("swing");
+
+    expect(runtime.phase).toBe("motion-check");
+    expect(runtime.running).toBeNull();
+    expect(runtime.menu).toBeNull();
+    expect(ofType("room:phase").map((message) => message.d.phase)).toEqual([
+      "menu",
+      "motion-check",
+    ]);
+    time.advance(667);
+    expect(ofType("controller:state").at(-1)?.d).toEqual({
+      gameId: null,
+      views: [
+        {
+          to: [a, b, c],
+          view: { screen: "motion-permission", data: { gameId: "swing", title: "Swing", step: 1 } },
+        },
+      ],
+    });
+    expect(runtime.motion?.players.map(({ state }) => state)).toEqual([
+      "waiting",
+      "waiting",
+      "waiting",
+    ]);
+
+    // Platform actions don't count during the step.
+    handle(startAction(a));
+    expect(runtime.phase).toBe("motion-check");
+
+    const before = changes();
+    handle(motionStatus(a, "granted"));
+    handle(motionStatus(b, "denied"));
+    expect(changes()).toBe(before + 2);
+    expect(runtime.motion?.players.map(({ state }) => state)).toEqual([
+      "motion",
+      "touch",
+      "waiting",
+    ]);
+    handle(motionStatus(c, "unsupported"));
+    await settle();
+
+    expect(runtime.phase).toBe("playing");
+    expect(runtime.motion).toBeNull();
+    expect(runtime.running?.game.id).toBe("swing");
+    expect([...(runtime.running?.touchPlayers ?? [])]).toEqual([b, c]);
+    expect(stageLog).toEqual(["start swing 3"]);
+  });
+
+  it("starts after 20 seconds with the phones that never answered on touch", () => {
+    const { runtime, handle, play, lobby, time } = setup({ games: [motionGame()] });
+    const [a, b, c] = lobby.players.map((player) => player.id) as [string, string, string];
+    play("swing");
+    handle(motionStatus(a, "granted"));
+    time.advance(motionWaitMs - 1);
+    expect(runtime.phase).toBe("motion-check");
+    time.advance(1);
+    expect(runtime.phase).toBe("playing");
+    expect([...(runtime.running?.touchPlayers ?? [])]).toEqual([b, c]);
+  });
+
+  it("starts at once when the last phone the step waited for leaves", () => {
+    const { runtime, handle, play, lobby } = setup({ games: [motionGame()] });
+    const [a, b, c] = lobby.players.map((player) => player.id) as [string, string, string];
+    play("swing");
+    handle(motionStatus(a, "granted"));
+    handle(motionStatus(b, "granted"));
+    const left = { ...lobby, players: lobby.players.filter((player) => player.id !== c) };
+    handle({ t: "player:left", d: { id: c, reason: "expired" } }, left);
+    expect(runtime.phase).toBe("playing");
+    expect(runtime.running?.runner.players.map((player) => player.id)).toEqual([a, b]);
+    expect(runtime.running?.touchPlayers.size).toBe(0);
+  });
+
+  it("goes back to the menu when too few players are left once the step ends", () => {
+    const game = {
+      ...echoGame({ id: "swing", min: 3 }),
+      title: "Swing",
+      needsMotion: true,
+    } as CouchcadeGame;
+    const { runtime, handle, play, lobby, time } = setup({ games: [game] });
+    const [a, b, c] = lobby.players.map((player) => player.id) as [string, string, string];
+    play("swing");
+    handle(motionStatus(b, "granted"));
+    const left = { ...lobby, players: lobby.players.filter((player) => player.id !== c) };
+    handle({ t: "player:left", d: { id: c, reason: "kicked" } }, left);
+    handle(motionStatus(a, "granted"), left);
+    time.advance(1000);
+    expect(runtime.running).toBeNull();
+    expect(runtime.phase).toBe("menu");
+    expect(runtime.menu?.games.map(({ fits }) => fits)).toEqual([false]);
+  });
+
+  it("marks a player whose sensors stopped mid-game as touch, and asks again on play again", async () => {
+    const { runtime, handle, play, lobby, time, ofType } = setup({ games: [motionGame()] });
+    const ids = lobby.players.map((player) => player.id) as [string, string, string];
+    play("swing");
+    for (const id of ids) handle(motionStatus(id, "granted"));
+    await settle();
+    expect(runtime.running?.touchPlayers.size).toBe(0);
+
+    handle(motionStatus(ids[1], "unsupported"));
+    expect([...(runtime.running?.touchPlayers ?? [])]).toEqual([ids[1]]);
+    handle(motionStatus("NOTINGAME", "unsupported"));
+    expect(runtime.running?.touchPlayers.size).toBe(1);
+
+    handle(inputMessage(ids[0], { type: "end" }));
+    time.advance(17);
+    expect(runtime.phase).toBe("results");
+    handle(playAgainAction(ids[0]));
+    expect(runtime.phase).toBe("motion-check");
+    time.advance(667);
+    expect(ofType("controller:state").at(-1)?.d.views[0]?.view.data).toEqual({
+      gameId: "swing",
+      title: "Swing",
+      step: 2,
+    });
+  });
+
+  it("cancels the 20 second wait on dispose", () => {
+    const { runtime, play, time } = setup({ games: [motionGame()] });
+    play("swing");
+    runtime.dispose();
+    time.advance(motionWaitMs);
+    expect(runtime.running).toBeNull();
+    expect(time.pending).toBe(0);
   });
 });

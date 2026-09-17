@@ -608,6 +608,22 @@ Rules for game code:
 3. Every input goes through one `send` helper. It stamps `at` with `toHostTime(event.timeStamp)`, encodes and sends. Real-time games wrap it in the batching helper (CC-3.6).
 4. An unknown `gameId` shows "That game isn't on this phone yet. Reload the page." in the referee voice.
 
+### TV rendering (CC-4.11)
+
+The rule: **the game world is pixel art at 480×270, and overlays and text are drawn at the TV's own resolution.**
+
+1. **Canvas.** `apps/host/src/stage/boot.ts` sizes the Phaser canvas to the window times `devicePixelRatio`: 1920×1080 on a 1080p TV, 3840×2160 on a 4K TV. Above 4K pixels it renders at 4K and CSS scales it up, so a 5K or 6K screen doesn't cost more per frame. The canvas is refitted when the window or its pixel ratio changes. `pixelArt: true` stays on, so textures use nearest-neighbour filtering.
+2. **World camera.** `StageScene` makes `cameras.main` the world camera. It shows the 480×270 world at the largest whole-number zoom that fits the canvas (×4 at 1080p, ×8 at 4K, ×2 at 720p), centred, with the rest letterboxed in Sky. Games place everything in the world in world pixels, as before.
+3. **Overlay camera.** `StageScene` adds a second camera over the same box. It draws only the overlay layer, which is laid out in 1920×1080 overlay pixels: every size in HOUSE_STYLE and the design canvas is used as is. Its zoom is the world zoom ÷ 4, so ×1 on a 1080p canvas, with `roundPixels` on. Each camera skips the other's objects. Overlay text renders its glyphs at the overlay camera's zoom, so a 4K TV gets 4K text instead of 1080p text scaled up. Anything that points at the world, such as a tag over a player, converts with `worldToOverlay` (×4).
+4. **Fonts.** Phaser measures and draws text once, when the text is created. `phaserStage.start` (`apps/host/src/runtime/stage.ts`) waits for Fredoka and Pixelify Sans in every weight the TV type scale uses before it starts a scene. It waits 3 s at most, so a missing font never blocks a game.
+
+Why this approach, from Phaser 4.2's own guidance (the bundled "Pixel Art Guide" and the camera, text and scale docs):
+
+- Rounded pixel art (`pixelArt`, `roundPixels`) keeps text most legible, but Phaser only rounds vertices for a camera that isn't zoomed. A zoomed world camera and an unzoomed overlay camera give each layer what it needs.
+- A separate UI camera that ignores world objects is Phaser's standard HUD pattern. It needs no render texture and no extra draw pass, and the world keeps plain whole-number zoom.
+- `smoothPixelArt` would antialias the edges of scaled pixels and blend colours outside the palette. Integer zoom doesn't need it.
+- Rendering the world into a 480×270 render texture and scaling that up would give the same world pixels, but costs an extra texture pass per frame and makes camera effects such as shake harder. Keeping the canvas at 480×270 and scaling it with CSS was the old setup. It drew text at 8px and made it blurry and blocky on the TV (owner playtest, 17 September 2026).
+
 ### Auto-discovery registry
 
 `@couchcade/game-sdk/registry` builds the registry. The apps own the `import.meta.glob` call, because a package may not import from `games/` and Vite resolves a glob relative to the file that contains it.
