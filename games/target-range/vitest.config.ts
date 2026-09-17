@@ -24,6 +24,9 @@ export default defineLibConfig({
         test: {
           name: "node",
           exclude: [...configDefaults.exclude, browserTests, controllerTests],
+          // The property and whole-match tests share CI's two cores with headless Chromium, which
+          // makes them several times slower there than on a laptop.
+          testTimeout: 60_000,
         },
       },
       {
