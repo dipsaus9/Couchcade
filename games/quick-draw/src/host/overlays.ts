@@ -2,9 +2,11 @@ import { color, typeScale } from "@couchcade/theme";
 import type { Hex } from "@couchcade/theme";
 import { drawSlab, textStyle } from "@couchcade/stage/draw";
 import { metrics, safeArea, worldToOverlay } from "@couchcade/stage/layout";
+import type { Rect } from "@couchcade/stage/layout";
 import { roomCodeMetrics } from "@couchcade/stage/room-code";
 import { GameObjects } from "phaser";
 import type { Scene, Types } from "phaser";
+import type { Box } from "./label-layout.ts";
 import type { PipLabel } from "./present.ts";
 
 /**
@@ -26,11 +28,12 @@ const tagPadX = 12;
 /**
  * A pill over a Pip: a time in Ink on Chalk, or FOUL! in Chalk with an Ink outline on Signal
  * (HOUSE_STYLE "Colour": Chalk text on Signal needs the outline). Its origin is its bottom
- * centre, so it sits on top of the Pip's head. `show` takes overlay pixels.
+ * centre, so it sits on top of the Pip's head. It measures and moves in overlay pixels.
  */
 export class PipTag extends GameObjects.Container {
   #key: string | null = null;
   #text = "";
+  #size = { width: 0, height: 0 };
 
   constructor(scene: Scene) {
     super(scene, 0, 0);
@@ -42,11 +45,32 @@ export class PipTag extends GameObjects.Container {
     return this.visible ? this.#text : null;
   }
 
-  show(label: PipLabel | null, x: number, bottom: number): void {
+  /** The tag's box around its origin, shadow included, or null while hidden. */
+  get box(): Box | null {
+    if (!this.visible) return null;
+    const left = this.x - Math.round(this.#size.width / 2);
+    return {
+      left,
+      top: this.y - this.#size.height,
+      right: left + this.#size.width,
+      bottom: this.y,
+    };
+  }
+
+  /**
+   * Shows `label`, or hides the tag for null. Returns the tag's size, shadow included, so the
+   * scene can place it before it moves.
+   */
+  setLabel(label: PipLabel | null): { width: number; height: number } | null {
     this.setVisible(label !== null);
-    if (label === null) return;
+    if (label === null) return null;
     const key = `${label.tone}:${label.text}`;
     if (key !== this.#key) this.#build(label, key);
+    return this.#size;
+  }
+
+  /** Puts the tag's bottom centre at (`x`, `bottom`), plus the label's wobble. */
+  place(label: PipLabel, x: number, bottom: number): void {
     this.setPosition(x + worldToOverlay(label.offsetX), bottom);
   }
 
@@ -66,6 +90,7 @@ export class PipTag extends GameObjects.Container {
     );
     const width = Math.ceil(text.width) + 2 * tagPadX;
     const height = Math.ceil(text.height) + 2 * metrics.outline;
+    this.#size = { width, height: height + metrics.depth };
     const rect = {
       x: -Math.round(width / 2),
       y: -height - metrics.depth,
@@ -111,29 +136,39 @@ export function bangText(scene: Scene): GameObjects.Text {
     .setVisible(false);
 }
 
-/** The instruction panel's box: the bottom row of the safe area, left of the room code panel. */
-export const instructionPanelRect = (() => {
-  const gap = 24;
-  const y = safeArea.bottom - metrics.depth - roomCodeMetrics.height;
+/** The space between the instruction panel and the room code panel. */
+const panelGap = 24;
+
+/**
+ * The instruction panel's box: the bottom row of the safe area, left of the room code panel.
+ * `roomCodeLeft` is the room code panel's left edge. It defaults to where the narrowest room code
+ * panel starts, so the panel is the same size with or without a room code.
+ */
+export function instructionPanelRect(
+  roomCodeLeft = safeArea.right - roomCodeMetrics.minWidth,
+): Rect {
   return {
     x: safeArea.left,
-    y,
-    width: safeArea.width - roomCodeMetrics.minWidth - gap,
+    y: safeArea.bottom - metrics.depth - roomCodeMetrics.height,
+    width:
+      Math.min(roomCodeLeft, safeArea.right - roomCodeMetrics.minWidth) - panelGap - safeArea.left,
     height: roomCodeMetrics.height,
   };
-})();
+}
 
 /**
  * The bottom instruction panel (HOUSE_STYLE "Screen layouts": whose turn and the instruction):
- * a Chalk panel with one line in Fredoka at the `body` size. The bottom-right corner stays free
- * for the stage's room code panel.
+ * a Chalk panel with one line in Fredoka at the `body` size. It ends left of the stage's room code
+ * panel in the bottom-right corner.
  */
 export class InstructionPanel extends GameObjects.Container {
   readonly #line: GameObjects.Text;
+  readonly rect: Rect;
 
-  constructor(scene: Scene) {
+  constructor(scene: Scene, roomCodeLeft?: number) {
     super(scene, 0, 0);
-    const rect = instructionPanelRect;
+    const rect = instructionPanelRect(roomCodeLeft);
+    this.rect = rect;
     const slab = scene.make.graphics({}, false);
     drawSlab(slab, rect);
     this.#line = scene.make
