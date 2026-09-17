@@ -1,10 +1,10 @@
 ---
 id: CC-3.10
 title: Show extra joiners as audience
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-17 16:24'
+updated_date: '2026-09-17 16:30'
 labels:
   - story
 dependencies:
@@ -50,10 +50,10 @@ Branch: CC-3.10/audience-mode
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Audience phones show a "Watching" screen
-- [ ] #2 Audience members take a free slot when a player leaves between games
-- [ ] #3 When 16 phones (8 players + 8 audience) are in the room, a further join returns 409 room-full and the phone shows the approved Room is full error screen
-- [ ] #4 The 9th to 16th joiners become audience
+- [x] #1 Audience phones show a "Watching" screen
+- [x] #2 Audience members take a free slot when a player leaves between games
+- [x] #3 When 16 phones (8 players + 8 audience) are in the room, a further join returns 409 room-full and the phone shows the approved Room is full error screen
+- [x] #4 The 9th to 16th joiners become audience
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -75,4 +75,12 @@ Verify: pnpm check && pnpm test
 Owner decision 2026-09-16 (CC-2.1): at most 16 phones per room (8 players + 8 audience). See docs/architecture/platform.md join flow step 4 and the join API errors.
 
 References amended 2026-09-17 (glue outside the original three paths, exact files): room-side cap needs a new close code 4012 room-full (packages/protocol close-codes + its test, docs/architecture/platform.md close codes table row); maxPhones moved from apps/server/src/api/join.ts into room/audience.ts (api.test import); controller wiring (App.vue, session/state.ts screenOf audience + next-game and 4012, runtime/controller.ts no controller for audience/next-game, join/copy.ts, screens/waiting/copy.ts next-game copy, screens/room-full/ for the approved Room is full screen); host audience {position} views and next-game for mid-game joiners (runtime/host-runtime.ts, screens/lobby/lobby-state.ts); and tests. E2E skipped: seatCount is a protocol constant with no test-only override, and 9 to 17 browser phones are too heavy for CI; server tests cover the cap and promotion through the real Worker routing.
+
+Review (dipsaus-ai:story-reviewer, round 1): verdict pass. All 4 criteria met, no scope violations, no findings. Reviewer re-ran protocol, server, controller and host tests and typechecks (all green) and cross-checked copy and rules against session-flow.md, platform.md, security.md decision 18 and platform-screens.md.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Rooms now hold up to 16 phones: the 9th to 16th joiners get slot null and the approved Watching screen, with their place in line (You're next, 2nd in line) from a host audience view { position }. The join API still answers 409 room-full, and the room now enforces the cap too: a phone it has never seen that connects while 16 phones hold a place (connected, or dropped inside the seat window) is closed with the new close code 4012 room-full, added to @couchcade/protocol and the platform.md close codes table. Both cases show the approved Room is full screen (8/8 badge, Try another code). Promotion (apps/server/src/room/audience.ts, room.ts): when a seat frees through leave, kick, flood revocation or seat expiry outside playing, and when room:phase leaves playing, the longest-waiting connected audience member gets the lowest free slot (one players write, player:promoted to the host and that phone). Audience input, calibration taps, ui actions and motion status stay dropped by the relay. Phones never show a game controller to audience or to next-game views, and seated players who aren't in the running game get Next game soon (the host now sends next-game during playing too). Tests: server audience.test.ts through the real Worker routing (cap, 4012, held places, promotion on leave, kick, expiry and phase change, dropped audience input), controller and host unit tests. No new E2E: seatCount is a protocol constant with no test-only override, and 9 to 17 browser phones are too heavy for CI.
+<!-- SECTION:FINAL_SUMMARY:END -->
