@@ -1,5 +1,6 @@
 import { createRoomClock, type StoredDisplayLag } from "@couchcade/game-sdk/clock";
 import type { CouchcadeGame } from "@couchcade/game-sdk/contract";
+import { createLazyGameRegistry } from "@couchcade/game-sdk/registry";
 import type { HostToRelayMessage, RelayToHostMessage } from "@couchcade/protocol";
 import { describe, expect, it } from "vitest";
 import { motionWaitMs } from "../../src/motion/motion-check.ts";
@@ -30,6 +31,8 @@ import {
 function setup({
   games = [echoGame()] as CouchcadeGame[],
   sceneFails = false,
+  /** A game id whose full rules fail to load (a dropped chunk), or null for every game to load. */
+  gameLoadFails = null as string | null,
   storedLag = null as StoredDisplayLag | null,
 } = {}) {
   const time = createVirtualTime(1_000_000);
@@ -57,9 +60,23 @@ function setup({
     stop: (game) => stageLog.push(`stop ${game.id}`),
   };
   const clock = createRoomClock({ now: time.now, schedule: time.schedule });
+  const gameRegistry =
+    gameLoadFails === null
+      ? fakeGameRegistry(games)
+      : createLazyGameRegistry(
+          Object.fromEntries(
+            games.map((game) => [
+              `games/${game.id}/src/index.ts`,
+              () =>
+                game.id === gameLoadFails
+                  ? Promise.reject(new Error("dropped chunk"))
+                  : Promise.resolve(game),
+            ]),
+          ),
+        );
   const runtime = createHostRuntime({
     metaRegistry: fakeMetaRegistry(games),
-    gameRegistry: fakeGameRegistry(games),
+    gameRegistry,
     stage,
     clock,
     send: (message) => sent.push(message),
@@ -266,6 +283,16 @@ describe("createHostRuntime", () => {
     time.advance(1001);
     expect(runtime.running?.runner.tick).toBe(60);
     expect(warnings).toEqual([expect.stringContaining("host scene failed to load")]);
+  });
+
+  it("goes back to the menu with a notice when a game's rules fail to load (a dropped chunk)", async () => {
+    const { runtime, play, warnings } = setup({ gameLoadFails: "echo" });
+    play();
+    await settle();
+    expect(runtime.running).toBeNull();
+    expect(runtime.phase).toBe("menu");
+    expect(runtime.menu?.notice).toBe("That game couldn't load. Try again.");
+    expect(warnings).toEqual([expect.stringContaining("echo failed to load")]);
   });
 
   it("applies inputs in arrival order before the tick and drops ones failing the inputSchema", async () => {
