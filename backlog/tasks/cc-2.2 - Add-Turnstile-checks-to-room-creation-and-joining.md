@@ -4,7 +4,7 @@ title: Add Turnstile checks to room creation and joining
 status: In Progress
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-17 10:23'
+updated_date: '2026-09-17 10:25'
 labels:
   - story
 dependencies:
@@ -81,4 +81,6 @@ Delivery notes (2026-09-17):
 - Site key: VITE_TURNSTILE_SITE_KEY at build time (deploy.yml sets it from the TURNSTILE_SITE_KEY Actions variable), else Cloudflare's invisible test key 1x00000000000000000000BB.
 - deploy.yml stops before wrangler deploy while the TURNSTILE_SITE_KEY variable, the SMOKE_TOKEN Actions secret, or the TURNSTILE_SECRET_KEY / SMOKE_TOKEN Worker secrets (wrangler secret list, names only) are missing.
 - Local E2E (CI=1 pnpm e2e): 14 passed on Chromium and WebKit with the real Turnstile script and test keys.
+
+Review gate (dipsaus-ai:story-reviewer, round 1): pass. All 5 criteria met, no scope violations, no findings. Status left In Progress: merging turns Turnstile on for every deploy, so the owner sets up the widget, TURNSTILE_SECRET_KEY, SMOKE_TOKEN and the TURNSTILE_SITE_KEY variable first.
 <!-- SECTION:NOTES:END -->
