@@ -1,10 +1,10 @@
 ---
 id: CC-5.10
 title: Add the motion permission step and wake lock to the controller
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-17 09:33'
+updated_date: '2026-09-17 17:41'
 labels:
   - story
 dependencies:
@@ -50,7 +50,7 @@ Branch: CC-5.10/motion-permission-step
 - [x] #4 An E2E test with the injected adapter covers granted and denied
 - [x] #5 The host shows the motion step, waits for every seated phone's motion:status or 20 seconds, and marks touch-fallback players with the touch icon
 - [x] #6 The approved motion permission screen shows the one-line Portrait Orientation Lock hint on iPhone, and Android requests fullscreen with a portrait lock during motion games
-- [ ] #7 The task notes record the owner's real-iPhone check of the approved motion-denied hint (steps written for the owner); if Safari does not ask again, a one-line copy change is proposed to the owner
+- [x] #7 The task notes record the owner's real-iPhone check of the approved motion-denied hint (steps written for the owner); if Safari does not ask again, a one-line copy change is proposed to the owner
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -97,6 +97,8 @@ AC#7 OWNER CHECK (real iPhone, motion-denied hint). No motion game is live yet, 
 7. Record in these notes which of step 6, (a), (b), (c) asked again. If step 6 asks again, the hint stays. If only (b) or (c) asks, the proposed one-line copy change is 'Want motion? Close this tab and join again.' If nothing asks, the proposed line is 'Want motion? Turn it on in Safari: aA > Website Settings.' Either change needs a one-line owner OK. To reset between tries: aA in the address bar > Website Settings > Motion & Orientation Access > Ask (or Settings > Apps > Safari > Clear History and Website Data). Stop pnpm dev and the tunnel afterwards.
 
 Review gate round 1 (dipsaus-ai:story-reviewer): pass. Criteria 1-6 met, 7 pending the owner's iPhone, no scope violations. Advisory 1: oxlint consistent-function-scoping on withMotion in the e2e registry wrapper; fixed by inlining it. Advisory 2: the reviewer saw two cold-cache WebKit failures (denied phone briefly 'Connection lost') around the registry wrap, then 4 passes; the wrap now runs right after the room opens, before any phone joins, and the spec passed again on both browsers. CI retries once.
+
+Owner, 2026-09-17: waived the real-iPhone motion-denied check ("I don't care about the fallback of enable motion"). No copy change.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
