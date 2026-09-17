@@ -1,10 +1,10 @@
 ---
 id: CC-3.18
 title: Add the InputChannel to the game contract
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-17 17:50'
-updated_date: '2026-09-17 21:52'
+updated_date: '2026-09-17 21:54'
 labels:
   - story
 dependencies:
@@ -109,4 +109,23 @@ Reviewer's own recommended fix: add it to References (lower-friction than splitt
 separate story for a one-line, mechanically-forced consistency update). Done: References amended
 via `backlog task edit CC-3.18 --ref ...` to include packages/game-sdk/test/contract.test.ts.
 Re-review requested.
+
+Reviewer round 2 (sonnet): verdict pass. All 6 acceptance criteria met, no scope violations. One advisory (non-blocking) finding carried over: input?/link? optionality, to be tightened once CC-3.19/CC-3.20 land.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added createInputChannel (packages/game-sdk/src/input/channel.ts), the DOM-free implementation
+behind InputChannel from docs/architecture/realtime-link.md's API sketch. Games get one
+stream/fire/last/clear/path capability: direct-path stream() throttles per type at its hz (30 or
+60) and skips repeats; relay-path stream() packs up to 7 earlier samples into `more` on the shared
+4-per-second, 250 ms budget also used by fire; fire() sends at once on direct and resends the last
+500 ms of events (at most 4, same event id) on a switch to relay. contract/index.ts gained
+InputChannelPath, InputChannel<TInput>, CouchcadeController.streams, ControllerProps.input and
+HostSceneData.link (the latter two typed optional pending CC-3.19/CC-3.20's runtime wiring, a
+disclosed deviation from the doc's literal required sketch, reviewed and accepted). Verified with
+pnpm check, check:deps, check:style, test and build, all green repo-wide. Independent review
+(dipsaus-ai:story-reviewer, sonnet) passed on round 2 after amending References to cover a
+one-line forced fix in test/contract.test.ts.
+<!-- SECTION:FINAL_SUMMARY:END -->
