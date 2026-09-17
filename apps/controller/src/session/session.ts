@@ -31,6 +31,8 @@ export interface PhoneSession {
   join(draft: JoinDraft): Promise<void>;
   /** Sends a message to the room. Dropped while the phone has no socket. */
   send(message: PhoneToRelayMessage): void;
+  /** Leaves an ended-room screen such as Kicked for an empty join form. */
+  dismissNotice(): void;
   dispose(): void;
 }
 
@@ -148,6 +150,7 @@ export function createPhoneSession({
     state,
     join,
     send,
+    dismissNotice: () => dispatch({ type: "notice-dismissed" }),
     dispose: () => {
       clock.disconnect();
       stopReconnecting();
