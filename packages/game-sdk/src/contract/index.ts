@@ -76,6 +76,12 @@ export interface CouchcadeGame<
   needsMotion: boolean;
   /** "desert", "alley", ... */
   scene: ScenePaletteId;
+  /**
+   * true while the game isn't playable end to end yet (no controller, TV scene or bot-match E2E
+   * test). The host registry still checks it but leaves it out, so the menu never lists it and
+   * nothing can start it. The story that registers the game removes the flag.
+   */
+  hidden?: boolean;
   /** Every input is validated before onPlayerInput. */
   inputSchema: ZodMiniType<TInput>;
 
@@ -185,6 +191,8 @@ export function checkGameDefinition(game: unknown): string[] {
   for (const key of ["realtime", "needsMotion"] as const) {
     if (typeof g[key] !== "boolean") problems.push(`${key} is not a boolean`);
   }
+  if (g.hidden !== undefined && typeof g.hidden !== "boolean")
+    problems.push("hidden is not a boolean");
   if (typeof g.scene !== "string" || g.scene === "") problems.push("scene is empty");
 
   const schema = g.inputSchema as { safeParse?: unknown } | undefined;
