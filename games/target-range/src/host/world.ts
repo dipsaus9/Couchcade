@@ -521,7 +521,12 @@ export class RangeWorld {
   }
 }
 
-/** The face sprite for a round radius. */
+/**
+ * The face sprite for a round radius. Each face is drawn at its round's radius, so a radius without
+ * one would show rings that don't match the scoring: fail loudly instead.
+ */
 function faceKey(radius: number): string {
-  return faces[radius] ?? sprites.faceNear.key;
+  const key = faces[radius];
+  if (key === undefined) throw new Error(`No target face sprite for radius ${radius}`);
+  return key;
 }
