@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { createRoomResponseSchema, joinRoomResponseSchema } from "@couchcade/protocol";
 import { beforeEach, describe, expect, it } from "vitest";
+import { smokeHeader } from "../src/api/turnstile.ts";
 import { clientKey } from "../src/security/rate-limits.ts";
 import { signTicket } from "../src/security/tickets.ts";
 import defaultWorker from "../src/worker.ts";
@@ -120,6 +121,25 @@ describe("POST /api/rooms", () => {
         rooms: [],
       });
       expect(await call(post("/api/rooms", "{", ip))).toEqual({
+        status: 429,
+        body: rateLimited,
+        rooms: [],
+      });
+    },
+    timeout,
+  );
+  it(
+    "applies both limits to requests with the smoke token too",
+    async () => {
+      const ip = freshIp();
+      const smoke = (body: unknown) => {
+        const request = post("/api/rooms", body, ip);
+        request.headers.set(smokeHeader, env.SMOKE_TOKEN ?? "");
+        return request;
+      };
+      expect(await repeat(4, () => smoke({ passcode }))).toEqual([201, 201, 201, 429]);
+      expect(await call(smoke({ passcode: "wrong" }))).toMatchObject({ status: 401 });
+      expect(await call(smoke({ passcode }))).toEqual({
         status: 429,
         body: rateLimited,
         rooms: [],

@@ -35,6 +35,7 @@ const joinFailureByError: Record<string, JoinFailure> = {
   "room-full": "room-full",
   "room-locked": "room-locked",
   "rate-limited": "rate-limited",
+  "turnstile-failed": "turnstile",
   "turnstile-unavailable": "turnstile",
 };
 

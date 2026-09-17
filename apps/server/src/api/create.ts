@@ -6,6 +6,7 @@ import { readJsonObject } from "./body.ts";
 import type { ApiContext } from "./context.ts";
 import { errorResponse } from "./errors.ts";
 import { passcodeMatches } from "./passcode.ts";
+import { hasSmokeToken, turnstileError } from "./turnstile.ts";
 
 /** Codes tried before giving up. Two live rooms on one code is already rare. */
 export const maxCodeAttempts = 5;
@@ -19,13 +20,19 @@ export async function createRoom(request: Request, ctx: ApiContext): Promise<Res
   //    counting only failures would mean checking the passcode before the limit.
   if (await isRateLimited(ctx.env, "RL_PASSCODE", request)) return errorResponse("rate-limited");
 
-  // 2. A JSON body under 1 KB that matches the schema. A missing passcode passes this step, so it
-  //    still gets 401 below.
+  // 2. A JSON body under 4 KB that matches the schema. A missing passcode or Turnstile token passes
+  //    this step, so it still gets 403 or 401 below.
   const body = await readJsonObject(request);
-  const parsed = body && createRoomRequestSchema.safeParse({ passcode: "", ...body });
+  const parsed =
+    body && createRoomRequestSchema.safeParse({ passcode: "", turnstile: "", ...body });
   if (!parsed?.success) return errorResponse("bad-request");
 
-  // 3. CC-2.2: Turnstile, action "create". Else 403.
+  // 3. Turnstile, action "create". The deploy smoke test skips only this step with the smoke token
+  //    (security.md, decision 19). A wrong or missing smoke token gets the normal check.
+  if (!(await hasSmokeToken(request, ctx.env))) {
+    const failed = await turnstileError(request, parsed.data.turnstile, "create", ctx.env);
+    if (failed) return errorResponse(failed);
+  }
 
   // 4. The passcode, in constant time.
   if (!(await passcodeMatches(parsed.data.passcode, ctx.env.HOST_PASSCODE))) {

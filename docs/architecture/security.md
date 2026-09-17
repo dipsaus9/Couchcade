@@ -68,8 +68,9 @@ These are the parts no story can do for you.
 1. **Choose the production passcode** as 4 random words from a word list, for example with a password manager's passphrase generator. Set it with `npx wrangler secret put HOST_PASSCODE`. Never reuse `change-me` or a password you use elsewhere.
 2. **Set `TICKET_SIGNING_SECRET`** to 32 random bytes: `openssl rand -base64 32`.
 3. **Turn on two-factor sign-in** (a passkey or an authenticator app) for GitHub and Cloudflare.
-4. **Create the Turnstile widget** in the Cloudflare dashboard: mode Invisible, hostname `couchcade.<account>.workers.dev`. Set its secret with `npx wrangler secret put TURNSTILE_SECRET_KEY`.
-5. **Share the passcode only with people who host.** Players never need it.
+4. **Create the Turnstile widget** in the Cloudflare dashboard under Turnstile, Add widget: mode Invisible, hostname `couchcade.dipsaus9.workers.dev`. Set its secret key as a Worker secret with `pnpm --filter @couchcade/server exec wrangler secret put TURNSTILE_SECRET_KEY`, and its site key as the GitHub Actions variable `TURNSTILE_SITE_KEY`.
+5. **Set the smoke token** (decision 19): 32 random bytes from `openssl rand -base64 32`, set as the Worker secret `SMOKE_TOKEN` with `pnpm --filter @couchcade/server exec wrangler secret put SMOKE_TOKEN` and as a GitHub Actions secret with the same name and value. The deploy stops before `wrangler deploy` while `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` or `SMOKE_TOKEN` is missing.
+6. **Share the passcode only with people who host.** Players never need it.
 
 ---
 
@@ -138,11 +139,11 @@ Hosting now needs a passcode, so the question was whether room creation still ne
 
 How it works:
 
-1. One widget in Invisible mode, for the production hostname. The site key is public and built into both apps. The secret is a Worker secret.
-2. Both apps render the widget with `execution: "execute"` and run it when the user submits, so the token is always fresh. Tokens are single-use and valid for 300 seconds.
-3. The Worker calls Siteverify once per request. It requires `success`, and in production also `action` matching the endpoint and `hostname` matching the request. A `join` token can't create a room.
+1. One widget in Invisible mode, for the production hostname. The site key is public and built into both apps from `VITE_TURNSTILE_SITE_KEY`, which `deploy.yml` sets from the `TURNSTILE_SITE_KEY` Actions variable. Without it the apps use Cloudflare's Invisible test site key `1x00000000000000000000BB`. The secret is a Worker secret.
+2. Both apps render the widget with `execution: "execute"` and run it when the user submits, so the token is always fresh. Tokens are single-use and valid for 300 seconds. The script loads on the first submit, not on page load. The apps reset the widget before every run after the first.
+3. The Worker calls Siteverify once per request. It requires `success`, and in production also `action` matching the endpoint and `hostname` matching the request. A `join` token can't create a room. A missing, empty, refused or mismatched token gets 403 `turnstile-failed`. A token longer than Cloudflare's 2,048 characters gets it without a Siteverify call.
 4. Cloudflare's test secrets (starting `1x0000`, `2x0000` or `3x0000`) return fixed `action` and `hostname` values, so those two checks are skipped when a test secret is configured. Development and tests use the test keys and the dummy token `XXXX.DUMMY.TOKEN.XXXX` (CC-2.2).
-5. **Fail closed.** If Siteverify errors or times out after 3 seconds, the API returns 403 `turnstile-unavailable`. The apps reset the widget and let the user try again. A Turnstile outage blocking a party for a few minutes is better than an open door.
+5. **Fail closed.** If `TURNSTILE_SECRET_KEY` isn't set, or Siteverify errors, times out after 3 seconds or rejects the secret, the API returns 403 `turnstile-unavailable`. The apps reset the widget and let the user try again. A Turnstile outage blocking a party for a few minutes is better than an open door.
 6. On any 403 the app resets the widget before retrying, because the old token is spent.
 7. Siteverify is a subrequest from the Worker. It uses no Durable Object request, and waiting for it doesn't count as CPU time.
 
@@ -155,18 +156,20 @@ Cheap checks run first, and nothing reaches a room until every check has passed.
 **`POST /api/rooms`**
 
 1. Passcode-attempt limit, 5 per IP per minute, counted on every attempt. Else 429.
-2. Body is JSON under 1 KB and matches the schema. Else 400. A missing or empty `passcode` passes this step, so it still gets 401 at step 4.
-3. Turnstile, action `create`. Else 403.
+2. Body is JSON under 4 KB and matches the schema. Else 400. A missing or empty `passcode` or `turnstile` passes this step, so it still gets 403 at step 3 or 401 at step 4.
+3. Turnstile, action `create`. Else 403. The deploy smoke test skips this step, and only this step, with an `x-cc-smoke` header that matches the `SMOKE_TOKEN` secret, compared in constant time (decision 19). A wrong or missing smoke token gets the normal Turnstile check.
 4. Passcode, constant-time. Else 401.
 5. Room-creation limit, 3 per IP per minute. Else 429.
 6. `/internal/create` on the room, up to 5 code attempts.
 
 The passcode limit counts every attempt, not only wrong ones. The binding can only count and answer in one call, so counting only failures would mean checking the passcode before the limit, and then the limit would never stop a lucky guess. A host who mistypes 5 times waits a minute. That's fine.
 
+API bodies may be up to 4 KB, unlike the 1 KB cap on socket messages, because a Turnstile token alone can be 2,048 characters. A real token under a 1 KB cap would sometimes get 400.
+
 **`POST /api/rooms/:code/join`**
 
 1. Join limit, 20 per IP per minute. Else 429.
-2. Code matches `^[A-HJ-NP-Z]{4}$`. Else 404. Body is JSON under 1 KB and matches the schema. Else 400.
+2. Code matches `^[A-HJ-NP-Z]{4}$`. Else 404. Body is JSON under 4 KB and matches the schema. Else 400. A missing `turnstile` passes this step, so it still gets 403 at step 4.
 3. Name rules. Else 400. This runs before Turnstile so a rejected name doesn't spend the token. The phone runs the same check first.
 4. Turnstile, action `join`. Else 403.
 5. `/internal/status` on the room: live, not locked, not full. Else 404, 423 or 409.
