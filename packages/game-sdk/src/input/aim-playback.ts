@@ -19,7 +19,14 @@
  *
  * Shots never use this. A fire input carries the aim the phone had at that moment (motion.md,
  * "Fitting the input budget", rule 3), so the trailing crosshair never changes a hit.
+ *
+ * `aimAt` is a thin wrapper over the generic `createPlayback` (`playback.ts`): a fresh, stateless
+ * player per call, with prediction off, so it keeps today's exact behaviour (interpolate, hold
+ * across a gap, no lag) until Target Range moves to the input channel and `createPlayback`
+ * directly (CC-11.9).
  */
+import { createPlayback } from "./playback.ts";
+import type { SampleTrack } from "./playback.ts";
 
 /** One packed sample as the phone sends it: offset from the input's `at`, yaw and pitch (−1 to 1). */
 export type AimSample = readonly [dtMs: number, yaw: number, pitch: number];
@@ -62,7 +69,7 @@ export function addAimSamples(
   for (const [dtMs, yaw, pitch] of samples.slice(-AIM_SAMPLES_PER_MESSAGE)) {
     const at = atMs + dtMs;
     if (!Number.isFinite(at) || !Number.isFinite(yaw) || !Number.isFinite(pitch)) continue;
-    added.push([at, clampUnit(yaw), clampUnit(pitch)]);
+    added.push([at, clampAimUnit(yaw), clampAimUnit(pitch)]);
   }
   if (added.length === 0) return track;
   const times = new Set(added.map(([at]) => at));
@@ -83,30 +90,19 @@ export function aimAt(
   nowMs: number,
   delayMs: number = AIM_PLAYBACK_DELAY_MS,
 ): Aim | null {
-  const first = track[0];
-  if (first === undefined) return null;
-  const t = nowMs - delayMs;
-  if (t <= first[0]) return toAim(first);
-
-  const nextIndex = track.findIndex(([at]) => at > t);
-  const last = track.at(-1) ?? first;
-  if (nextIndex === -1) return toAim(last);
-
-  const before = track[nextIndex - 1] ?? first;
-  const after = track[nextIndex] ?? last;
-  const start = Math.max(before[0], after[0] - sampleIntervalMs);
-  if (t <= start) return toAim(before);
-  const f = (t - start) / (after[0] - start);
-  return {
-    yaw: before[1] + (after[1] - before[1]) * f,
-    pitch: before[2] + (after[2] - before[2]) * f,
-  };
+  if (track.length === 0) return null;
+  // Prediction off, the fixed 15 Hz interval (not inferred, so a 2-point track still holds
+  // correctly), and a fresh player every call: the target is drawn with no lag, exactly as today.
+  // `frameMs` never matters here since a stateless player has no catch-up to ease.
+  const value = createPlayback<[number, number]>({ predictMs: 0, intervalMs: sampleIntervalMs }).at(
+    track as unknown as SampleTrack<[number, number]>,
+    nowMs,
+    delayMs,
+    0,
+  );
+  return value === null ? null : { yaw: value[0], pitch: value[1] };
 }
 
-function clampUnit(value: number): number {
+function clampAimUnit(value: number): number {
   return Math.min(1, Math.max(-1, value));
-}
-
-function toAim([, yaw, pitch]: AimPoint): Aim {
-  return { yaw, pitch };
 }
