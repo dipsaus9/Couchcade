@@ -1,5 +1,6 @@
 import { color, toPhaserColor, world } from "@couchcade/theme";
 import { GameObjects } from "phaser";
+import type { Game } from "phaser";
 import { describe, expect, it } from "vitest";
 import {
   OVERLAY_DEPTH,
@@ -10,7 +11,7 @@ import {
 } from "../src/layout/index.ts";
 import { RoomCodePanel } from "../src/room-code/index.ts";
 import { StageScene } from "../src/scene/index.ts";
-import { boot, expectedColour, hex, hostData, pixel } from "./boot.ts";
+import { boot, expectedColour, hex, hostData, pixel, player, readArea } from "./boot.ts";
 
 /** A game scene that adds the room code first and then covers the whole world in Turf. */
 class CoveredWorldScene extends StageScene {
@@ -142,4 +143,74 @@ describe("StageScene", () => {
     expect(scene.hostData).toBeUndefined();
     expect(scene.reducedMotion).toBe(false);
   });
+});
+
+/** The players on the scoreboard in the text sharpness test. */
+const sharpRoom = [player("ana", "Ana Lima", 0, 1), player("ben", "Benjamin", 1, 2)];
+
+/**
+ * Checks that overlay text lands 1:1 on canvas pixels: every pixel of the text's box on the canvas
+ * equals the text's own texture drawn over Chalk at its snapped position. Text rasterised at another
+ * size and resampled, or stretched by a pixel, fails this.
+ */
+async function expectSharpText(game: Game, scene: StageScene, text: GameObjects.Text) {
+  const zoom = scene.overlayCamera?.zoom ?? 0;
+  const { canvas } = text;
+  const bounds = text.getBounds();
+  const area = {
+    x: Math.round(scene.viewport.x + bounds.x * zoom),
+    y: Math.round(scene.viewport.y + bounds.y * zoom),
+    width: canvas.width,
+    height: canvas.height,
+  };
+  const drawn = await readArea(game, area);
+  const glyphs = text.context.getImageData(0, 0, canvas.width, canvas.height).data;
+  const chalk = toPhaserColor(color.chalk);
+  const background = [(chalk >> 16) & 255, (chalk >> 8) & 255, chalk & 255];
+  let inked = 0;
+  let wrong = 0;
+  for (let i = 0; i < glyphs.length; i += 4) {
+    const alpha = (glyphs[i + 3] ?? 0) / 255;
+    if (alpha > 0) inked += 1;
+    for (let channel = 0; channel < 3; channel++) {
+      const expected =
+        (glyphs[i + channel] ?? 0) * alpha + (background[channel] ?? 0) * (1 - alpha);
+      if (Math.abs((drawn[i + channel] ?? 0) - expected) > 8) {
+        wrong += 1;
+        break;
+      }
+    }
+  }
+  expect(inked, `${text.text} has glyphs`).toBeGreaterThan(100);
+  expect(wrong / (glyphs.length / 4), `${text.text}: pixels off at ×${zoom}`).toBeLessThan(0.01);
+  // Rasterised at the overlay zoom, in a texture of whole canvas pixels.
+  expect(text.style.resolution).toBe(zoom);
+  expect([canvas.width, canvas.height]).toEqual(
+    [text.width * zoom, text.height * zoom].map(Math.round),
+  );
+}
+
+describe("StageScene overlay text", () => {
+  // A 1080p TV in a browser window (world ×3) and a HiDPI laptop (world ×6).
+  it.each([
+    [1440, 810, 0.75],
+    [2880, 1620, 1.5],
+  ])(
+    "draws scoreboard names 1:1 on canvas pixels on a %i×%i canvas (overlay ×%f)",
+    async (width, height, zoom) => {
+      const { game, scene } = await boot(StageScene, undefined, { width, height });
+      expect(scene.overlayCamera?.zoom).toBe(zoom);
+      const scoreboard = scene.addScoreboard({ players: sharpRoom, scores: { ana: 2, ben: 10 } });
+      // Let a frame run, so the stage has sized the text for the overlay zoom.
+      await pixel(game, 0, 0);
+      const texts = scoreboard.list.filter(
+        (child): child is GameObjects.Text =>
+          child instanceof GameObjects.Text && ["Ana Lima", "Benjamin"].includes(child.text),
+      );
+      expect(texts.map((text) => text.text)).toEqual(["Ana Lima", "Benjamin"]);
+      for (const text of texts) {
+        await expectSharpText(game, scene, text);
+      }
+    },
+  );
 });
