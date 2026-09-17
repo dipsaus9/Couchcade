@@ -15,6 +15,24 @@ describe("FREDOKA_TEXT", () => {
   it("has no duplicate characters", () => {
     expect(new Set(FREDOKA_TEXT).size).toBe(FREDOKA_TEXT.length);
   });
+
+  it("covers the owner's 2026-09-17 accented-name examples (CC-4.12)", () => {
+    for (const name of ["Renée", "Chloë", "Zoë", "Jürgen"]) {
+      for (const ch of name) expect(FREDOKA_TEXT).toContain(ch);
+    }
+  });
+
+  it("covers every Latin-1 Supplement letter (U+00C0-U+00FF, minus × and ÷)", () => {
+    for (let cp = 0x00c0; cp <= 0x00ff; cp++) {
+      const ch = String.fromCodePoint(cp);
+      if (ch === "×" || ch === "÷") continue;
+      expect(FREDOKA_TEXT).toContain(ch);
+    }
+  });
+
+  it("covers the Latin Extended-A letters upstream Fredoka actually has a glyph for", () => {
+    for (const ch of "ıŁłŒœŠšŸŽž") expect(FREDOKA_TEXT).toContain(ch);
+  });
 });
 
 describe("PIXELIFY_TEXT", () => {
