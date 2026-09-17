@@ -1,8 +1,20 @@
-import { roomClock } from "@couchcade/game-sdk/clock";
-import type { RoomClock } from "@couchcade/game-sdk/clock";
+import {
+  getDisplayLagMs,
+  readDisplayLag,
+  roomClock,
+  saveDisplayLag,
+} from "@couchcade/game-sdk/clock";
+import type { RoomClock, StoredDisplayLag } from "@couchcade/game-sdk/clock";
 import type { CouchcadeGame, Outcome } from "@couchcade/game-sdk/contract";
 import type { GameRegistry } from "@couchcade/game-sdk/registry";
 import type { ControllerView, HostToRelayMessage, RelayToHostMessage } from "@couchcade/protocol";
+import { createCalibration } from "../screens/calibration/calibration.ts";
+import type {
+  Calibration,
+  CalibrationStatus,
+  FlashFrame,
+  Measurement,
+} from "../screens/calibration/calibration.ts";
 import type { LobbyState } from "../screens/lobby/lobby-state.ts";
 import { seatedPlayers, vip } from "../screens/lobby/lobby-state.ts";
 import { createGameMenu } from "../screens/menu/menu.ts";
@@ -35,15 +47,42 @@ export interface HostRuntimeOptions {
   random?: () => number;
   reducedMotion?: () => boolean;
   warn?: (message: string) => void;
+  /** Where the calibrated TV lag lives. Defaults to the host's `localStorage`, through the SDK. */
+  displayLag?: DisplayLagStore;
 }
+
+/** Reads and stores the calibrated TV lag (session-flow.md, "Storage and use"). */
+export interface DisplayLagStore {
+  /** The lag games get, 0 when the TV was never calibrated. */
+  ms(): number;
+  /** The stored measurement, or null. */
+  read(): StoredDisplayLag | null;
+  save(ms: number): void;
+}
+
+export const localDisplayLag: DisplayLagStore = {
+  ms: () => getDisplayLagMs(),
+  read: () => readDisplayLag(),
+  save: (ms) => {
+    saveDisplayLag(ms, Date.now());
+  },
+};
 
 export interface RunningGame {
   readonly game: CouchcadeGame;
   readonly runner: GameRunner;
 }
 
-/** The phases this runtime drives today. Calibration and motion check come later. */
-export type HostPhase = "lobby" | "menu" | "playing" | "results";
+/** The phases this runtime drives today. The motion check comes later. */
+export type HostPhase = "lobby" | "menu" | "calibration" | "playing" | "results";
+
+/** What the TV lag calibration screen draws. */
+export interface CalibrationScreenState {
+  status: CalibrationStatus;
+  /** Room time of the first flash. */
+  startsAt: number;
+  measurement: Measurement;
+}
 
 /** What the TV menu draws. */
 export interface MenuScreenState {
@@ -69,6 +108,21 @@ export interface HostRuntime {
   readonly menu: MenuScreenState | null;
   /** The last game's standings while the phase is `results`, else null. */
   readonly results: ResultsScreenState | null;
+  /** The TV lag check while the phase is `calibration`, else null. */
+  readonly calibration: CalibrationScreenState | null;
+  /** The stored TV lag for the lobby's "Check TV lag" button, or null when never measured. */
+  readonly displayLag: StoredDisplayLag | null;
+  /** "Check TV lag" on the TV lobby starts the calibration. Does nothing outside the lobby. */
+  checkTvLag(): void;
+  /** "Skip" on the TV: back to the lobby, the stored value unchanged. */
+  skipCalibration(): void;
+  /** "Try again" on the TV after nobody got enough taps in. */
+  retryCalibration(): void;
+  /**
+   * Called on every animation frame of the calibration screen with that frame's room time.
+   * Returns what to draw, and records the frame that first draws each flash.
+   */
+  calibrationFrame(roomTime: number): FlashFrame | null;
   /** Feeds one relay message, with the lobby state after that message was applied. */
   handle(message: RelayToHostMessage, lobby: LobbyState): void;
   /** Tells the runtime the socket closed; it reconnects and gets a new `room:welcome`. */
@@ -83,6 +137,10 @@ export interface HostRuntime {
  * game, a 3 second countdown starts it, the game ticks at a fixed 60 Hz, views go to phones
  * through the view sync, and when the game has an outcome, the results screen shows one game's
  * placements until the VIP picks "Play again" (restarts the same game) or "Back to menu".
+ *
+ * From the lobby, "Check TV lag" on the laptop runs the TV lag calibration: the phones tap along
+ * with a flash, the median offset is stored, and the lobby comes back. It is never forced before a
+ * game. Skipping keeps the old value. Games get the stored value as `displayLagMs`.
  */
 export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
   const clock = options.clock ?? roomClock;
@@ -91,11 +149,13 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
   const warn = options.warn ?? devWarn;
   const createSeed = options.createSeed ?? (() => crypto.getRandomValues(new Uint32Array(1))[0]!);
   const reducedMotion = options.reducedMotion ?? (() => false);
+  const displayLag = options.displayLag ?? localDisplayLag;
 
   const views = createViewSync({ send: options.send, now, schedule, warn });
   let lobby: LobbyState | null = null;
   let running: (RunningGame & { loop: FixedStepLoop }) | null = null;
   let results: GameResults | null = null;
+  let calibration: Calibration | null = null;
   /** The phase last sent to the relay with `room:phase`. */
   let phase: HostPhase = "lobby";
 
@@ -116,15 +176,32 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
     },
   });
 
+  /** Ends the calibration, measured or skipped, and goes back to the lobby. */
+  function endCalibration(): void {
+    if (calibration === null) return;
+    calibration.dispose();
+    calibration = null;
+    setPhase("lobby");
+    showPlatformViews();
+    options.onChange?.();
+  }
+
   function setPhase(next: HostPhase): void {
     if (phase === next) return;
     phase = next;
     options.send({ t: "room:phase", d: { phase: next } });
   }
 
-  /** The lobby or menu views of every seated phone. The VIP's lobby view carries the game buttons. */
+  /**
+   * The lobby, calibration or menu views of every seated phone. The VIP's lobby view carries the
+   * game buttons.
+   */
   function showPlatformViews(): void {
     if (lobby === null || running !== null) return;
+    if (calibration !== null) {
+      views.show(null, calibration.views());
+      return;
+    }
     if (menu.open) {
       views.show(null, menu.views());
       return;
@@ -146,10 +223,12 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
   function start(game: CouchcadeGame, state: LobbyState): void {
     menu.close(game.id);
     results = null;
+    // Read once per game, so a game sees one value from start to end.
+    const displayLagMs = displayLag.ms();
     const runner = createGameRunner(game, {
       players: seatedPlayers(state),
       seed: createSeed(),
-      displayLagMs: 0,
+      displayLagMs,
     });
     const loop = createFixedStepLoop({
       now,
@@ -177,7 +256,7 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
       .start(game, {
         getState: () => runner.state,
         players: runner.players,
-        displayLagMs: 0,
+        displayLagMs,
         reducedMotion: reducedMotion(),
       })
       .then(
@@ -248,6 +327,51 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
         : null;
     },
 
+    get calibration() {
+      return phase === "calibration" && calibration !== null
+        ? {
+            status: calibration.status,
+            startsAt: calibration.startsAt,
+            measurement: calibration.measurement(),
+          }
+        : null;
+    },
+
+    get displayLag() {
+      return displayLag.read();
+    },
+
+    checkTvLag() {
+      if (phase !== "lobby" || running !== null || menu.open || lobby === null) return;
+      calibration = createCalibration({
+        lobby: () => lobby,
+        roomNow: () => clock.toHostTime(now()),
+        schedule,
+        onMeasured: (lagMs) => {
+          displayLag.save(lagMs);
+          endCalibration();
+        },
+        onSkip: endCalibration,
+        onChange: () => {
+          showPlatformViews();
+          options.onChange?.();
+        },
+      });
+      setPhase("calibration");
+      showPlatformViews();
+      options.onChange?.();
+    },
+
+    skipCalibration: endCalibration,
+
+    retryCalibration() {
+      calibration?.retry();
+    },
+
+    calibrationFrame(roomTime) {
+      return calibration?.frame(roomTime) ?? null;
+    },
+
     handle(message, state) {
       lobby = state;
       switch (message.t) {
@@ -268,9 +392,14 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
             warn(`dropped input ${JSON.stringify(message.d.type)} from ${message.from}`);
           }
           return;
+        case "calibration:tap":
+          calibration?.tap(message.from, message.d);
+          return;
         case "ui:action":
           if (running !== null) return;
-          if (phase === "results") results?.action(message.from, message.d);
+          // During the TV lag check only the VIP's skip-calibration counts.
+          if (calibration !== null) calibration.action(message.from, message.d);
+          else if (phase === "results") results?.action(message.from, message.d);
           else menu.action(message.from, message.d);
           return;
         case "player:joined":
@@ -307,6 +436,8 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
 
     dispose() {
       menu.dispose();
+      calibration?.dispose();
+      calibration = null;
       if (running) {
         running.loop.stop();
         options.stage.stop(running.game);
