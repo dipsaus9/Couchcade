@@ -3,6 +3,8 @@
  */
 export { gameContractChecks, testGameContract } from "./contract.ts";
 export type { GameContractCheck, GameContractOptions } from "./contract.ts";
+export { createFakeLink } from "./fake-link.ts";
+export type { FakeLink, FakeLinkOptions, FakeLinkSide } from "./fake-link.ts";
 export { createFakeRoom } from "./fake-room.ts";
 export type { FakeRoom, FakeRoomOptions, RecordedInput, Recording } from "./fake-room.ts";
 export { createPlayers } from "./players.ts";
