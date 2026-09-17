@@ -8,7 +8,7 @@ import {
 import { EN_NAME_BLOCKLIST, NL_NAME_BLOCKLIST } from "@couchcade/utils/names";
 import { describe, expect, it, vi } from "vitest";
 import { apiErrorCodes, apiErrorStatus } from "../src/api/index.ts";
-import { maxPhones } from "../src/api/join.ts";
+import { maxPhones } from "../src/room/audience.ts";
 import { passcodeMatches } from "../src/api/passcode.ts";
 import { smokeHeader } from "../src/api/turnstile.ts";
 import { maxTokenLength } from "../src/security/turnstile.ts";

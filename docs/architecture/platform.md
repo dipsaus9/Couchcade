@@ -389,6 +389,7 @@ The README's `ping` and `pong` for the dev overlay are these clock samples. The 
 | 4008 | Flooding | No |
 | 4009 | Replaced by a newer connection for the same player or host | No (the newer tab wins) |
 | 4011 | Seat expired: rejoined more than 2 minutes after disconnecting | No. Show the join screen with the code filled in. |
+| 4012 | Room is full: a phone the room has never seen connects while 16 phones are in it. The Worker answers `409 room-full` first; the room closes with 4012 when two joins pass that check at once. | No. Show "Room is full". |
 
 ### HTTP API
 

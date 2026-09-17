@@ -23,7 +23,7 @@ import type {
   Measurement,
 } from "../screens/calibration/calibration.ts";
 import type { LobbyState } from "../screens/lobby/lobby-state.ts";
-import { seatedPlayers, vip } from "../screens/lobby/lobby-state.ts";
+import { audienceViews, seatedPlayers, vip } from "../screens/lobby/lobby-state.ts";
 import { joinUrl } from "../screens/lobby/join-url.ts";
 import { createGameMenu, fits } from "../screens/menu/menu.ts";
 import type { Countdown, GameMenu, MenuGame } from "../screens/menu/menu.ts";
@@ -74,6 +74,9 @@ export interface DisplayLagStore {
   read(): StoredDisplayLag | null;
   save(ms: number): void;
 }
+
+/** What a seated player who isn't in the running game sees until the next one starts. */
+const nextGameView: ControllerView = { screen: "next-game", data: null };
 
 export const localDisplayLag: DisplayLagStore = {
   ms: () => getDisplayLagMs(),
@@ -244,6 +247,32 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
     options.onChange?.();
   }
 
+  /**
+   * Sends `screenViews` with what every other phone should see (session-flow.md, "What each device
+   * shows"): audience phones get their place in line, and while a game runs, seated players who
+   * aren't in it (`inGame`) get `next-game`.
+   */
+  function show(
+    gameId: string | null,
+    screenViews: ReadonlyMap<string, ControllerView>,
+    inGame?: readonly Player[],
+  ): void {
+    if (lobby === null) {
+      views.show(gameId, screenViews);
+      return;
+    }
+    const all = new Map(screenViews);
+    if (inGame !== undefined) {
+      for (const player of seatedPlayers(lobby)) {
+        if (!all.has(player.id) && !inGame.some(({ id }) => id === player.id)) {
+          all.set(player.id, nextGameView);
+        }
+      }
+    }
+    for (const [id, view] of audienceViews(lobby)) all.set(id, view);
+    views.show(gameId, all);
+  }
+
   function setPhase(next: HostPhase): void {
     if (phase === next) return;
     phase = next;
@@ -257,15 +286,15 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
   function showPlatformViews(): void {
     if (lobby === null || running !== null) return;
     if (motionCheck !== null) {
-      views.show(null, motionCheck.views());
+      show(null, motionCheck.views());
       return;
     }
     if (calibration !== null) {
-      views.show(null, calibration.views());
+      show(null, calibration.views());
       return;
     }
     if (menu.open) {
-      views.show(null, menu.views());
+      show(null, menu.views());
       return;
     }
     const leader = vip(lobby)?.id;
@@ -273,13 +302,13 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
     for (const player of seatedPlayers(lobby)) {
       lobbyViews.set(player.id, { screen: "lobby", data: { vip: player.id === leader } });
     }
-    views.show(null, lobbyViews);
+    show(null, lobbyViews);
   }
 
   /** Every seated phone's results view: the VIP's actions, others' placement or `next-game`. */
   function showResultsViews(): void {
     if (results === null) return;
-    views.show(null, results.views());
+    show(null, results.views());
   }
 
   /** Starts `game`, with the motion step first when it needs motion. */
@@ -351,7 +380,7 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
           return;
         }
         snapshots.tick();
-        views.show(game.id, runner.views());
+        show(game.id, runner.views(), runner.players);
       },
     });
     setPhase("playing");
@@ -369,7 +398,7 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
     const current = { game, runner, loop, touchPlayers, snapshots };
     running = current;
 
-    views.show(game.id, runner.views());
+    show(game.id, runner.views(), runner.players);
     options.onChange?.();
 
     const beginTicking = (): void => {

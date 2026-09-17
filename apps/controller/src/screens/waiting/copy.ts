@@ -25,6 +25,14 @@ export function waitingCopy(state: Exclude<PhoneState, { status: "join" }>): Wai
   if (!state.hostConnected) {
     return { title: "Waiting for the TV", body: "The TV is reconnecting. Keep this page open." };
   }
+  // A late joiner or promoted audience member while a game runs or its results show.
+  if (state.view?.screen === "next-game") {
+    return {
+      title: "Next game soon",
+      body: "You're in. You play from the next game.",
+      hint: "Watch the TV until then.",
+    };
+  }
   if (state.gameId === null && state.view?.screen === "vip-choosing") {
     const name = choosingName(state.view);
     return {

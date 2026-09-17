@@ -76,6 +76,27 @@ describe("showsGameController", () => {
     });
     expect(showsGameController(hostAway)).toBe(false);
   });
+
+  it("never shows a controller to audience phones or to players waiting for the next game", () => {
+    expect(showsGameController(gameState("tap-race", { screen: "next-game", data: null }))).toBe(
+      false,
+    );
+    const audience = reduce(
+      initialState(null, { code: "BEAN", playerId: sam.id, rejoinToken: "r" }),
+      {
+        type: "message",
+        message: {
+          t: "room:welcome",
+          d: { role: "audience", code: "BEAN", phase: "playing", you: { ...sam, slot: null } },
+        },
+      },
+    );
+    const watching = reduce(audience, {
+      type: "message",
+      message: { t: "controller:state", d: { gameId: "tap-race", view: tapView } },
+    });
+    expect(showsGameController(watching)).toBe(false);
+  });
 });
 
 describe("useGameController", () => {
