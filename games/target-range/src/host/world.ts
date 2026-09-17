@@ -1,21 +1,20 @@
-import { motion, world } from "@couchcade/theme";
+import { motion, toPhaserColor, world } from "@couchcade/theme";
 import type { Hex } from "@couchcade/theme";
 import { drawPlayerShape } from "@couchcade/stage/draw";
 import type { GameObjects, Scene } from "phaser";
-import { art, bandColour } from "./art.ts";
-import { placeShapes, stubSize } from "./label-layout.ts";
+import { art, sprites } from "./art.ts";
+import { placeShapes } from "./label-layout.ts";
 import type { Box } from "./label-layout.ts";
 import {
-  bossMarginPx,
   bowPoint,
   crosshairBox,
   crosshairCentre,
   crosshairShapeBox,
   crosshairSize,
+  flagFrame,
   horizonY,
-  legPx,
-  poleHeightPx,
   shapeBounds,
+  standAt,
 } from "./layout.ts";
 import type {
   CrosshairPresentation,
@@ -29,10 +28,10 @@ import { worldPip, worldPipKey, worldPipSize } from "./world-pip.ts";
 import type { WorldPipLook } from "./world-pip.ts";
 
 /**
- * The range, drawn in world pixels on the core colours (HOUSE_STYLE "Game worlds": 1px Ink
- * outlines on characters and props, none on the background). Until CC-11.5 brings the CC0 art,
- * every picture here is painted from a pixel function into a texture once, and the scene only
- * moves images around. CC-11.5 swaps each `paint…` texture for its sprite under the same role.
+ * The range, built from the sprites in games/target-range/assets (HOUSE_STYLE "Game worlds": pixel
+ * art on the core colours plus the `range` palette, 1px Ink outlines on characters and props, none
+ * on the background). Every sprite sits on whole world pixels. Only the player-coloured things are
+ * painted here: the World Pips, the crosshairs, and the arrows' fletching in the player's colour.
  */
 
 /** Pixels of a texture, one row at a time. `null` is transparent. */
@@ -68,28 +67,49 @@ function paint(scene: Scene, key: string, width: number, height: number, pixel: 
   return key;
 }
 
-/** Adds a 1px Ink outline (four neighbours) around a pixel function's shape. */
-function outlined(pixel: PixelFn): PixelFn {
-  return (x, y) => {
-    const own = pixel(x, y);
-    if (own !== null) return own;
-    const near = pixel(x - 1, y) ?? pixel(x + 1, y) ?? pixel(x, y - 1) ?? pixel(x, y + 1);
-    return near === null ? null : art.outline;
+/** A colour channel as two hex digits. */
+const hexByte = (value: number): string => value.toString(16).toUpperCase().padStart(2, "0");
+
+/**
+ * A loaded sprite's pixels, read once. `null` is transparent. The sprites are on the palette, so
+ * every pixel is an exact palette colour.
+ */
+function spritePixels(scene: Scene, key: string): { width: number; pixel: PixelFn } {
+  const source = scene.textures.get(key).getSourceImage() as HTMLImageElement;
+  const { width, height } = source;
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  if (context === null) throw new Error("No 2D context");
+  context.drawImage(source, 0, 0);
+  const data = context.getImageData(0, 0, width, height).data;
+  return {
+    width,
+    pixel: (x, y) => {
+      if (x < 0 || y < 0 || x >= width || y >= height) return null;
+      const i = (y * width + x) * 4;
+      if ((data[i + 3] ?? 0) < 128) return null;
+      return `#${hexByte(data[i] ?? 0)}${hexByte(data[i + 1] ?? 0)}${hexByte(data[i + 2] ?? 0)}` as Hex;
+    },
   };
 }
 
-/** A 25% dither: one pixel of every 2×2 block. */
-const dither = (x: number, y: number): boolean => x % 2 === 0 && y % 2 === 0;
+/** A sprite with its fletching in `fletch`, so every arrow shows whose it is. */
+function fletched(pixel: PixelFn, fletch: Hex): PixelFn {
+  return (x, y) => {
+    const own = pixel(x, y);
+    return own === art.fletching ? fletch : own;
+  };
+}
 
-/** Where the left fence rail runs: from the front corner up to the hedge. */
-const fenceRailY = (x: number): number => Math.round(158 - (x * 72) / 136);
-const fenceEndX = 136;
-
-/** Depths inside the world. */
+/** Depths inside the world. Things nearer the front draw on top. */
 const depth = {
   backdrop: -10,
-  flag: 10,
-  target: 20,
+  bales: -5,
+  stand: 10,
+  face: 11,
+  flag: 12,
   stub: 30,
   arrowShape: 31,
   pip: 50,
@@ -97,160 +117,118 @@ const depth = {
   crosshair: 100,
 } as const;
 
-/** The mown range: sky, trees and a hedge at the far end, grass, a low fence down each side. */
-export function buildBackdrop(scene: Scene): void {
-  const trees = [
-    { x: 36, y: 58, r: 13 },
-    { x: 150, y: 62, r: 10 },
-    { x: 322, y: 60, r: 12 },
-    { x: 446, y: 56, r: 14 },
-  ];
-  const key = paint(scene, "target-range:backdrop", world.width, world.height, (x, y) => {
-    const hedgeTop = 70 + Math.round(2 * Math.sin(x / 7));
-    const inTree = trees.some((tree) => (x - tree.x) ** 2 + (y - tree.y) ** 2 <= tree.r ** 2);
-    if (y < horizonY && (y >= hedgeTop || inTree)) {
-      return dither(x, y) ? art.hedgeShade : art.hedge;
-    }
-    if (y < horizonY) return art.sky;
+const tile = 16;
 
-    const mirroredX = Math.min(x, world.width - 1 - x);
-    if (mirroredX <= fenceEndX) {
-      const rail = fenceRailY(mirroredX);
-      const post = mirroredX % 17 === 0 && y <= rail && y >= rail - 7;
-      const onRail = (top: number) => y >= rail - top && y <= rail - top + 1;
-      if (post || onRail(6) || onRail(3)) return art.fence;
-    }
-    return art.grass;
-  });
-  scene.add.image(0, 0, key).setOrigin(0).setDepth(depth.backdrop);
-}
+/** The mown stripes, from the far end to the front: taller towards the couch, for depth. */
+const stripeHeights = [16, 24, 32, 40, 48, 30] as const;
 
-/**
- * The straw boss on its stand with the painted face, for a round's radius. The face is the rings
- * of the rules: ring `k` reaches `radius × (11 − k) / 10`, in five colour bands.
- */
-function targetTexture(scene: Scene, radius: number): { key: string; centre: number } {
-  /** The straw boss reaches this far from the face centre; its outline is one pixel further. */
-  const boss = radius + bossMarginPx;
-  const centre = boss + 1;
-  const legs = [-Math.round(radius / 2), Math.round(radius / 2)];
-  const key = paint(
-    scene,
-    `target-range:target:${radius}`,
-    2 * centre + 1,
-    2 * centre + 1 + legPx,
-    outlined((px, py) => {
-      const dx = px - centre;
-      const dy = py - centre;
-      if (Math.abs(dx) > boss) return null;
-      if (dy > boss) {
-        const onLeg = legs.some((leg) => dx === leg || dx === leg + Math.sign(leg));
-        return onLeg && dy < boss + legPx ? art.wood : null;
-      }
-      if (dy < -boss) return null;
-      // Round the boss's corners by one pixel.
-      if (Math.abs(dx) === boss && Math.abs(dy) === boss) return null;
-      const distance = Math.hypot(dx, dy);
-      if (distance <= radius + 0.5) {
-        const ring = Math.min(10, Math.max(1, Math.floor(11 - (10 * distance) / radius)));
-        return bandColour(ring);
-      }
-      if (distance <= radius + 1.5) return art.outline;
-      return (px * 3 + py * 5) % 11 === 0 ? art.strawSpeck : art.straw;
-    }),
-  );
-  return { key, centre };
-}
-
-/** Flag cloth length, droop and wave by wind strength 0 to 4: limp, light, stiff, flapping. */
-function flagTexture(scene: Scene, strength: number, frame: number): string {
-  const kind = Math.min(3, strength);
-  const width = 34;
-  const height = poleHeightPx + 2;
-  const pole = 16;
-  const cloth = (x: number, y: number): boolean => {
-    if (kind === 0) return x >= pole + 1 && x <= pole + 3 && y >= 2 && y <= 10;
-    const length = [0, 7, 11, 14][kind] as number;
-    const i = x - pole - 1;
-    if (i < 0 || i >= length) return false;
-    const droop = kind === 1 ? Math.round((3 * i) / length) : 0;
-    const wave =
-      kind === 3
-        ? Math.round(Math.sin((i + frame * 3) / 2))
-        : kind === 2 && frame === 1 && i > 7
-          ? 1
-          : 0;
-    const top = 2 + droop + wave;
-    return y >= top && y < top + 5;
-  };
-  return paint(
-    scene,
-    `target-range:flag:${kind}:${kind === 0 ? 0 : frame}`,
-    width,
-    height,
-    (x, y) => {
-      if (x === pole && y >= 1) return art.pole;
-      return outlined((cx, cy) => (cloth(cx, cy) ? art.flag : null))(x, y);
-    },
-  );
-}
-
-/** A bow seen from behind, 5×11, facing right: the Ink stave and a Chalk string. */
-const bowMask = [
-  "..#..",
-  "...#.",
-  "..s#.",
-  "..s.#",
-  "..s.#",
-  "..s.#",
-  "..s.#",
-  "..s.#",
-  "..s#.",
-  "...#.",
-  "..#..",
+/** Pine trees behind the hedge: x of each tree's left edge and how far it sinks into the hedge. */
+const pines: readonly [x: number, sink: number][] = [
+  [10, 6],
+  [34, 10],
+  [58, 4],
+  [134, 8],
+  [236, 10],
+  [304, 6],
+  [398, 4],
+  [424, 10],
+  [452, 6],
 ];
 
-function bowTexture(scene: Scene): string {
-  return paint(scene, "target-range:bow", 5, bowMask.length, (x, y) => {
-    const cell = bowMask[y]?.[x];
-    return cell === "#" ? art.bow : cell === "s" ? art.bowString : null;
+/** The side fences run from the front corners of the range up to the hedge. */
+const fenceFront = { x: 6, y: 170 } as const;
+const fenceBack = { x: 102, y: 98 } as const;
+const sidePostStepPx = 12;
+const fencePostStepPx = 12;
+const backFenceY = 98;
+
+/**
+ * The mown range: sky, pine trees and a hedge at the far end, a wall of hay bales behind the
+ * target, grass in mown stripes and a low wooden fence down each side.
+ */
+export function buildBackdrop(scene: Scene): void {
+  const { add } = scene;
+  add
+    .rectangle(0, 0, world.width, horizonY, toPhaserColor(art.sky))
+    .setOrigin(0)
+    .setDepth(depth.backdrop);
+
+  let top = horizonY;
+  stripeHeights.forEach((height, index) => {
+    const key = index % 2 === 0 ? sprites.grass.key : sprites.grassLight.key;
+    add
+      .tileSprite(0, top, world.width, height, key)
+      .setOrigin(0)
+      .setTilePosition(index * 5, top)
+      .setDepth(depth.backdrop);
+    top += height;
   });
+
+  for (const [x, sink] of pines) {
+    add
+      .image(x, horizonY - tile + 4 + sink, sprites.pineTree.key)
+      .setOrigin(0, 1)
+      .setDepth(depth.backdrop + 1);
+  }
+  // Bushes 12 px apart overlap into one lumpy hedge.
+  for (let x = -6; x < world.width; x += 12) {
+    const lift = (x / 12) % 3 === 0 ? 1 : 0;
+    add
+      .image(x, horizonY + 3 - lift, sprites.hedgeBush.key)
+      .setOrigin(0, 1)
+      .setDepth(depth.backdrop + 2);
+  }
+
+  // Hay bales behind the target, where stray arrows end up.
+  for (let x = 112; x < 368; x += 32) {
+    add
+      .image(x, horizonY + 14, sprites.hayBale.key)
+      .setOrigin(0, 1)
+      .setDepth(depth.bales);
+  }
+
+  // The back fence, either side of the bales: posts 12 px apart join their rails.
+  for (let x = -4; x < world.width; x += fencePostStepPx) {
+    if (x > 100 && x < 368) continue;
+    add
+      .image(x, backFenceY, sprites.fence.key)
+      .setOrigin(0, 1)
+      .setDepth(depth.bales - 1);
+  }
+  // The side fences' posts, from the back corners to the front, so nearer posts draw on top.
+  const posts = Math.floor((fenceBack.x - fenceFront.x) / sidePostStepPx);
+  for (let i = posts; i >= 0; i--) {
+    const x = fenceFront.x + i * sidePostStepPx;
+    const y = Math.round(
+      fenceFront.y +
+        ((fenceBack.y - fenceFront.y) * (x - fenceFront.x)) / (fenceBack.x - fenceFront.x),
+    );
+    for (const side of [1, -1] as const) {
+      const left = side === 1 ? x - 4 : world.width - x - 12;
+      add
+        .image(left, y, sprites.fence.key)
+        .setOrigin(0, 1)
+        .setCrop(4, 0, 8, tile)
+        .setDepth(depth.bales + y / 1000);
+    }
+  }
 }
 
-/** Flying arrows, facing right: fletching in the player's colour, a Chalk shaft, an Ink head. */
-const arrowMasks = [
-  ["f.h", "fsh", "f.h"],
-  ["f..h.", "fsssh", "f..h."],
-  ["f....h.", "fsssssh", "f....h."],
+/** Target face sprites by round radius. */
+const faces: Readonly<Record<number, string>> = {
+  36: sprites.faceNear.key,
+  30: sprites.faceMiddle.key,
+  24: sprites.faceFar.key,
+};
+
+/** Wind flag sprites by strength 0 to 4: limp, light, stiff, then flapping for 3 and 4. */
+const flags = [
+  sprites.flagCalm.key,
+  sprites.flagLight.key,
+  sprites.flagStiff.key,
+  sprites.flagFlapping.key,
+  sprites.flagFlapping.key,
 ] as const;
-
-function arrowTexture(scene: Scene, fletch: Hex, size: 0 | 1 | 2): string {
-  const mask = arrowMasks[size];
-  return paint(scene, `target-range:arrow:${fletch}:${size}`, mask[0].length, 3, (x, y) => {
-    const cell = mask[y]?.[x];
-    return cell === "f"
-      ? fletch
-      : cell === "s"
-        ? art.arrowShaft
-        : cell === "h"
-          ? art.arrowHead
-          : null;
-  });
-}
-
-/** A stuck arrow's stub: 3×3 in the player's colour around the Ink shaft, with an Ink outline. */
-function stubTexture(scene: Scene, fill: Hex): string {
-  return paint(
-    scene,
-    `target-range:stub:${fill}`,
-    stubSize,
-    stubSize,
-    outlined((x, y) => {
-      if (x < 1 || y < 1 || x > 3 || y > 3) return null;
-      return x === 2 && y === 2 ? art.arrowHead : fill;
-    }),
-  );
-}
 
 /** True on the crosshair's four ticks: 4 px long, ending 2 px from the centre. */
 function tick(x: number, y: number): boolean {
@@ -271,6 +249,50 @@ function crosshairTexture(scene: Scene, fill: Hex): string {
     if (tick(x, y)) return fill;
     const nearTick = tick(x - 1, y) || tick(x + 1, y) || tick(x, y - 1) || tick(x, y + 1);
     return nearTick && distance <= 5.5 ? art.outline : null;
+  });
+}
+
+/** The arrow sprite's rows and columns: fletching, shaft and the two head columns. */
+const arrowSprite = { top: 2, rows: 3, fletching: 0, shaft: [1, 2, 3, 4], head: [5, 6] } as const;
+
+/**
+ * A flying arrow with the player's fletching, facing right. Size 2 is the whole 7×3 sprite; the
+ * smaller sizes drop shaft columns (5×3, then 3×3) as the arrow flies away from the couch.
+ */
+function arrowTexture(scene: Scene, fletch: Hex, size: 0 | 1 | 2): string {
+  const key = `target-range:arrow:${fletch}:${size}`;
+  if (scene.textures.exists(key)) return key;
+  const { pixel } = spritePixels(scene, sprites.arrow.key);
+  const columns = [
+    arrowSprite.fletching,
+    ...arrowSprite.shaft.slice(0, 2 * size),
+    ...arrowSprite.head,
+  ];
+  const coloured = fletched(pixel, fletch);
+  return paint(scene, key, columns.length, arrowSprite.rows, (x, y) =>
+    coloured(columns[x] ?? -1, arrowSprite.top + y),
+  );
+}
+
+/** The stub sprite's pixel that goes on the landing pixel: the shaft's bottom right. */
+const stubLanding = { x: 4, y: 4 } as const;
+
+/**
+ * A stuck arrow seen end on, with the player's fletching. The shaft gets the house style's 1px Ink
+ * outline, which joins the four fletching pixels into a square that stands out on every band.
+ */
+function stubTexture(scene: Scene, fletch: Hex): string {
+  const key = `target-range:stub:${fletch}`;
+  if (scene.textures.exists(key)) return key;
+  const { width, pixel } = spritePixels(scene, sprites.stub.key);
+  const shaft = (x: number, y: number) => pixel(x, y) === art.wood;
+  const coloured = fletched(pixel, fletch);
+  return paint(scene, key, width, width, (x, y) => {
+    const own = coloured(x, y);
+    if (own !== null) return own;
+    return shaft(x - 1, y) || shaft(x + 1, y) || shaft(x, y - 1) || shaft(x, y + 1)
+      ? art.outline
+      : null;
   });
 }
 
@@ -299,10 +321,11 @@ class PipActor {
       .setOrigin(0)
       .setFlipX(facing === -1)
       .setDepth(depth.pip);
+    // The bow sprite's limbs bend to the left: flip it for a Pip shooting to the right.
     this.bow = scene.add
-      .image(0, 0, bowTexture(scene))
+      .image(0, 0, sprites.bow.key)
       .setOrigin(0.5)
-      .setFlipX(facing === -1)
+      .setFlipX(facing === 1)
       .setDepth(depth.pip + 1);
   }
 
@@ -323,7 +346,7 @@ class PipActor {
   update(pip: PipPresentation): void {
     this.body.setTexture(this.#texture(pip));
     const bow = bowPoint(pip.slot, pip.bowRaised);
-    this.bow.setPosition(bow.x + (pip.slot.facing === 1 ? 0.5 : -0.5), bow.y + 0.5);
+    this.bow.setPosition(bow.x, bow.y);
   }
 }
 
@@ -337,8 +360,9 @@ export type LookOf = (playerId: string) => WorldPipLook;
 export class RangeWorld {
   readonly #scene: Scene;
   readonly #lookOf: LookOf;
+  readonly stand: GameObjects.Image;
   readonly target: GameObjects.Image;
-  readonly flag: GameObjects.Image;
+  readonly flag: GameObjects.Sprite;
   readonly #pips: PipActor[];
   readonly #crosshairs = new Map<
     string,
@@ -350,19 +374,15 @@ export class RangeWorld {
   /** Game time each player's crosshair first showed this match, for the one-time pop. */
   readonly #firstSeenMs = new Map<string, number>();
   #shapeBoxes: Box[] = [];
-  #targetRadius = 0;
 
   constructor(scene: Scene, view: Presentation, lookOf: LookOf) {
     this.#scene = scene;
     this.#lookOf = lookOf;
     buildBackdrop(scene);
-    this.flag = scene.add
-      .image(0, 0, flagTexture(scene, 0, 0))
-      .setOrigin(16 / 34, 1)
-      .setDepth(depth.flag);
-    this.target = scene.add
-      .image(0, 0, targetTexture(scene, view.target.radius).key)
-      .setDepth(depth.target);
+    this.stand = scene.add.image(0, 0, sprites.stand.key).setOrigin(0).setDepth(depth.stand);
+    // The face's centre pixel is the middle pixel of its odd-sized circle.
+    this.target = scene.add.image(0, 0, faceKey(view.target.radius)).setDepth(depth.face);
+    this.flag = scene.add.sprite(0, 0, flags[0], 0).setDepth(depth.flag);
     this.#pips = view.pips.map((pip) => new PipActor(scene, pip, lookOf(pip.id)));
     for (const [seat, pip] of view.pips.entries()) {
       const look = lookOf(pip.id);
@@ -412,23 +432,23 @@ export class RangeWorld {
 
   #showTarget(view: Presentation): void {
     const { x, y, radius } = view.target;
-    if (radius !== this.#targetRadius) {
-      const { key, centre } = targetTexture(this.#scene, radius);
-      this.target.setTexture(key);
-      this.#targetRadius = radius;
-      this.target.setOrigin(centre / this.target.width, centre / this.target.height);
-    }
-    // The origin is the face centre pixel's top-left corner, so that pixel is the target's.
-    this.target.setPosition(x, y);
+    const at = standAt(view.target);
+    this.stand.setPosition(at.x, at.y);
+    const key = faceKey(radius);
+    if (this.target.texture.key !== key) this.target.setTexture(key);
+    // The origin is the centre pixel's top-left corner, so that pixel is the target centre's.
+    const half = Math.floor(this.target.width / 2);
+    this.target.setOrigin(half / this.target.width, half / this.target.height).setPosition(x, y);
   }
 
   #showFlag(wind: WindPresentation): void {
-    // The pole is column 16 of 34, or 17 once mirrored. The bottom row stands on the foot.
+    const flipped = wind.direction === -1;
+    const poleX = flipped ? flagFrame.size - flagFrame.poleX - 2 : flagFrame.poleX;
     this.flag
-      .setTexture(flagTexture(this.#scene, wind.strength, wind.frame))
-      .setFlipX(wind.direction === -1)
-      .setOrigin(wind.direction === -1 ? 17 / 34 : 16 / 34, 1)
-      .setPosition(wind.foot.x, wind.foot.y + 1);
+      .setTexture(flags[wind.strength] ?? flags[0], wind.frame)
+      .setFlipX(flipped)
+      .setOrigin(poleX / flagFrame.size, flagFrame.poleBottom / flagFrame.size)
+      .setPosition(wind.foot.x, wind.foot.y);
   }
 
   #showCrosshairs(
@@ -475,7 +495,7 @@ export class RangeWorld {
     while (this.#stubs.length < stuck.length) {
       this.#stubs.push(
         this.#scene.add
-          .image(0, 0, stubTexture(this.#scene, art.outline))
+          .image(0, 0, stubTexture(this.#scene, art.fletching))
           .setOrigin(0)
           .setDepth(depth.stub),
       );
@@ -484,10 +504,9 @@ export class RangeWorld {
       const arrow = stuck[index];
       stub.setVisible(arrow !== undefined);
       if (!arrow) return;
-      const half = Math.floor(stubSize / 2);
       stub
         .setTexture(stubTexture(this.#scene, this.#lookOf(arrow.id).jersey))
-        .setPosition(arrow.x - half, arrow.y - half);
+        .setPosition(arrow.x - stubLanding.x, arrow.y - stubLanding.y);
     });
 
     const newest = stuck.filter((arrow) => arrow.newest);
@@ -500,4 +519,14 @@ export class RangeWorld {
       if (box) shape.setPosition(box.left, box.top);
     }
   }
+}
+
+/**
+ * The face sprite for a round radius. Each face is drawn at its round's radius, so a radius without
+ * one would show rings that don't match the scoring: fail loudly instead.
+ */
+function faceKey(radius: number): string {
+  const key = faces[radius];
+  if (key === undefined) throw new Error(`No target face sprite for radius ${radius}`);
+  return key;
 }
