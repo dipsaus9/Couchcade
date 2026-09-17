@@ -120,6 +120,7 @@ onBeforeUnmount(() => {
       :state="state"
       :send-message="session.send"
       :motion="motionGame"
+      :link="session.link"
     />
     <WaitingScreen v-else v-bind="waitingCopy(state)" />
   </main>

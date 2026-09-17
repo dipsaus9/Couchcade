@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import type { GameInput, InputChannel } from "@couchcade/game-sdk/contract";
 import { createControllerRegistry } from "@couchcade/game-sdk/registry";
 import { calibrateRest, type Calibration } from "@couchcade/motion/calibration";
 import { createFakeAdapter, synthetic, traceSamples } from "@couchcade/motion/sensors";
@@ -175,6 +176,20 @@ describe("controllerProps", () => {
     }) as GameState;
     const send = createInputSender({ sendMessage: () => {}, canSend: () => true });
     expect(controllerProps(next, send)).toMatchObject({ screen: "done", data: 3 });
+  });
+
+  it("carries the real-time input channel only once the link runtime has one (CC-3.19)", () => {
+    const state = gameState("tap-race") as GameState;
+    const send = createInputSender({ sendMessage: () => {}, canSend: () => true });
+    const input: InputChannel<GameInput> = {
+      stream: () => {},
+      fire: () => {},
+      last: () => null,
+      clear: () => {},
+      path: "direct",
+    };
+    expect(controllerProps(state, send)).not.toHaveProperty("input");
+    expect(controllerProps(state, send, undefined, input)).toMatchObject({ input });
   });
 });
 
