@@ -3,6 +3,7 @@ import { createRequire } from "node:module";
 import { join } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import { toFontFaceCss } from "@couchcade/theme/generate";
+import { NAME_CHARACTERS } from "@couchcade/utils/names";
 
 /**
  * Neither `harfbuzzjs` nor `fontverter` ships TypeScript types (checked: no `@types/harfbuzzjs` or
@@ -137,5 +138,12 @@ describe("Fredoka accented-name glyph coverage (CC-4.12 AC3)", () => {
     for (const ch of "ıŁłŒœŠšŸŽž") {
       expect(fredokaCodepoints.has(ch.codePointAt(0)!)).toBe(true);
     }
+  });
+
+  // CC-2.4, security.md "Player names" rule 5: the name allowlist matches the glyphs in the font,
+  // so no allowed name ever shows a box or a fallback font on the TV.
+  it("draws every character the player name allowlist accepts", () => {
+    const missing = [...NAME_CHARACTERS].filter((ch) => !fredokaCodepoints.has(ch.codePointAt(0)!));
+    expect(missing).toEqual([]);
   });
 });

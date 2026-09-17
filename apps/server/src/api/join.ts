@@ -1,11 +1,7 @@
-import {
-  joinRoomRequestSchema,
-  playerNameSchema,
-  seatCount,
-  type JoinRoomResponse,
-} from "@couchcade/protocol";
+import { joinRoomRequestSchema, seatCount, type JoinRoomResponse } from "@couchcade/protocol";
 import { isRoomCode, roomCode } from "@couchcade/utils";
 import { internalPaths, type RoomStatus } from "../room/room.ts";
+import { allowedPlayerName } from "../security/names.ts";
 import { isRateLimited } from "../security/rate-limits.ts";
 import { signRejoinToken, signTicket } from "../security/tickets.ts";
 import { readJsonObject } from "./body.ts";
@@ -32,9 +28,10 @@ export async function joinRoom(request: Request, code: string, ctx: ApiContext):
   const parsed = body && joinRoomRequestSchema.safeParse({ turnstile: "", ...body });
   if (!parsed?.success) return errorResponse("bad-request");
 
-  // 3. Name rules. CC-2.4 replaces this with NFKC, the character allowlist and the blocklists.
-  const name = playerNameSchema.safeParse(parsed.data.name.trim());
-  if (!name.success) return errorResponse("name-not-allowed");
+  // 3. Name rules: NFKC, 1 to 12 code points, the character allowlist and the NL + EN blocklists.
+  //    Before Turnstile, so a rejected name doesn't spend the token.
+  const name = allowedPlayerName(parsed.data.name);
+  if (name === null) return errorResponse("name-not-allowed");
 
   // 4. Turnstile, action "join". Nothing skips it here: the smoke token only works on room creation.
   const failed = await turnstileError(request, parsed.data.turnstile, "join", ctx.env);
@@ -49,7 +46,7 @@ export async function joinRoom(request: Request, code: string, ctx: ApiContext):
   if (status.phones >= maxPhones) return errorResponse("room-full");
 
   // 6. Sign the ticket and the rejoin token for a new player id.
-  const identity = { role: "player", playerId: newPlayerId(), name: name.data } as const;
+  const identity = { role: "player", playerId: newPlayerId(), name } as const;
   const secret = ctx.env.TICKET_SIGNING_SECRET;
   const joined: JoinRoomResponse = {
     playerId: identity.playerId,

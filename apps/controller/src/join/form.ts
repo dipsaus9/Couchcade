@@ -1,7 +1,16 @@
 import { isRoomCode, ROOM_CODE_LENGTH } from "@couchcade/utils";
+import {
+  checkName as checkNameRules,
+  NAME_MAX_LENGTH,
+  type NameProblem,
+} from "@couchcade/utils/names";
 
-/** Longest name a player can pick, in characters (docs/architecture/security.md, "Player names"). */
-export const nameMaxLength = 12;
+// The name rules live in @couchcade/utils (docs/architecture/security.md, "Player names"). The
+// phone runs the same function as the Worker, so honest players see a problem before they tap Join.
+export { nameLength, normaliseName, type NameProblem } from "@couchcade/utils/names";
+
+/** Longest name a player can pick, in code points after normalising. */
+export const nameMaxLength = NAME_MAX_LENGTH;
 
 /** What the player typed on the join screen. */
 export interface JoinDraft {
@@ -12,7 +21,6 @@ export interface JoinDraft {
 }
 
 export type CodeProblem = "incomplete";
-export type NameProblem = "empty" | "too-long";
 
 export interface JoinFormCheck {
   code: CodeProblem | null;
@@ -39,23 +47,10 @@ export function cleanRoomCodeInput(raw: string): string {
     .slice(0, ROOM_CODE_LENGTH);
 }
 
-/**
- * The name as it is sent: NFKC, trimmed, runs of spaces collapsed into one. The server's check is
- * the one that counts; CC-2.4 adds the character allowlist and blocklists to both ends.
- */
-export function normaliseName(raw: string): string {
-  return raw.normalize("NFKC").trim().replace(/\s+/g, " ");
-}
-
-/** Length of the normalised name in characters (code points), as the name rules count it. */
-export function nameLength(raw: string): number {
-  return [...normaliseName(raw)].length;
-}
-
+/** What's wrong with the name, or null when the Worker will accept it. */
 export function checkName(raw: string): NameProblem | null {
-  const length = nameLength(raw);
-  if (length === 0) return "empty";
-  return length > nameMaxLength ? "too-long" : null;
+  const result = checkNameRules(raw);
+  return result.ok ? null : result.problem;
 }
 
 export function checkJoinForm({ code, name }: Pick<JoinDraft, "code" | "name">): JoinFormCheck {

@@ -371,7 +371,7 @@ export function present(state: TargetRangeState, options: PresentOptions): Prese
       strength,
       direction: wind === 0 ? 0 : wind > 0 ? 1 : -1,
       frame: reducedMotion || strength === 0 ? 0 : Math.floor(nowMs / flagFrameMs) % 3,
-      foot: flagFoot(target, rules.radius),
+      foot: flagFoot(target),
     },
     pips,
     crosshairs,
@@ -390,7 +390,7 @@ export function present(state: TargetRangeState, options: PresentOptions): Prese
         : null,
     tags,
     callout: bullseye
-      ? { text: "BULLSEYE!", key: `bullseye:${volley}`, at: calloutAt(target, rules.radius) }
+      ? { text: "BULLSEYE!", key: `bullseye:${volley}`, at: calloutAt(target) }
       : null,
     results: state.phase === "roundEnd" || state.phase === "over" ? roundResults(state) : null,
   };

@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { controllerViewSchema, encode } from "@couchcade/protocol";
+import { controllerViewSchema, utf8ByteLength } from "@couchcade/protocol";
 import type { JsonValue } from "@couchcade/protocol";
-import { checkGameDefinition, isGameId, maxPlayers } from "../src/contract/index.ts";
+import {
+  checkGameDefinition,
+  isGameId,
+  maxGameSnapshotBytes,
+  maxPlayers,
+} from "../src/contract/index.ts";
 import type { CouchcadeGame, GameInput, Outcome, Player } from "../src/contract/index.ts";
 import { createFakeRoom } from "./fake-room.ts";
 import { createPlayers } from "./players.ts";
@@ -29,9 +34,6 @@ export interface GameContractCheck {
   /** Throws an assertion error when the game breaks the contract. */
   run(testPath?: string): void;
 }
-
-/** Round number in the `room:snapshot` frame that the snapshot size check encodes. */
-const snapshotRound = 9;
 
 /**
  * The checks `testGameContract` runs, one per test. Exposed so a check can be run on its own,
@@ -160,19 +162,18 @@ export function gameContractChecks<TInput extends GameInput, TState, TView exten
       },
     },
     {
-      name: "snapshot fits a 1 KB frame and restore is deterministic (when the game has them)",
+      name: `snapshot fits ${maxGameSnapshotBytes} bytes and restore is pure (when the game has them)`,
       run() {
         if (!game.snapshot || !game.restore) return;
         const samples = inputs();
         sessions((players, seed) => {
           const room = play(game, players, seed, samples, ticks, inputEvery);
           const snapshot = expectPure("snapshot", game.snapshot!.bind(game), [room.state]);
-          expect(() =>
-            encode({
-              t: "room:snapshot",
-              d: { round: snapshotRound, gameId: game.id, data: snapshot as JsonValue },
-            }),
-          ).not.toThrow();
+          const bytes = utf8ByteLength(JSON.stringify(snapshot as JsonValue) ?? "");
+          expect(
+            bytes,
+            `snapshot is ${bytes} bytes, over the ${maxGameSnapshotBytes} byte limit`,
+          ).toBeLessThanOrEqual(maxGameSnapshotBytes);
           const restored = expectPure("restore", game.restore!.bind(game), [
             players,
             seed,

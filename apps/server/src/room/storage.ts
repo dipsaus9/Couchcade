@@ -5,11 +5,12 @@ import {
   type PlayerId,
   type RoomPhase,
 } from "@couchcade/protocol";
+import { readSnapshot, saveSnapshot, snapshotTableSql, type RoomSnapshot } from "./snapshot.ts";
 
 /**
  * The room's SQLite tables (docs/architecture/platform.md, "Room storage"). The room writes only
- * on create, join, leave, seat release, profile change, kick, lock, phase change and flood
- * revocation, never per message. CC-3.5 adds the `snapshot` table.
+ * on create, join, leave, seat release, profile change, kick, lock, phase change, flood revocation
+ * and round snapshot, never per message.
  *
  * Tables are created by `create()`, not on start, so a socket or request that reaches a room that
  * was never created leaves no tables behind.
@@ -35,7 +36,7 @@ CREATE TABLE IF NOT EXISTS players (
   revoked INTEGER NOT NULL DEFAULT 0,
   released INTEGER NOT NULL DEFAULT 0
 );
-`;
+${snapshotTableSql}`;
 
 export interface RoomMeta {
   code: string;
@@ -226,8 +227,18 @@ export class RoomStorage {
     );
   }
 
+  /** The host's round snapshot, replacing the stored one. One write per `room:snapshot`. */
+  saveSnapshot(snapshot: RoomSnapshot, now: number): void {
+    saveSnapshot(this.#sql, snapshot, now);
+  }
+
+  /** The last round snapshot, or null when the host never sent one. */
+  readSnapshot(): RoomSnapshot | null {
+    return readSnapshot(this.#sql);
+  }
+
   /**
-   * Adds columns that later stories introduced to a room created before them, so a room that lives
+   * Adds tables and columns that later stories introduced to a room created before them, so a room that lives
    * through a deploy keeps working. Runs once per instance.
    */
   #migrate(): void {
@@ -246,6 +257,7 @@ export class RoomStorage {
     if (row?.hostRevoked === 0) {
       this.#sql.exec("ALTER TABLE meta ADD COLUMN host_revoked INTEGER NOT NULL DEFAULT 0");
     }
+    this.#sql.exec(snapshotTableSql);
   }
 }
 
