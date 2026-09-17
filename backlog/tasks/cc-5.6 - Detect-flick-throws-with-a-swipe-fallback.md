@@ -1,10 +1,10 @@
 ---
 id: CC-5.6
 title: Detect flick throws with a swipe fallback
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-17 16:58'
+updated_date: '2026-09-17 17:10'
 labels:
   - story
 dependencies:
@@ -31,9 +31,9 @@ Branch: CC-5.6/flick-gesture
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A flick emits { power 0–1, direction degrees, wobble 0–1, at timestamp }
-- [ ] #2 The swipe fallback emits the same shape
-- [ ] #3 Tests replay synthetic flick traces
+- [x] #1 A flick emits { power 0–1, direction degrees, wobble 0–1, at timestamp }
+- [x] #2 The swipe fallback emits the same shape
+- [x] #3 Tests replay synthetic flick traces
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -52,4 +52,14 @@ Verify: pnpm check && pnpm test
 Tune thresholds with traces from CC-5.9 when available.
 
 References amended (2026-09-17): added packages/motion/src/gestures/index.ts and packages/motion/src/fallbacks/index.ts, the subpath barrels that must re-export the new flick modules (same glue CC-5.4 and CC-5.5 added).
+
+Detector: pitch-down rate is measured around the horizontal axis right of the top edge's heading; direction integrates the top edge's heading rate (not world yaw), so a wrist twist adds to wobble and not to direction. A flick that peaked while gripped is still emitted if its acceleration arrives within 100 ms after a grip-up at the peak. Swipe fallback throws on finger lift and reuses createSwingSwipe for the 60 px rule and the power mapping; wobble samples the path evenly by distance. No recorded flick traces exist yet (CC-5.9 recorder is built, none saved), so defaults are untuned against real phones.
+
+Review gate (dipsaus-ai:story-reviewer, sonnet, round 1): pass. AC1-3 met, no scope violations, no findings.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added createFlickDetector (packages/motion/src/gestures/flick.ts) and createFlickSwipe (packages/motion/src/fallbacks/flick.ts), both emitting { power, direction, wobble, at } per docs/architecture/motion.md Flick (CC-5.6). The detector reads pose-tracker readings while the throw grip is held: pitch-down rate over 300 deg/s with linear acceleration over 6 m/s² within 100 ms of the peak, power mapped 300..1,200 deg/s, direction from the top edge's heading change over 150 ms (±30°), wobble as off-pitch RMS over pitch RMS, one flick per grip and an 800 ms cooldown (at most 1.25 throws/s, inside the 4 inputs/s budget). The swipe pad throws on lift, reuses the swing swipe's 60 px rule and finger-speed mapping, and derives direction and wobble from the path. Tests replay synthetic dart-throw traces through calibration and the pose tracker (both gravity sign conventions) and pointer paths; defaults are not yet tuned against recorded phone traces.
+<!-- SECTION:FINAL_SUMMARY:END -->
