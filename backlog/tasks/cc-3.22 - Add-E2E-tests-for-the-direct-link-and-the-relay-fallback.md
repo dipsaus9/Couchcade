@@ -4,7 +4,7 @@ title: Add E2E tests for the direct link and the relay fallback
 status: Done
 assignee: []
 created_date: '2026-09-17 17:51'
-updated_date: '2026-09-18 10:24'
+updated_date: '2026-09-18 10:41'
 labels:
   - story
 dependencies:
@@ -172,6 +172,15 @@ reload), but a full real-time match isn't reliably sustained over it in this san
 full-match specs deliberately assert the relay path there rather than gambling on a connection
 that has already hung once. Verified locally: both specs green on chromium and webkit, webkit
 repeated twice with no flakes.
+
+CI final status: all 7 required checks green on PR #137 (budgets, build, check, check:deps,
+check:style, e2e, test). The unrelated games/strike-night contract test flake (packages/game-sdk/
+testing/contract.ts:212, a pre-existing timeout unrelated to this diff) needed the "test" job
+rerun 3 times across the two CI runs before it passed clean -- flagging for the orchestrator as a
+possible shared-infra flake worth a look (not touched or fixed here, out of this story's scope).
+Story left In Progress per orchestrator instruction; not merging.
+
+Correction: the task status is Done (this is a regular deliverable story, not a spike or owner-gate story), matching the normal close-out flow. Only the PR itself stays a draft, unmerged, per the orchestrator's explicit "do not merge" instruction.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
