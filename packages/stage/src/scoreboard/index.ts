@@ -1,29 +1,40 @@
 import type { PlayerInfo } from "@couchcade/protocol";
-import { color, players as playerTokens, typeScale } from "@couchcade/theme";
+import { color, typeScale } from "@couchcade/theme";
 import { GameObjects } from "phaser";
 import type { Scene, Types } from "phaser";
-import { SHAPE_SIZE, drawPlayerShape, drawSlab, textStyle } from "../draw/index.ts";
+import { drawSlab, textStyle } from "../draw/index.ts";
 import { metrics, safeArea } from "../layout/index.ts";
 import type { Rect } from "../layout/index.ts";
+import { buildInterfacePipHead, interfacePipHeadSize } from "./pip-head.ts";
 
-/** Scoreboard measurements in overlay pixels, from the 1080p TV chip in the design canvas. */
+export * from "./pip-head.ts";
+
+/**
+ * Scoreboard measurements in overlay pixels, from the 1080p TV chip in the design canvas. Each
+ * chip's avatar is the player's Interface Pip head, 56px (docs/architecture/pips.md "Sizes on
+ * screen": "TV game menu and scoreboard chips"), replacing the plain player-shape icon this chip
+ * drew before CC-6.6: at 8 simultaneous chips plus the round counter, the safe area (1728px at
+ * 1080p) has no room left for both a 56px Pip head and a separate 36px shape icon per chip (that
+ * combination overflowed by several hundred px in testing). The chip's name still sits next to
+ * the Pip, so colour is never this chip's only cue (docs/HOUSE_STYLE.md, "shapes wherever a
+ * player colour appears"): the Pip's jersey colour still shows through the head crop even without
+ * the shape mark on it (pips.md: the jersey starts above the crop's bottom edge).
+ */
 export const scoreboardMetrics = {
   /** Chip height. */
   chipHeight: 72,
-  /** Space before the shape. */
+  /** Space before the Pip head. */
   padStart: 16,
   /** Space after the name or score. */
   padEnd: 24,
-  /** Space between shape, name and score. */
+  /** Space between the Pip head, the name and the score. */
   gap: 12,
   /** Space between chips. */
   chipGap: 16,
   /** How far the active player's chip lifts. */
   lift: 8,
-  /** One pixel of the player shape: as wide as the outline, so the shape's outline matches it. */
-  shapePixel: metrics.outline,
-  /** The drawn player shape, outline included (36px). */
-  shapeSize: SHAPE_SIZE * metrics.outline,
+  /** The Interface Pip head crop, the chip's avatar. */
+  pipHeadSize: interfacePipHeadSize,
 } as const;
 
 export interface RoundCounter {
@@ -210,7 +221,7 @@ export class Scoreboard extends GameObjects.Container {
         ),
         fixed:
           padStart +
-          scoreboardMetrics.shapeSize +
+          scoreboardMetrics.pipHeadSize +
           (score ? gap + this.#width(score, scoreStyle) : 0) +
           padEnd,
       };
@@ -268,7 +279,7 @@ export class Scoreboard extends GameObjects.Container {
   }
 
   #draw(plan: Plan): void {
-    const { chipHeight, padStart, padEnd, gap, lift, shapePixel, shapeSize } = scoreboardMetrics;
+    const { chipHeight, padStart, padEnd, gap, lift, pipHeadSize } = scoreboardMetrics;
     const top = safeArea.top + metrics.outline + lift;
     const centreY = top + chipHeight / 2;
     const text = (content: string, style: Types.GameObjects.Text.TextStyle, x: number) =>
@@ -281,22 +292,27 @@ export class Scoreboard extends GameObjects.Container {
       const active = chip.player.id === this.#activePlayerId;
       const y = active ? top - lift : top;
       const bounds = { x: chip.x, y, width: chip.width, height: chipHeight };
-      const token = playerTokens[chip.player.slot] ?? playerTokens[0];
 
+      // The chip's Chalk pill sits behind everything else, so it's added first; the Pip head
+      // (docs/architecture/pips.md "Pips on the TV") sits on top of it.
       const graphics = this.scene.make.graphics({}, false);
       drawSlab(graphics, bounds, { radius: "pill", ...(active ? { ring: color.sunny } : {}) });
-      const shapeX = chip.x + padStart;
-      drawPlayerShape(
-        graphics,
-        token.shape,
-        token.color,
-        shapeX,
-        y + Math.floor((chipHeight - shapeSize) / 2),
-        shapePixel,
-      );
       this.add(graphics);
+      const pipHeadX = chip.x + padStart;
 
-      let x = shapeX + shapeSize;
+      const pipHeadKey = buildInterfacePipHead(this.scene, {
+        profile: chip.player.profile,
+        slot: chip.player.slot,
+      });
+      const pipHead = this.scene.make
+        .image({}, false)
+        .setTexture(pipHeadKey)
+        .setOrigin(0, 0)
+        .setDisplaySize(pipHeadSize, pipHeadSize)
+        .setPosition(pipHeadX, y + Math.floor((chipHeight - pipHeadSize) / 2));
+      this.add(pipHead);
+
+      let x = pipHeadX + pipHeadSize;
       const liftBy = (object: GameObjects.Text) => object.setY(object.y - (top - y));
       if (chip.name) {
         const name = liftBy(text(chip.name, textStyle("body"), x + gap));
