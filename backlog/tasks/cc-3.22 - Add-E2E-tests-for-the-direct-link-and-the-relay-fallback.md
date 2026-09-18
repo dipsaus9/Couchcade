@@ -1,10 +1,10 @@
 ---
 id: CC-3.22
 title: Add E2E tests for the direct link and the relay fallback
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-17 17:51'
-updated_date: '2026-09-17 17:51'
+updated_date: '2026-09-18 06:38'
 labels:
   - story
 dependencies:
@@ -31,14 +31,71 @@ Branch: CC-3.22/realtime-link-e2e
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 e2e/platform/realtime-link.spec.ts shows a Chromium phone reaching the direct path through the test hook, and a Target Range bot match completing with no input message on that phone's relay socket during a volley
-- [ ] #2 Cutting the link through the test hook moves the phone to the relay path within 1 s and the match still completes
-- [ ] #3 Reloading the TV brings the phone's link back after room:host connected true
-- [ ] #4 In the WebKit project the specs assert the direct path when Playwright WebKit supports RTCPeerConnection, otherwise the relay path, and the task notes record which
+- [x] #1 e2e/platform/realtime-link.spec.ts shows a Chromium phone reaching the direct path through the test hook, and a Target Range bot match completing with no input message on that phone's relay socket during a volley
+- [x] #2 Cutting the link through the test hook moves the phone to the relay path within 1 s and the match still completes
+- [x] #3 Reloading the TV brings the phone's link back after room:host connected true
+- [x] #4 In the WebKit project the specs assert the direct path when Playwright WebKit supports RTCPeerConnection, otherwise the relay path, and the task notes record which
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Reuse the existing e2e patterns: window.__couchcade* test hooks (like motion's) and the
+watchTv/tvState game-state readers, extended for the real-time link.
+
+1. Controller-side test hook (apps/controller/src/runtime/link.ts, link-test-hook.ts, App.vue):
+   ControllerLink gains debugCut(), closing the current data channels the way a real drop does so
+   the state machine's own retry/fallback fires. App.vue exposes window.__couchcadeLink (path +
+   cut()) in dev builds only, mirroring apps/controller/src/motion/adapter.ts.
+2. e2e/src/link.ts: reads/waits on the hook's path, calls cut(), records relay-socket frames
+   (framesent/framereceived on /ws/ sockets, same technique as host-recovery.spec.ts), and checks
+   RTCPeerConnection support per engine for the WebKit branch (AC4).
+3. e2e/src/fixtures.ts: hostSearch option + phone search option, so a spec can open with ?link=1
+   (both apps' switch defaults off).
+4. e2e/src/target-range.ts: extract Target Range's bot-match helpers out of
+   e2e/games/target-range.spec.ts (matching the existing quick-draw.ts split), adding startMatch
+   and playFullMatch so realtime-link.spec.ts can reuse a full match instead of duplicating it.
+5. e2e/platform/realtime-link.spec.ts: three specs -- direct link + full match with no input frame
+   on the relay socket; cut the link mid-match, assert relay within 1s and the match still
+   completes; TV reload brings the phone back to its path after room:host connected true. Each
+   branches on supportsRtc() for WebKit (assert relay, or skip the cut case, when unsupported).
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 Verify: pnpm check, pnpm test, pnpm build, pnpm e2e.
+
+AC4 finding: on this machine (macOS, local Playwright), Playwright's WebKit build DOES expose
+RTCPeerConnection and the phone reaches the direct path in all three specs, same as Chromium --
+confirmed by running `playwright test platform/realtime-link.spec.ts --project=webkit`, all 3
+green with no relay-path branch or skip triggered. CI runs on ubuntu-latest; that WebKit build's
+RTCPeerConnection support is unconfirmed until the PR's CI run, so the specs branch on
+supportsRtc() at runtime rather than hard-coding an expectation per project -- whichever way CI's
+WebKit goes, the specs assert the right path (or skip the cut case with a clear reason) instead of
+failing.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added e2e/platform/realtime-link.spec.ts with the three specs from docs/architecture/realtime-link.md's
+Testing section: a phone reaches the direct link and plays a full Target Range match with no input
+frame on its relay socket; cutting the link through the test hook moves it to relay within 1 second
+and the match still completes; and a TV reload brings the phone's link back after
+room:host { connected: true }. All three branch on RTCPeerConnection support per browser engine and
+assert the relay path (or skip the cut case) on a WebKit build without WebRTC (AC4) -- on this
+machine's Playwright WebKit, RTCPeerConnection is supported and the direct path is reached, same as
+Chromium.
+
+ControllerLink gained a debugCut() test hook, wired to window.__couchcadeLink in dev builds only
+(apps/controller/src/runtime/link-test-hook.ts, App.vue), the same dev-only pattern the motion sensor
+hook uses. e2e/src/link.ts drives it, records relay-socket frames and checks RTC support.
+e2e/src/fixtures.ts grew hostSearch/search options so a spec can open with ?link=1 (both apps' link
+switch defaults off). Target Range's bot-match helpers moved from games/target-range.spec.ts into
+e2e/src/target-range.ts (matching the existing quick-draw.ts split) so this suite reuses a full match
+instead of duplicating it.
+
+All three new specs plus the full 28-test e2e suite pass on both chromium and webkit projects, with
+pnpm check, pnpm test and pnpm build all green.
+<!-- SECTION:FINAL_SUMMARY:END -->
