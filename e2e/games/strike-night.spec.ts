@@ -89,25 +89,31 @@ function holdStill(phone: Page): { stop(): Promise<void> } {
   };
 }
 
-/** Simulates a bowl by pressing and releasing the big ball button. */
+/** Simulates a bowl with a swipe gesture on the big ball button. */
 async function simpleBowl(phone: Page): Promise<void> {
-  const button = phone.getByRole("button", { name: "Hold the ball, swing, let go" });
-  const box = await button.boundingBox();
-  if (box === null) throw new Error("the ball button is not on screen");
+  // The big action button responds to swipes. For touch mode, we need a swipe up.
+  const locator = phone.locator("div.grip");
+  const box = await locator.boundingBox();
+  if (box === null) throw new Error("the grip area is not on screen");
+
   const x = box.x + box.width / 2;
   const y = box.y + box.height / 2;
+  const swipeDistance = box.height * 0.4; // Swipe up about 40% of the button height
+
+  // Perform a swipe: down -> up motion, which triggers the swipe gesture
   await phone.mouse.move(x, y);
   await phone.mouse.down();
-  // Simulate a quick swing by moving down a bit and then releasing
-  await phone.mouse.move(x, y + 10, { steps: 2 });
+  await phone.mouse.move(x, y - swipeDistance, { steps: 3 });
   await phone.mouse.up();
+  // Give the gesture detector time to process
+  await phone.waitForTimeout(100);
 }
 
 test("two bots play a full 10-frame match and the match completes with a results screen", async ({
   host,
   phones,
 }) => {
-  test.setTimeout(360_000); // 6 minutes for a full 10-frame match with 2 players
+  test.setTimeout(120_000); // 2 minutes - enough for a few frames, fails fast if stalled
 
   const code = await openRoom(host);
   const [ana] = await phones(1, { motion: { permission: "denied" } });
@@ -147,57 +153,75 @@ test("two bots play a full 10-frame match and the match completes with a results
     // Wait for the first lineup phase
     await expect.poll(async () => (await tvState(host))?.phase, { timeout: 15_000 }).toBe("lineup");
 
-    // Play all 10 frames. For each turn, we send a simple bowl input.
-    // The game will cycle through turns automatically based on strikes/spares.
-    // Continue until the match is over (phase becomes "over").
-    for (let turnCount = 0; turnCount < 100; turnCount++) {
+    // Play frames until the match is over or we hit a limit. Each frame has 1-2 rolls depending
+    // on strikes. A typical match has ~15-20 rolls total (less if there are many strikes).
+    let lastTurn = 0;
+    for (let rollCount = 0; rollCount < 30; rollCount++) {
       const state = await tvState(host);
-      if (state?.phase === "over") {
-        break;
-      }
 
-      if (state === null) {
-        throw new Error("game state unavailable");
-      }
+      if (state === null) throw new Error("game state unavailable");
+      if (state.phase === "over") break;
 
-      if (state.phase === "lineup") {
-        // A bowler is ready. Send a bowl input.
-        const bowlerPhone = state.bowler === "Ana" ? ana : ben;
-        await simpleBowl(bowlerPhone);
-
-        // Wait for the phase to change from lineup (to rolling, result, frameEnd, or over)
-        await host.waitForFunction(
-          () => {
-            const s = window.__strikeNightState?.();
-            return s?.phase !== "lineup";
-          },
-          undefined,
-          { polling: 100, timeout: 30_000 },
+      // Detect if we're making progress by checking if turn number increases
+      if (state.turn === lastTurn && rollCount > 0) {
+        throw new Error(
+          `Match stalled on turn ${lastTurn}; no progress after ${rollCount} iterations`,
         );
-      } else {
-        // Wait for the next lineup
+      }
+      lastTurn = state.turn;
+
+      if (state.phase !== "lineup") {
+        // Wait for lineup with a shorter timeout (5 sec per phase transition)
         await host.waitForFunction(
           () => {
             const s = window.__strikeNightState?.();
             return s?.phase === "lineup";
           },
           undefined,
-          { polling: 100, timeout: 30_000 },
+          { polling: 50, timeout: 5_000 },
         );
+        continue;
       }
+
+      // In lineup phase: send a bowl input
+      const bowlerPhone = state.bowler === "Ana" ? ana : ben;
+      try {
+        await simpleBowl(bowlerPhone);
+      } catch (err) {
+        throw new Error(`Failed to bowl for ${state.bowler}: ${err}`);
+      }
+
+      // Wait for phase to leave lineup (to rolling, result, frameEnd, or over)
+      await host.waitForFunction(
+        () => {
+          const s = window.__strikeNightState?.();
+          return s?.phase !== "lineup";
+        },
+        undefined,
+        { polling: 50, timeout: 5_000 },
+      );
     }
 
-    // The match is over. Verify the results screen shows both players.
+    // The match should be over now
+    const finalState = await tvState(host);
+    if (finalState?.phase !== "over") {
+      throw new Error(`Match did not complete; final phase is ${finalState?.phase}, not 'over'`);
+    }
+
+    // Verify the results screen shows both players
     const tvResults = host.getByRole("region", { name: "Results" });
     await expect(tvResults).toBeVisible();
-    // Check that one of the players won (there should be a winner heading)
+
+    // Check for a winner heading with actual winner text (not just any heading)
     const winnerHeading = tvResults.getByRole("heading");
     await expect(winnerHeading).toBeVisible();
+    // Verify it's a winner declaration, not an error or empty state
+    await expect(winnerHeading).toContainText(/wins|tie/i);
   } finally {
     await resting.stop();
   }
 
-  // Both players should see the results screen
+  // Final state assertions
   const final = await tvState(host);
   if (final === null) throw new Error("expected final state");
   expect(final.phase).toBe("over");
