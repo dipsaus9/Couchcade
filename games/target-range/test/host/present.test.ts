@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { tickMs } from "@couchcade/game-sdk/contract";
 import { createPlayers } from "@couchcade/game-sdk/testing";
-import { AIM_PLAYBACK_DELAY_MS, aimAt } from "@couchcade/game-sdk/input";
 import { SHAPE_SIZE } from "@couchcade/stage/draw";
 import { world } from "@couchcade/theme";
+import { createCrosshairPlayback } from "../../src/host/aim-playback.ts";
 import {
   calloutAt,
   crosshairShapeBox,
@@ -156,25 +157,14 @@ describe("present", () => {
     expect(present(opened, options)).toEqual(present(structuredClone(opened), options));
   });
 
-  it("shows a crosshair only for aiming players, in seat order, 250 ms behind the aim", () => {
-    const openAtMs = opened.openAtMs as number;
-    const track = [
-      [openAtMs + 100, 0.1, 0.2],
-      [openAtMs + 400, 0.3, -0.1],
-    ] as const;
-    const state = withPlayers({ ...opened, nowMs: openAtMs + 500 }, (i) =>
-      i === 2 || i === 0 ? { aiming: true, aim: [...track] } : {},
-    );
-    const view = present(state, options);
-    const expected = aimPoint(aimAt([...track], openAtMs + 500) ?? { yaw: 0, pitch: 0 });
-    expect(aimAt([...track], openAtMs + 500)).toEqual(
-      aimAt([...track], openAtMs + 500, AIM_PLAYBACK_DELAY_MS),
-    );
-    expect(view.crosshairs).toEqual([
-      { id: id(0), x: Math.round(expected.x), y: Math.round(expected.y) },
-      { id: id(2), x: Math.round(expected.x), y: Math.round(expected.y) },
-    ]);
-    expect(present({ ...state, phase: "landing" }, options).crosshairs).toEqual([]);
+  it("threads whatever crosshairs it's given straight through, in the order given", () => {
+    const crosshairs = [
+      { id: id(2), x: 10, y: 20 },
+      { id: id(0), x: 30, y: 40 },
+    ];
+    expect(present(opened, { ...options, crosshairs }).crosshairs).toEqual(crosshairs);
+    // Defaults to none, such as before the scene has a frame to play back.
+    expect(present(opened, options).crosshairs).toEqual([]);
   });
 
   it("flies an arrow from its Pip's bow and sticks it where it lands, wobbling for 2 frames", () => {
@@ -284,10 +274,12 @@ describe("present", () => {
 
   it("keeps a whole 8-player bot match inside the world, with at most one crosshair and arrow per seat", () => {
     const bots = botRoom(8, 2, spreadBots);
+    const crosshairPlayback = createCrosshairPlayback();
     const seen = new Set<string>();
     while (!bots.room.over) {
       const state = bots.step();
-      const view = present(state, options);
+      const crosshairs = crosshairPlayback.at(state, tickMs, () => 0);
+      const view = present(state, { ...options, crosshairs });
       for (const crosshair of view.crosshairs) {
         expect(crosshair.x).toBeGreaterThanOrEqual(0);
         expect(crosshair.x).toBeLessThan(world.width);

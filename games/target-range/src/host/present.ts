@@ -1,8 +1,6 @@
 import { motion } from "@couchcade/theme";
 import { tickMs } from "@couchcade/game-sdk/contract";
-import { aimAt } from "@couchcade/game-sdk/input";
 import {
-  aimPoint,
   arrowsPerRound,
   bullseyePoints,
   currentWind,
@@ -141,6 +139,12 @@ export interface PresentOptions {
   reducedMotion: boolean;
   /** Where the target stood last round, so it slides from there. Null for no slide. */
   previousTarget?: Point | null;
+  /**
+   * Each aiming player's crosshair, already played back by `createCrosshairPlayback`
+   * (`aim-playback.ts`, CC-11.9): `present` only threads them through, so it stays a pure function
+   * of `state` and these options. Defaults to none, such as before the scene has a frame to play back.
+   */
+  crosshairs?: readonly CrosshairPresentation[];
 }
 
 /** "Noor", "Noor and Sam", "Noor, Sam and Kim". */
@@ -342,16 +346,7 @@ export function present(state: TargetRangeState, options: PresentOptions): Prese
       state.arrows.some((arrow) => arrow.playerId === player.id && inVolley(arrow)),
   }));
 
-  const crosshairs =
-    state.phase === "open"
-      ? state.players.flatMap((player): CrosshairPresentation[] => {
-          if (!player.aiming || player.left) return [];
-          const aim = aimAt(player.aim, nowMs);
-          if (aim === null) return [];
-          const point = aimPoint(aim);
-          return [{ id: player.id, x: Math.round(point.x), y: Math.round(point.y) }];
-        })
-      : [];
+  const crosshairs = [...(options.crosshairs ?? [])];
 
   const revealAgeMs = nowMs - state.phaseAtMs;
   const pop = reducedMotion ? 1 : Math.min(1, Math.max(0, revealAgeMs / motion.ui.ms));

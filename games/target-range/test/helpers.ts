@@ -28,9 +28,9 @@ export const shoot = (volley: number, yaw = 0, pitch = 0, power = 1): TargetRang
 
 export const lower = (volley: number): TargetRangeInput => ({ type: "lower", payload: { volley } });
 
-export const aim = (...samples: Array<[number, number, number]>): TargetRangeInput => ({
+export const aim = (yaw: number, pitch: number): TargetRangeInput => ({
   type: "aim",
-  payload: { aim: samples },
+  payload: { yaw, pitch },
 });
 
 export const ctxAt = (atMs: number, nowMs = atMs): InputContext => ({

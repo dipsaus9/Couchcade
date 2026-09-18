@@ -7,8 +7,7 @@
  * The host only says `tr-watch` or `tr-shoot`. Drawing, too weak and shot are this phone's own
  * states, so the button answers the finger at once and a second shot can't happen.
  */
-import { createInputStream } from "@couchcade/game-sdk/input";
-import type { Player } from "@couchcade/game-sdk/contract";
+import type { InputChannel, Player } from "@couchcade/game-sdk/contract";
 import type { PointerPoint } from "@couchcade/motion/fallbacks";
 import { CcBigAction } from "@couchcade/ui";
 import { haptic } from "@couchcade/ui/haptics";
@@ -16,7 +15,7 @@ import { computed, onBeforeUnmount, ref, watch } from "vue";
 import type { TargetRangeInput } from "../shared/input.ts";
 import type { TargetRangeScreen, TargetRangeView } from "../shared/view.ts";
 import AimPad from "./AimPad.vue";
-import { createShotAim, type TargetRangeMotion } from "./aim.ts";
+import { createShotAim, type ShotChannel, type TargetRangeMotion } from "./aim.ts";
 import { useClockSynced } from "./clock-sync.ts";
 import { powerOf, shoots } from "./draw.ts";
 import { present, type DrawPhase } from "./present.ts";
@@ -26,12 +25,22 @@ const props = defineProps<{
   data: TargetRangeView;
   player: Player;
   send(input: TargetRangeInput, eventTimeStamp?: number): unknown;
+  /** Aim, `shoot` and `lower` all go through this one channel (CC-11.9). The runtime always has
+   * it by the time a real-time game's controller mounts (realtime-link.md, "Join"); a no-op
+   * fallback keeps tests and tools that leave it out from throwing. */
+  input?: InputChannel<TargetRangeInput>;
   motion?: TargetRangeMotion;
 }>();
 
+const noopChannel: ShotChannel = {
+  stream: () => {},
+  fire: () => {},
+  last: () => null,
+  clear: () => {},
+};
+
 const synced = useClockSynced();
-const stream = createInputStream<TargetRangeInput>((input, t) => props.send(input, t));
-const aim = createShotAim(stream);
+const aim = createShotAim(props.input ?? noopChannel);
 const mode = ref(aim.mode());
 
 watch(
@@ -131,7 +140,6 @@ function onPad(point: PointerPoint): void {
 
 onBeforeUnmount(() => {
   aim.dispose();
-  stream.dispose();
 });
 </script>
 
