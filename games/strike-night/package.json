@@ -1,0 +1,31 @@
+{
+  "name": "@couchcade/game-strike-night",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Strike Night: hold the ball, swing your arm, let go. Twist your wrist to hook it into the pins. Spec in docs/games/strike-night.md.",
+  "type": "module",
+  "sideEffects": false,
+  "scripts": {
+    "typecheck": "vue-tsc",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@couchcade/game-sdk": "workspace:*",
+    "@couchcade/physics": "workspace:*",
+    "@couchcade/protocol": "workspace:*",
+    "@couchcade/stage": "workspace:*",
+    "@couchcade/theme": "workspace:*",
+    "@couchcade/ui": "workspace:*",
+    "@couchcade/utils": "workspace:*",
+    "phaser": "catalog:",
+    "vue": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@couchcade/config": "workspace:*",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:",
+    "vue-tsc": "catalog:"
+  }
+}
