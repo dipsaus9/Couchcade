@@ -89,31 +89,67 @@ function holdStill(phone: Page): { stop(): Promise<void> } {
   };
 }
 
-/** Simulates a bowl with a swipe gesture on the big ball button. */
-async function simpleBowl(phone: Page): Promise<void> {
-  // The big action button responds to swipes. For touch mode, we need a swipe up.
-  const locator = phone.locator("div.grip");
-  const box = await locator.boundingBox();
-  if (box === null) throw new Error("the grip area is not on screen");
+/**
+ * A bowling swing (motion mode): rotation-rate spike that crosses SWING_START_RATE (120 deg/s) and
+ * peaks at least SWING_MIN_PEAK (240). This is at line 62 of packages/motion/src/gestures/swing.ts.
+ */
+function swingTrace(ms: number): MotionTrace {
+  const samples: unknown[] = [];
+  // Ramp up rotation rate over ~200ms to cross 120 deg/s and peak at 300 deg/s
+  for (let t = 0; t <= ms; t += 1000 / 60) {
+    // z-axis rotation (yaw for bowling swing): ramp up to 300 then fade
+    const phase = Math.min(t, 200) / 200; // 0..1 over ~200ms
+    const rz = phase < 0.5 ? phase * 2 * 300 : (1 - phase) * 600; // Triangle wave peak 300
+    samples.push([
+      Math.round(t),
+      16.7,
+      [0, 0, 0], // accel (still)
+      [0, 6.94, 6.94], // gravity
+      [0.4, -0.2, rz / 360], // rotation rate: z-axis in rad/s (~rz / 360 converts deg to rad)
+    ]);
+  }
+  return {
+    v: 1,
+    gesture: "swing",
+    label: "e2e-bowling-swing",
+    platform: "android",
+    device: "fake adapter",
+    recordedAt: "2026-09-17",
+    rawSigns: "w3c",
+    expect: { events: 1 },
+    marks: [],
+    samples,
+  };
+}
 
-  const x = box.x + box.width / 2;
-  const y = box.y + box.height / 2;
-  const swipeDistance = box.height * 0.4; // Swipe up about 40% of the button height
+/** Simulates a bowl for the given mode (touch or motion). */
+async function simpleBowl(phone: Page, mode: "touch" | "motion"): Promise<void> {
+  if (mode === "touch") {
+    // Touch mode: use mouse swipe on the grip element
+    const locator = phone.locator("div.grip");
+    const box = await locator.boundingBox();
+    if (box === null) throw new Error("the grip area is not on screen");
 
-  // Perform a swipe: down -> up motion, which triggers the swipe gesture
-  await phone.mouse.move(x, y);
-  await phone.mouse.down();
-  await phone.mouse.move(x, y - swipeDistance, { steps: 3 });
-  await phone.mouse.up();
-  // Give the gesture detector time to process
-  await phone.waitForTimeout(100);
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+    const swipeDistance = box.height * 0.4;
+
+    await phone.mouse.move(x, y);
+    await phone.mouse.down();
+    await phone.mouse.move(x, y - swipeDistance, { steps: 3 });
+    await phone.mouse.up();
+    await phone.waitForTimeout(100);
+  } else {
+    // Motion mode: inject a swing-shaped motion trace with rotation-rate spike
+    await playMotionTrace(phone, swingTrace(300));
+  }
 }
 
 test("two bots play a full 10-frame match and the match completes with a results screen", async ({
   host,
   phones,
 }) => {
-  test.setTimeout(120_000); // 2 minutes - enough for a few frames, fails fast if stalled
+  test.setTimeout(600_000); // 10 minutes - allows time for 30 rolls at ~20s each (including auto-roll fallback)
 
   const code = await openRoom(host);
   const [ana] = await phones(1, { motion: { permission: "denied" } });
@@ -171,34 +207,37 @@ test("two bots play a full 10-frame match and the match completes with a results
       lastTurn = state.turn;
 
       if (state.phase !== "lineup") {
-        // Wait for lineup with a shorter timeout (5 sec per phase transition)
+        // Wait for lineup. Allow up to 20s for the game's own auto-roll fallback to kick in
+        // if the bowler never sends input (turnTimerMs + autoRollWaitMs ~= 20.5s).
         await host.waitForFunction(
           () => {
             const s = window.__strikeNightState?.();
             return s?.phase === "lineup";
           },
           undefined,
-          { polling: 50, timeout: 5_000 },
+          { polling: 50, timeout: 20_000 },
         );
         continue;
       }
 
-      // In lineup phase: send a bowl input
+      // In lineup phase: send a bowl input using the appropriate mode
       const bowlerPhone = state.bowler === "Ana" ? ana : ben;
+      const bowlerMode = state.bowler === "Ana" ? "touch" : "motion";
       try {
-        await simpleBowl(bowlerPhone);
+        await simpleBowl(bowlerPhone, bowlerMode);
       } catch (err) {
         throw new Error(`Failed to bowl for ${state.bowler}: ${err}`);
       }
 
-      // Wait for phase to leave lineup (to rolling, result, frameEnd, or over)
+      // Wait for phase to leave lineup (to rolling, result, frameEnd, or over).
+      // Allow up to 20s for auto-roll fallback if the input didn't fire.
       await host.waitForFunction(
         () => {
           const s = window.__strikeNightState?.();
           return s?.phase !== "lineup";
         },
         undefined,
-        { polling: 50, timeout: 5_000 },
+        { polling: 50, timeout: 20_000 },
       );
     }
 
