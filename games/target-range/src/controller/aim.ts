@@ -59,9 +59,19 @@ const noop = (): void => {};
 type Source = Pick<AimSource<unknown>, "aim" | "recentre" | "on">;
 
 export function createShotAim(stream: ShotStream, options: AimSenderOptions = {}): ShotAim {
-  // The sender only sends `aim`. Naming the type here keeps the stream typed to this game's inputs.
+  // CC-3.21 moved createAimSender onto the game SDK's InputChannel (one channel.stream call per
+  // sample, no packing). This game still sends over the plain CC-3.6 stream until CC-11.9 moves it
+  // to the InputChannel too, so this adapter re-packs each single sample into today's wire shape
+  // (`{ aim: [[dtMs, yaw, pitch]] }`, one entry). `stream.set`'s own pacing still caps this at 4
+  // messages a second; CC-11.9 removes this shim along with the packed schema.
   const sender = createAimSender(
-    { set: (input, t) => stream.set({ type: "aim", payload: input.payload }, t) },
+    {
+      stream: (input, t) =>
+        stream.set(
+          { type: "aim", payload: { aim: [[0, input.payload.yaw, input.payload.pitch]] } },
+          t,
+        ),
+    },
     options,
   );
 

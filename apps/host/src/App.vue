@@ -2,9 +2,11 @@
 import { audio } from "@couchcade/audio";
 import { roomClock } from "@couchcade/game-sdk/clock";
 import { onBeforeUnmount, ref, watch } from "vue";
+import { watchButtonPresses } from "./audio/button-press.ts";
 import { isClickForSoundVisible } from "./audio/click-for-sound.ts";
 import { applyHostSettings } from "./audio/host-settings.ts";
 import { applyPhaseMusic } from "./audio/phase-music.ts";
+import { applyPhaseScene } from "./audio/phase-scene.ts";
 import { registerPlatformSounds } from "./audio/platform-sounds.ts";
 import { watchForUnlock } from "./audio/unlock.ts";
 import MotionStepScreen from "./motion/MotionStepScreen.vue";
@@ -42,6 +44,10 @@ registerPlatformSounds();
 const stopWatchingForUnlock = watchForUnlock();
 onBeforeUnmount(stopWatchingForUnlock);
 
+// `press` on every laptop button click (CC-7.7, audio.md's token table).
+const stopWatchingButtonPresses = watchButtonPresses();
+onBeforeUnmount(stopWatchingButtonPresses);
+
 // The `M` key (CC-7.6, audio.md "Host settings" rule 3): toggles mute on any TV screen, except
 // while a text field has focus.
 const stopWatchingMuteHotkey = watchMuteHotkey();
@@ -50,6 +56,9 @@ onBeforeUnmount(stopWatchingMuteHotkey);
 // The music for the phase the TV is showing. `screen.name` already models `playing` (the frame
 // stays empty then), so this covers every phase without reading the runtime's `HostPhase` too.
 watch(() => screen.value.name, applyPhaseMusic);
+
+// The `scene` whoosh on every phase change (CC-7.7, audio.md's token table).
+watch(() => screen.value.name, applyPhaseScene);
 
 // The "Click for sound" chip: shown while the autoplay lock is still shut (owner decision 4), and
 // again if it falls back to locked (Safari suspending on an interruption).

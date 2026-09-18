@@ -27,8 +27,13 @@ describe("lobbyLoop", () => {
   it("is a looping music ref pointing at lobby-loop.ogg", () => {
     expect(lobbyLoop.owner).toBe("platform");
     expect(lobbyLoop.def.bus).toBe("music");
-    expect(lobbyLoop.def.loop).toBe(true);
     expect(lobbyLoop.def.src.endsWith("audio/lobby-loop.ogg")).toBe(true);
+  });
+
+  it("loops sample-accurate startS/endS points, not the whole file (CC-7.7)", () => {
+    // The file carries extra tail audio past endS on purpose (apps/host/CREDITS.md), so this
+    // isn't `loop: true` over the whole buffer.
+    expect(lobbyLoop.def.loop).toEqual({ startS: 0.030204, endS: 22.178821 });
   });
 });
 
