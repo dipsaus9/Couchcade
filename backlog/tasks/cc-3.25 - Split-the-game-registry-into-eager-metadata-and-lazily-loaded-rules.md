@@ -4,11 +4,12 @@ title: Split the game registry into eager metadata and lazily loaded rules
 status: Done
 assignee: []
 created_date: '2026-09-17 22:18'
-updated_date: '2026-09-17 23:03'
+updated_date: '2026-09-18 04:41'
 labels:
   - story
 dependencies: []
 references:
+  - e2e/platform/motion-permission.spec.ts
   - packages/game-sdk/src/contract/index.ts
   - packages/game-sdk/src/registry/index.ts
   - packages/game-sdk/src/index.ts
@@ -117,6 +118,8 @@ was cheap and directly covers new code this story added. Reviewer independently 
 pnpm --filter @couchcade/game-sdk test (304/304), pnpm --filter @couchcade/host test (207/207),
 pnpm --filter @couchcade/budgets test (22/22) and pnpm --filter ./tooling/check-deps run
 check:deps (clean) in the worktree itself.
+
+CI e2e run on PR #130 caught a real regression the review missed: e2e/platform/motion-permission.spec.ts reached into apps/host/src/runtime/games.ts's old single-registry export at runtime via a dynamic import in the browser (not statically importable/typecheckable from a Node context, so pnpm check's typecheck never saw it). Fixed by patching both metaRegistry and gameRegistry there; verified locally (playwright test, chromium project) for motion-permission, quick-draw and host-recovery specs before re-pushing. Added e2e/platform/motion-permission.spec.ts to References.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
