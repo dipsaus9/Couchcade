@@ -16,5 +16,4 @@ export default defineGameMeta({
   realtime: true,
   needsMotion: true,
   scene: "alley",
-  hidden: true,
 });
