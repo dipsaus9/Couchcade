@@ -4,7 +4,7 @@ title: Add E2E tests for the direct link and the relay fallback
 status: Done
 assignee: []
 created_date: '2026-09-17 17:51'
-updated_date: '2026-09-18 06:41'
+updated_date: '2026-09-18 07:00'
 labels:
   - story
 dependencies:
@@ -83,6 +83,21 @@ scoped prerequisite -- the test hook has to live in the app bundle Playwright ac
 against, matching the existing window.__couchcadeMotion pattern (apps/controller/src/motion/adapter.ts),
 and the fixtures/target-range changes are backward-compatible additions needed to open the app
 with ?link=1 and reuse the existing bot-match flow.
+
+CI fix (round 2, after PR #137's first CI run): the first push's AC4 implementation used
+typeof RTCPeerConnection === "function" as the WebKit branch signal, based on a local macOS run
+where that check happened to agree with the actual outcome. On CI's ubuntu-latest runner, that
+check was misleading: RTCPeerConnection exists on Playwright's WebKit there but never completes a
+real connection, so all 3 realtime-link specs hung waiting for "direct" and failed the e2e job
+(3 failed, https://github.com/dipsaus9/Couchcade/actions/runs/35316009775). Replaced the
+feature-detection with observeLinkPath(), which waits for the link's path hook to actually reach
+"direct" and falls back to "relay" once a generous deadline (30s) passes, rather than predicting
+the outcome up front. This matches AC4's intent ("assert the direct path when ... supports
+RTCPeerConnection, otherwise the relay path") using the path the link truly settles on as the
+ground truth instead of a constructor-existence check that doesn't reflect whether a connection
+can actually complete. Re-verified green locally on chromium and webkit (both reach direct here);
+CI's webkit outcome (direct or relay) will show once this push's CI run completes -- either way the
+specs now assert correctly instead of failing.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
