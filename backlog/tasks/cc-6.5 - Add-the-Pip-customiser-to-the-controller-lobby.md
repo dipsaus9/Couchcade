@@ -4,7 +4,7 @@ title: Add the Pip customiser to the controller lobby
 status: Done
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-18 06:33'
+updated_date: '2026-09-18 06:40'
 labels:
   - story
 dependencies:
@@ -61,6 +61,8 @@ Reviewer round 2 (dipsaus-ai:story-reviewer, model sonnet): PASS. Both acceptanc
 Reference amendment 4: e2e/platform/rejoin.spec.ts. CI's e2e job failed on 'a phone closed mid-game rejoins with the same seat...': it snapshots the player's room:welcome right after the original join as 'seated' and later asserts the reconnect's room:welcome toEqual(seated) verbatim. That snapshot is taken before LobbyScreen.vue's new reconcileOnEntry (CC-6.5) sends its one player:profile correction, so 'seated' froze the pre-reconcile default {0,0,0} profile; by the time the phone reconnects, the server's player list already reflects the corrected profile from that earlier send, so the two objects differ only in 'profile'. The test's own comment says the intent is 'same id, name, seat... and join time' -- profile identity was never the point, it only held by coincidence because no code ever changed a profile before this story. Narrowed the assertion to the fields the comment names.
 
 CI (round 2 push) e2e job failed: platform/rejoin.spec.ts's toEqual(seated) comparison included Pip profile, which the new on-entry reconcile legitimately changes between the original join and a later reconnect (see Reference amendment 4 note). Fixed the assertion, verified locally: rejoin.spec.ts passes on chromium and webkit, full platform/ suite (8 specs) and games/ suite (3 specs) pass on chromium, e2e package typecheck clean. Not re-running story-reviewer for this narrow, test-only, CI-driven fix (round 2 already passed on the feature code; this is outside that diff) -- documented here instead.
+
+CI green on PR #136: check, check:deps, check:style, test, build, budgets, e2e all pass. Ready for the orchestrator's merge decision.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
