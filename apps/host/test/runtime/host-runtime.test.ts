@@ -1045,6 +1045,7 @@ describe("CC-3.20: WebRTC links", () => {
   it("gives the running game's scene a link() accessor with the relay defaults by default", async () => {
     const { play, sceneLinks } = setup();
     play();
+    await settle();
     const link = sceneLinks.at(-1);
     expect(link?.("PLAYER99")).toEqual({ path: "relay", rttMs: null, playbackDelayMs: 180 });
   });
