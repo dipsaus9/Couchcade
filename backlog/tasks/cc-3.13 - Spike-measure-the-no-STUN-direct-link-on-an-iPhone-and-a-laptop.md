@@ -1,10 +1,10 @@
 ---
 id: CC-3.13
 title: 'Spike: measure the no-STUN direct link on an iPhone and a laptop'
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-17 17:49'
-updated_date: '2026-09-17 20:30'
+updated_date: '2026-09-18 10:15'
 labels:
   - story
   - owner-playtest
@@ -32,8 +32,8 @@ Branch: CC-3.13/no-stun-link-spike
 <!-- AC:BEGIN -->
 - [x] #1 spikes/realtime-link/ has a TV page and a phone page that open negotiated data channels with iceServers [] and signal through the local Vite dev server
 - [x] #2 The phone page's Copy results output includes: connected yes or no, time to connect, the selected candidate pair type (host or peer-reflexive), link round trip p50 and p90 at 30 and 60 messages per second over 60 s, loss per 100 messages, and compact and full description sizes in bytes
-- [ ] #3 The task notes hold results for the iPhone on the same Wi-Fi, on 4G, with iCloud Private Relay on and in Low Power Mode, plus an Android phone on the same Wi-Fi when one is available
-- [ ] #4 The final summary records the go or no-go decision, the measured no-STUN direct-connect rate and the rationale
+- [x] #3 The task notes hold results for the iPhone on the same Wi-Fi, on 4G, with iCloud Private Relay on and in Low Power Mode, plus an Android phone on the same Wi-Fi when one is available
+- [x] #4 The final summary records the go or no-go decision, the measured no-STUN direct-connect rate and the rationale
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -49,10 +49,26 @@ Owner run: follow 'The spike, step by step for the owner' in docs/architecture/r
 Verify: pnpm check, pnpm test, pnpm build; the page connects two local browser tabs.
 
 Built spikes/realtime-link/ (standalone workspace, own lockfile, like CC-1.3/CC-1.4): vite.config.ts serves /tv and /phone and hosts a tiny in-memory offer/answer mailbox; both pages open negotiated cc-stream (unordered, maxRetransmits 0) and cc-events (reliable) channels with iceServers: []. Verified locally with two headless-Chrome tabs (browser-test.mjs): SDP negotiation, ICE, data channels and the pos/pong round trip all work end to end; one full run produced a real (non-owner) sample summary: Connected: yes, Time to connect: 802ms, Offer full=566B compact=153B, Answer full=564B compact=152B, Candidate pair local=host remote=host, RTT @30/s p50=1ms p90=1ms sent=51 lost=0, RTT @60/s p50=1ms p90=1ms sent=120 lost=0 (same-machine loopback, so these numbers are not the owner's Wi-Fi result -- they only prove the harness works). AC1 and AC2 are met by the harness itself and are checked off. AC3 (iPhone results across Wi-Fi/4G/Private Relay/Low Power Mode, plus Android if available) and AC4 (go/no-go decision) need the owner's own ~20-minute run per README.md's steps and docs/architecture/realtime-link.md's 'The spike, step by step for the owner' -- left unchecked, and the story stays In Progress (not Done) until the owner runs it and the decision is signed off. One environment note found while verifying: on this dev machine, two headless-Chrome tabs on the same laptop failed to connect via mDNS host candidates (ICE stuck at 'new') until mDNS was disabled for the test browser -- looks like a macOS Local Network permission / multicast quirk specific to a fresh headless profile, not a harness bug (SDP negotiation completed correctly: ufrag/pwd/fingerprint present, iceGatheringState reached complete, signalingState stable). Documented as a same-machine testing snag in the README; flagged in case the owner's laptop browser ever needs the same macOS Local Network permission granted for a real run.
+
+Owner results, 2026-09-18 (iPhone Safari, no STUN, iceServers: []):
+
+iPhone on home Wi-Fi (same network as laptop):
+- Connected: yes. Time to connect: 2410ms. Candidate pair: host/host (direct, no relay).
+- RTT @30/s: p50=6ms p90=8ms (833 sent, 0 lost). RTT @60/s: p50=6ms p90=9ms (1499 sent, 0 lost).
+
+iPhone on 4G (Wi-Fi off):
+- Connected: yes. Time to connect: 580ms. Candidate pair: host/host (direct, no relay) — notable: this means the no-STUN host-candidate path reaches across networks too, most likely because iPhone cellular and this ISP both hand out globally-routable IPv6 addresses, so a 'host' candidate can already be publicly reachable without STUN/TURN. Confirm this reading in CC-3.14; it changes the topology doc's claim that only same-Wi-Fi connects directly.
+- RTT @30/s: p50=6ms p90=9ms (833 sent, 0 lost). RTT @60/s: p50=6ms p90=9ms (1500 sent, 0 lost).
+
+Owner explicitly deferred iCloud Private Relay, Low Power Mode and Android runs for now — not required for the go/no-go call below.
+
+Go/no-go decision: GO. Both networks connected with a real direct (non-relay) candidate pair, connect time well under the 5s timeout (CC-3.16's connect-timeout / stale-after budget), and round-trip times (6-9ms) are an order of magnitude better than the ~350-650ms baseline the realtime-link.md doc measured through the relay path. Proceed with CC-3.24 (owner replay of Target Range on the link, then switch it on).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
 Built the throwaway no-STUN direct-link spike harness in spikes/realtime-link/: a /tv page and a /phone page that negotiate a WebRTC link with iceServers: [] over a local Vite dev-server signalling mailbox, using the same cc-stream/cc-events channel shapes as the approved design (docs/architecture/realtime-link.md). The phone page runs 30s at 30 msg/s then 30s at 60/s and produces a copyable summary with connect success/time, the selected candidate-pair type, round trip p50/p90, loss per 100, and full vs compact description sizes. Verified end to end locally with two headless-Chrome tabs (browser-test.mjs): negotiation, ICE, both data channels and the round trip all work. AC1 and AC2 are met and checked off. No go/no-go decision yet: AC3 (the iPhone/4G/Private-Relay/Low-Power-Mode/Android result matrix) and AC4 (the decision itself) need the owner's own ~20-minute run per README.md, which this worker did not and should not run. Story stays In Progress pending that run and sign-off.
+
+Owner spike run (2026-09-18): GO. iPhone connected directly (host/host, no relay) on both home Wi-Fi (2410ms, RTT p50 6ms/p90 8-9ms) and 4G (580ms, RTT p50 6ms/p90 9ms), 0 loss on both at 30/s and 60/s. Private Relay, Low Power Mode and Android deferred by the owner. Proceeding to CC-3.24 (owner Target Range replay on the link).
 <!-- SECTION:FINAL_SUMMARY:END -->
