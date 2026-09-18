@@ -5,6 +5,12 @@ import { requestJoin, type FetchFn } from "../join/api.ts";
 import { normaliseName, roomCodeFromSearch, type JoinDraft } from "../join/form.ts";
 import { noTurnstile, type TurnstileProvider } from "../join/turnstile.ts";
 import { keepScreenAwake, lockPortrait, type ScreenWakeLock } from "../device/screen.ts";
+import {
+  browserPlayerStorage,
+  ensureStoredPlayer,
+  type PlayerStorageLike,
+} from "../pips/pip-record.ts";
+import { firstRandomPip } from "../pips/random-pip.ts";
 import { createControllerLink, type ControllerLink } from "../runtime/link.ts";
 import { watchReconnect, type ReconnectWatch } from "../runtime/reconnect.ts";
 import { openRoomSocket, type RoomSocket } from "./socket.ts";
@@ -21,6 +27,8 @@ import {
 export interface PhoneSessionOptions {
   search?: string;
   storage?: SessionStorageLike | null;
+  /** Where the remembered Pip lives (`couchcade:player`, pips.md). Defaults to `localStorage`. */
+  playerStorage?: PlayerStorageLike | null;
   fetchFn?: FetchFn;
   turnstile?: TurnstileProvider;
   /** The room clock inputs are stamped with. Defaults to the shared `roomClock`. */
@@ -53,6 +61,7 @@ export interface PhoneSession {
 export function createPhoneSession({
   search = globalThis.location.search,
   storage = browserSessionStorage(),
+  playerStorage = browserPlayerStorage(),
   fetchFn,
   turnstile = noTurnstile,
   clock = roomClock,
@@ -135,15 +144,17 @@ export function createPhoneSession({
     wakeLock ??= keepScreenAwake();
     lockPortrait();
 
+    const name = normaliseName(draft.name);
+    // The remembered Pip rides along in the join body (pips.md "When the Pip is sent", item 1).
+    // Making one here if this is the phone's first visit means every join always carries a look,
+    // even before the lobby (and its own on-entry reconcile, reconcile.ts) ever renders.
+    const { profile } = ensureStoredPlayer(playerStorage, name, firstRandomPip);
+
     const token = await turnstile.token().catch(() => null);
     const result =
       token === null
         ? ({ ok: false, failure: "turnstile" } as const)
-        : await requestJoin(
-            draft.code,
-            { name: normaliseName(draft.name), turnstile: token },
-            fetchFn,
-          );
+        : await requestJoin(draft.code, { name, turnstile: token, profile }, fetchFn);
     if (!result.ok) {
       if (result.failure === "turnstile") turnstile.reset();
       wakeLock?.release();

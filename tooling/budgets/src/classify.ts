@@ -30,8 +30,18 @@ function belongsToVendor(moduleId: string, vendor: string): boolean {
   );
 }
 
+/** A platform chunk that only loads on demand (a dynamic `import()`), matched by its facade module path. */
+export interface LazyChunkMatcher {
+  name: string;
+  /** A substring of the chunk's `facadeModuleId` (repo-relative folder is enough, e.g. `"apps/controller/src/pips/"`). */
+  path: string;
+}
+
 export interface AppMeasurements {
-  /** Gzip size of every chunk that isn't a game's own code: what loads before a game is picked. */
+  /**
+   * Gzip size of every chunk that is neither a game's own code nor a matched lazy chunk: what a
+   * phone or the TV loads before any game is chosen or any lazy platform screen opens.
+   */
   platformGzipBytes: number;
   /** Gzip size per game id, summed over every chunk Rollup split from that game's own folder. */
   perGame: Map<string, number>;
@@ -39,25 +49,37 @@ export interface AppMeasurements {
   fontsRawBytes: number;
   /** Gzip size per tracked vendor (e.g. `"phaser"`), summed over chunks built from its modules. */
   vendorGzipBytes: Map<string, number>;
+  /**
+   * Gzip size per matched `LazyChunkMatcher` name, summed over the chunks Rollup split for it.
+   * These chunks are excluded from `platformGzipBytes`: a dynamic `import()` never loads before
+   * the screen it belongs to is opened, so it never inflates what a phone downloads up front.
+   */
+  lazyGzipBytes: Map<string, number>;
 }
 
 /**
- * Classifies one app's build output into platform vs. per-game code, fonts and tracked vendor
- * chunks, purely from what Rollup actually emitted — no maintained list of games or file names.
+ * Classifies one app's build output into platform vs. per-game code, fonts, tracked vendor chunks
+ * and matched lazy (dynamic-import) platform chunks, purely from what Rollup actually emitted — no
+ * maintained list of games or file names.
  *
  * A chunk belongs to a game when Rollup split it from a module under `games/<id>/` (its
  * `facadeModuleId`, or the game's controller entry re-exported through a wrapper chunk still
- * carries that path). Every other chunk is platform code: what a phone or the TV loads before any
- * game is chosen. This is why the per-game phone controller code (`games/<id>/src/controller/`)
- * never inflates the platform budget, and why a game's TV scene never counts against the shared
- * host platform budget either — each is measured on its own.
+ * carries that path). A chunk not a game's belongs to a `lazyChunks` matcher when its
+ * `facadeModuleId` contains that matcher's `path`. Every other chunk is platform code: what a
+ * phone or the TV loads before any game is chosen or any lazy screen opens. This is why the
+ * per-game phone controller code (`games/<id>/src/controller/`) never inflates the platform
+ * budget, why a game's TV scene never counts against the shared host platform budget, and why a
+ * lazily-loaded platform screen (docs/architecture/pips.md's customiser: "a lazy chunk") is
+ * measured on its own instead of folding into the initial-JS ceiling it never actually adds to.
  */
 export function measureApp(
   items: readonly BuiltItem[],
   vendors: readonly string[],
+  lazyChunks: readonly LazyChunkMatcher[] = [],
 ): AppMeasurements {
   const perGame = new Map<string, number>();
   const vendorGzipBytes = new Map<string, number>(vendors.map((v) => [v, 0]));
+  const lazyGzipBytes = new Map<string, number>(lazyChunks.map((l) => [l.name, 0]));
   let platformGzipBytes = 0;
   let fontsRawBytes = 0;
 
@@ -69,10 +91,15 @@ export function measureApp(
 
     const size = gzipSize(item.code);
     const gameMatch = item.facadeModuleId ? GAME_PATH.exec(item.facadeModuleId) : null;
+    const lazyMatch = item.facadeModuleId
+      ? lazyChunks.find((l) => item.facadeModuleId?.includes(l.path))
+      : undefined;
 
     if (gameMatch) {
       const gameId = gameMatch[1] as string;
       perGame.set(gameId, (perGame.get(gameId) ?? 0) + size);
+    } else if (lazyMatch) {
+      lazyGzipBytes.set(lazyMatch.name, (lazyGzipBytes.get(lazyMatch.name) ?? 0) + size);
     } else {
       platformGzipBytes += size;
     }
@@ -84,5 +111,5 @@ export function measureApp(
     }
   }
 
-  return { platformGzipBytes, perGame, fontsRawBytes, vendorGzipBytes };
+  return { platformGzipBytes, perGame, fontsRawBytes, vendorGzipBytes, lazyGzipBytes };
 }
