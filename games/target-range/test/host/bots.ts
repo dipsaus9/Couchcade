@@ -1,6 +1,5 @@
 import { tickTimeMs } from "@couchcade/game-sdk/contract";
 import type { Player } from "@couchcade/game-sdk/contract";
-import { AIM_SAMPLES_PER_MESSAGE } from "@couchcade/game-sdk/input";
 import { createPlayers } from "@couchcade/game-sdk/testing";
 import { volleyOf } from "../../src/shared/index.ts";
 import type { TargetRangeInput, TargetRangeState } from "../../src/shared/index.ts";
@@ -35,9 +34,9 @@ export function namedPlayers(count: number): Player[] {
 const clampUnit = (value: number): number => Math.min(1, Math.max(-1, value));
 const twoDecimals = (value: number): number => Math.round(value * 100) / 100;
 
-/** How often a bot's phone sends a packed aim message: the 4 per second stream cap. */
-const aimMessageMs = 250;
-const sampleMs = aimMessageMs / AIM_SAMPLES_PER_MESSAGE;
+/** How often a bot's phone streams an aim sample: the InputChannel's 30 Hz direct-path cap
+ * (docs/architecture/realtime-link.md, "Rates"). */
+const sampleMs = 1000 / 30;
 
 /**
  * A room whose bots aim and shoot per `plan`. Call `step()` once per frame: it queues the inputs
@@ -71,13 +70,13 @@ export function botRoom(
           pitch: twoDecimals(clampUnit(final.pitch + 0.12 * left - wobble)),
         };
       };
-      for (let ms = shot.aimFromMs + aimMessageMs; ms <= endMs; ms += aimMessageMs) {
-        const samples = Array.from({ length: AIM_SAMPLES_PER_MESSAGE }, (_, index) => {
-          const dt = -Math.round((AIM_SAMPLES_PER_MESSAGE - 1 - index) * sampleMs);
-          const point = aimAt(ms + dt);
-          return [dt, point.yaw, point.pitch] as [number, number, number];
+      for (let ms = shot.aimFromMs + sampleMs; ms <= endMs; ms += sampleMs) {
+        const point = aimAt(ms);
+        pending.push({
+          playerId: player.id,
+          atMs: openAtMs + ms,
+          input: aim(point.yaw, point.pitch),
         });
-        pending.push({ playerId: player.id, atMs: openAtMs + ms, input: aim(...samples) });
       }
       if (shot.shootMs !== null) {
         pending.push({

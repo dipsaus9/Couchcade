@@ -50,7 +50,7 @@ type Match = {
 };
 
 function inputOf({ kind, volley, yaw, pitch, power }: Match["events"][number]): TargetRangeInput {
-  if (kind === "aim") return aim([-67, yaw, pitch], [0, pitch, yaw]);
+  if (kind === "aim") return aim(yaw, pitch);
   return kind === "shoot" ? shoot(volley, yaw, pitch, power) : lower(volley);
 }
 

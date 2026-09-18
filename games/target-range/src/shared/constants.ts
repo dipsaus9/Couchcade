@@ -56,10 +56,21 @@ export const worldHeight = 270;
 /** Where the crosshair sits when `yaw = 0` and `pitch = 0`. */
 export const aimHomeX = 240;
 export const aimHomeY = 140;
-/** World px from the home to a full `yaw` of ±1 (±25° with the motion defaults). */
+/** World px from the home to a full `yaw` of ±1. */
 export const yawPx = 200;
-/** World px from the home to a full `pitch` of ±1 (±15° with the motion defaults). */
+/** World px from the home to a full `pitch` of ±1. */
 export const pitchPx = 90;
+
+/**
+ * World px of aim movement per degree the phone turns, in both directions (owner decision,
+ * docs/architecture/realtime-link.md, "Tuning Target Range's aim speed"). The controller derives
+ * `yawRangeDeg` (33.3°) and `pitchRangeDeg` (15°) from this and `yawPx`/`pitchPx` and passes them
+ * to `createAimDetector`, so yaw and pitch feel the same speed instead of yaw's old third-faster
+ * 8 px/degree.
+ */
+export const aimPxPerDegree = 6;
+/** World px of aim movement per CSS px of touch-pad drag, in both directions (same tuning). */
+export const padPxPerCssPx = 1.5;
 
 /** The target centre lies in `x` 160 to 320 and `y` 110 to 160, in steps of 2 px. */
 export const targetMinX = 160;

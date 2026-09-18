@@ -162,12 +162,7 @@ describe("round flow", () => {
 
 describe("shooting", () => {
   it("flies the arrow from the aim at release with the volley's wind, not from the crosshair", () => {
-    let state = onPlayerInput(
-      openVolley(),
-      alice,
-      aim([-200, 0.9, 0.9], [0, 0.8, 0.8]),
-      ctxAt(21_000),
-    );
+    let state = onPlayerInput(openVolley(), alice, aim(0.8, 0.8), ctxAt(21_000));
     state = onPlayerInput(state, alice, shoot(8, -0.2, 0.1, 1), ctxAt(21_500, 21_700));
     const [arrow] = state.arrows;
     expect(arrow).toMatchObject({
@@ -209,7 +204,7 @@ describe("shooting", () => {
   it("counts only the first shot of a volley", () => {
     const first = onPlayerInput(openVolley(), alice, shoot(8), ctxAt(21_000));
     expect(onPlayerInput(first, alice, shoot(8, 0.3), ctxAt(21_000))).toBe(first);
-    expect(onPlayerInput(first, alice, aim([0, 0.1, 0.1]), ctxAt(21_000))).toBe(first);
+    expect(onPlayerInput(first, alice, aim(0.1, 0.1), ctxAt(21_000))).toBe(first);
   });
 
   it("ignores a shot for another volley, before the volley opened, or outside open and landing", () => {
@@ -226,12 +221,8 @@ describe("shooting", () => {
   });
 
   it("shows a crosshair from the first aim sample, and hides it on lower so the player can draw again", () => {
-    let state = onPlayerInput(
-      openVolley(),
-      bob,
-      aim([-67, 0.1, 0.2], [0, 0.12, 0.2]),
-      ctxAt(21_000),
-    );
+    let state = onPlayerInput(openVolley(), bob, aim(0.1, 0.2), ctxAt(20_933));
+    state = onPlayerInput(state, bob, aim(0.12, 0.2), ctxAt(21_000));
     expect(playerOf(state, bob.id)).toMatchObject({
       aiming: true,
       aim: [
@@ -248,8 +239,8 @@ describe("shooting", () => {
 
   it("ignores aim outside open, and hides every crosshair when the volley closes", () => {
     const landing = timedOutVolley();
-    expect(onPlayerInput(landing, bob, aim([0, 0, 0]), ctxAt(30_100))).toBe(landing);
-    const aiming = onPlayerInput(openVolley(), bob, aim([0, 0, 0]), ctxAt(21_000));
+    expect(onPlayerInput(landing, bob, aim(0, 0), ctxAt(30_100))).toBe(landing);
+    const aiming = onPlayerInput(openVolley(), bob, aim(0, 0), ctxAt(21_000));
     const closed = onTick({ ...aiming, nowMs: 30_000 - tickMs }, tickMs);
     expect(closed.phase).toBe("landing");
     expect(playerOf(closed, bob.id)).toMatchObject({ aiming: false, aim: [] });

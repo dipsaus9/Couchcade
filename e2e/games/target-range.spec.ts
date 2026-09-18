@@ -31,8 +31,10 @@ const rounds = [
 /** The crosshair's home in the TV world, and world px per unit of yaw and pitch. */
 const home = { x: 240, y: 140 };
 const unitPx = { yaw: 200, pitch: 90 };
-/** Pad px per unit of yaw and pitch: 200 px drag the whole −1..1 yaw range, 150 px pitch. */
-const padPx = { yaw: 100, pitch: 75 };
+// `padPxPerCssPx = 1.5` (games/target-range/src/shared/constants.ts, CC-11.9): the whole −1..1
+// yaw range is a 2 × 200 / 1.5 ≈ 266.7 px drag, pitch 2 × 90 / 1.5 = 120 px.
+/** Pad px per unit of yaw and pitch. */
+const padPx = { yaw: (2 * unitPx.yaw) / 1.5 / 2, pitch: (2 * unitPx.pitch) / 1.5 / 2 };
 /** A pull past 150 px is a full draw (games/target-range/src/controller/draw.ts). */
 const fullPullPx = 160;
 
