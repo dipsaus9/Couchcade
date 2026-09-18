@@ -81,15 +81,15 @@ describe("createAimDetector", () => {
     expect(detector.aim().pitch).toBeCloseTo(0.5, 1);
   });
 
-  it("emits -1..1 values rounded to 2 decimals, only when they change", () => {
+  it("emits -1..1 values rounded to 3 decimals, only when they change", () => {
     const heading = ease(0, 20, MOVE_START, MOVE_END);
     const elevation = ease(10, 0, MOVE_START, MOVE_END);
     const emitted = run(poseReadings(aimSamples({ durationMs: DURATION, heading, elevation })));
     expect(emitted.length).toBeGreaterThan(10);
     for (const reading of emitted) {
       expect(Object.keys(reading).toSorted()).toEqual(["pitch", "t", "yaw"]);
-      expect(Math.round(reading.yaw * 100) / 100).toBe(reading.yaw);
-      expect(Math.round(reading.pitch * 100) / 100).toBe(reading.pitch);
+      expect(Math.round(reading.yaw * 1000) / 1000).toBe(reading.yaw);
+      expect(Math.round(reading.pitch * 1000) / 1000).toBe(reading.pitch);
     }
     const steps = emitted.slice(1).map((reading, index) => {
       const previous = emitted[index] ?? reading;
