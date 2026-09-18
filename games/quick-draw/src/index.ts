@@ -1,4 +1,5 @@
 import { defineGame } from "@couchcade/game-sdk/contract";
+import meta from "./meta.ts";
 import {
   init,
   inputSchema,
@@ -12,17 +13,13 @@ import {
 } from "./shared/index.ts";
 
 /**
- * Quick Draw's complete definition (docs/games/quick-draw.md). Nothing registers it by hand: the
- * host's registry finds this file by its folder (apps/host/src/runtime/games.ts), and phones find
- * `./controller/index.ts` the same way. e2e/games/quick-draw.spec.ts plays a match through both.
+ * Quick Draw's complete definition (docs/games/quick-draw.md). Loaded lazily, once a room starts
+ * this game (apps/host/src/runtime/games.ts, CC-3.25): the host's eager menu reads only
+ * `./meta.ts`. Phones find `./controller/index.ts` the same way. e2e/games/quick-draw.spec.ts
+ * plays a match through both.
  */
 export default defineGame({
-  id: "quick-draw",
-  title: "Quick Draw",
-  players: { min: 1, max: 8 },
-  realtime: true,
-  needsMotion: false,
-  scene: "desert",
+  ...meta,
   inputSchema,
 
   init,

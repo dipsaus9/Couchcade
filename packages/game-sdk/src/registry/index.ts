@@ -5,9 +5,13 @@
  * package may not import from `games/` and Vite resolves a glob relative to the file that has it:
  *
  * ```ts
- * // apps/host: eager, the menu needs every title and player count
- * export const registry = createRegistry(
- *   import.meta.glob("../../../../games/*\/src/index.ts", { eager: true, import: "default" }),
+ * // apps/host: eager, the menu needs every title and player count without loading a game's rules
+ * export const metaRegistry = createGameMetaRegistry(
+ *   import.meta.glob("../../../../games/*\/src/meta.ts", { eager: true, import: "default" }),
+ * );
+ * // apps/host: lazy, the full game (physics included) loads once a room actually starts it
+ * export const gameRegistry = createLazyGameRegistry(
+ *   import.meta.glob("../../../../games/*\/src/index.ts", { import: "default" }),
  * );
  * // apps/controller: lazy, over each game's phone entry only
  * export const controllers = createControllerRegistry(
@@ -15,19 +19,39 @@
  * );
  * ```
  *
- * Nobody edits a list of games. With no games yet the glob is `{}` and the registry is empty.
+ * Nobody edits a list of games. With no games yet a glob is `{}` and its registry is empty.
  * Phones never load a game's `src/index.ts`, so physics and host-only shared code stay off them
- * (owner decision, 16 September 2026).
+ * (owner decision, 16 September 2026). The host's own platform bundle doesn't load it either until
+ * a room starts that game, for the same reason (CC-3.25): a game's rules can be as heavy as they
+ * need (Planck.js and friends) without inflating the shared platform bundle every game pays for.
  */
-import { checkControllerDefinition, checkGameDefinition } from "../contract/index.ts";
-import type { CouchcadeController, CouchcadeGame } from "../contract/index.ts";
+import {
+  checkControllerDefinition,
+  checkGameDefinition,
+  checkGameMeta,
+} from "../contract/index.ts";
+import type { CouchcadeController, CouchcadeGame, GameMeta } from "../contract/index.ts";
 
-export interface GameRegistry {
-  /** Every game, sorted by title. */
-  readonly games: readonly CouchcadeGame[];
+export interface GameMetaRegistry {
+  /** Every non-hidden game's metadata, sorted by title. */
+  readonly games: readonly GameMeta[];
   has(id: string): boolean;
-  /** The game with this id, or undefined for an unknown id. */
-  get(id: string): CouchcadeGame | undefined;
+  /** The metadata for this id, or undefined for an unknown or hidden id. Loads nothing. */
+  get(id: string): GameMeta | undefined;
+}
+
+export interface LazyGameRegistry {
+  /** The id of every game (hidden included), from its folder name, sorted. Loads nothing. */
+  readonly ids: readonly string[];
+  has(id: string): boolean;
+  /**
+   * Loads the full game for this id, once. Rejects with `UnknownGameError` for an id no game
+   * folder has, and with a `TypeError` when the entry is invalid or its id doesn't match its
+   * folder. A failed load isn't cached, so a dropped chunk can be retried. Doesn't itself check
+   * `hidden` — callers reach a game id through `GameMetaRegistry`, which already leaves hidden
+   * games out, so nothing offers one to load in the first place.
+   */
+  load(id: string): Promise<CouchcadeGame>;
 }
 
 export interface ControllerRegistry {
@@ -91,21 +115,23 @@ function expectEntry(path: string, id: string, entry: unknown, problems: string[
 }
 
 /**
- * Builds the host registry from an eager glob: `{ "<...>/<id>/src/index.ts": game }`. Throws when
- * a module isn't a valid game (see `checkGameDefinition`), when an id doesn't match its folder, or
+ * Builds the eager metadata registry from `{ "<...>/<id>/src/meta.ts": meta }`. Throws when an
+ * entry isn't a valid `GameMeta` (see `checkGameMeta`), when an id doesn't match its folder, or
  * when two games share an id. A game with `hidden: true` is checked the same way but left out, so
  * an unfinished game is never on the menu and can't be started.
  */
-export function createRegistry(modules: Readonly<Record<string, unknown>>): GameRegistry {
+export function createGameMetaRegistry(
+  modules: Readonly<Record<string, unknown>>,
+): GameMetaRegistry {
   const games = [...pathsById(Object.keys(modules))]
     .map(([id, path]) => {
-      const game = modules[path];
-      expectEntry(path, id, game, checkGameDefinition(game));
-      return game as CouchcadeGame;
+      const meta = modules[path];
+      expectEntry(path, id, meta, checkGameMeta(meta));
+      return meta as GameMeta;
     })
-    .filter((game) => game.hidden !== true)
+    .filter((meta) => meta.hidden !== true)
     .toSorted((a, b) => a.title.localeCompare(b.title, "en") || a.id.localeCompare(b.id, "en"));
-  const byId = new Map(games.map((game) => [game.id, game]));
+  const byId = new Map(games.map((meta) => [meta.id, meta]));
 
   return {
     games,
@@ -115,16 +141,16 @@ export function createRegistry(modules: Readonly<Record<string, unknown>>): Game
 }
 
 /**
- * Builds the phone registry from a lazy glob:
- * `{ "<...>/<id>/src/controller/index.ts": () => import(...) }`. Ids come from folder names, so
- * nothing loads until `load(id)`. Throws when two entries share an id.
+ * A registry over a lazy glob, loaded once per id and cached. Shared by `createLazyGameRegistry`
+ * and `createControllerRegistry`, which differ only in how they validate a loaded entry.
  */
-export function createControllerRegistry(
+function createLazyRegistry<T extends { id: string }>(
   loaders: Readonly<Record<string, () => Promise<unknown>>>,
-): ControllerRegistry {
+  check: (entry: unknown) => string[],
+): { ids: readonly string[]; has(id: string): boolean; load(id: string): Promise<T> } {
   const byId = pathsById(Object.keys(loaders));
   const ids = [...byId.keys()].toSorted((a, b) => a.localeCompare(b, "en"));
-  const loading = new Map<string, Promise<CouchcadeController>>();
+  const loading = new Map<string, Promise<T>>();
 
   return {
     ids,
@@ -137,9 +163,9 @@ export function createControllerRegistry(
       }
       let entry = loading.get(id);
       if (entry === undefined) {
-        entry = loader().then((controller) => {
-          expectEntry(path, id, controller, checkControllerDefinition(controller));
-          return controller as CouchcadeController;
+        entry = loader().then((value) => {
+          expectEntry(path, id, value, check(value));
+          return value as T;
         });
         entry.catch(() => loading.delete(id));
         loading.set(id, entry);
@@ -147,4 +173,25 @@ export function createControllerRegistry(
       return entry;
     },
   };
+}
+
+/**
+ * Builds the lazy full-game registry from `{ "<...>/<id>/src/index.ts": () => import(...) }`. Ids
+ * come from folder names, so nothing loads until `load(id)`. Throws when two entries share an id.
+ */
+export function createLazyGameRegistry(
+  loaders: Readonly<Record<string, () => Promise<unknown>>>,
+): LazyGameRegistry {
+  return createLazyRegistry<CouchcadeGame>(loaders, checkGameDefinition);
+}
+
+/**
+ * Builds the phone registry from a lazy glob:
+ * `{ "<...>/<id>/src/controller/index.ts": () => import(...) }`. Ids come from folder names, so
+ * nothing loads until `load(id)`. Throws when two entries share an id.
+ */
+export function createControllerRegistry(
+  loaders: Readonly<Record<string, () => Promise<unknown>>>,
+): ControllerRegistry {
+  return createLazyRegistry<CouchcadeController>(loaders, checkControllerDefinition);
 }

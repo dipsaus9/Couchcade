@@ -7,7 +7,7 @@ import {
   type EndReason,
   type RelayConnection,
 } from "../net/relay-socket.ts";
-import { registry } from "../runtime/games.ts";
+import { gameRegistry, metaRegistry } from "../runtime/games.ts";
 import {
   createHostRuntime,
   type CalibrationScreenState,
@@ -76,7 +76,8 @@ export function useHostSession() {
     let lobby = initialLobby(session.code);
     let connection: ConnectionStatus = "connecting";
     const roomRuntime = createHostRuntime({
-      registry,
+      metaRegistry,
+      gameRegistry,
       stage: phaserStage,
       send: (message) => relay?.send(message),
       onChange: () => show(),

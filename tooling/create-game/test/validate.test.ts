@@ -91,8 +91,9 @@ describe("writeGame", () => {
 
     const read = (path: string) => readFileSync(join(gamesDir, "paddle-panic", path), "utf8");
     expect(read("package.json")).toContain('"name": "@couchcade/game-paddle-panic"');
-    expect(read("src/index.ts")).toContain('id: "paddle-panic"');
-    expect(read("src/index.ts")).toContain('title: "Paddle Panic"');
+    expect(read("src/meta.ts")).toContain('id: "paddle-panic"');
+    expect(read("src/meta.ts")).toContain('title: "Paddle Panic"');
+    expect(read("src/index.ts")).toContain('import meta from "./meta.ts"');
     expect(read("src/shared/rules.ts")).toContain("PaddlePanicState");
     expect(read("src/host/scene.ts")).toContain("paddlePanicSceneKey");
     expect(read("src/host/scene.ts")).toContain("class PaddlePanicScene");
@@ -100,6 +101,7 @@ describe("writeGame", () => {
       "package.json",
       "tsconfig.json",
       "vitest.config.ts",
+      "src/meta.ts",
       "src/index.ts",
       "src/shared/input.ts",
       "src/shared/rules.ts",

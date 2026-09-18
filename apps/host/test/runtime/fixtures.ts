@@ -3,7 +3,14 @@
  * `games/`. The game logs every input and tick in order, echoes what players say into their views,
  * and ends when a player sends `end`.
  */
-import { defineGame, type Outcome, type Player } from "@couchcade/game-sdk/contract";
+import {
+  defineGame,
+  type CouchcadeGame,
+  type GameMeta,
+  type Outcome,
+  type Player,
+} from "@couchcade/game-sdk/contract";
+import { createGameMetaRegistry, createLazyGameRegistry } from "@couchcade/game-sdk/registry";
 import { createPlayers } from "@couchcade/game-sdk/testing";
 import type { RelayToHostMessage } from "@couchcade/protocol";
 import * as z from "zod/mini";
@@ -74,6 +81,29 @@ export function echoGame({ id = "echo", realtime = true, min = 1, max = 8, leave
       return { ...state, log, ended: state.players.length - gone < 2 };
     },
   });
+}
+
+function metaOf(game: CouchcadeGame): GameMeta {
+  const { id, title, players, realtime, needsMotion, scene, hidden } = game;
+  return hidden === undefined
+    ? { id, title, players, realtime, needsMotion, scene }
+    : { id, title, players, realtime, needsMotion, scene, hidden };
+}
+
+/** A `GameMetaRegistry` over these games' own metadata, keyed like the real eager glob (CC-3.25). */
+export function fakeMetaRegistry(games: readonly CouchcadeGame[]) {
+  return createGameMetaRegistry(
+    Object.fromEntries(games.map((game) => [`games/${game.id}/src/meta.ts`, metaOf(game)])),
+  );
+}
+
+/** A `LazyGameRegistry` over these games, keyed like the real lazy glob (CC-3.25). */
+export function fakeGameRegistry(games: readonly CouchcadeGame[]) {
+  return createLazyGameRegistry(
+    Object.fromEntries(
+      games.map((game) => [`games/${game.id}/src/index.ts`, () => Promise.resolve(game)]),
+    ),
+  );
 }
 
 /** A lobby with `count` seated, connected players. The first one is the VIP. */

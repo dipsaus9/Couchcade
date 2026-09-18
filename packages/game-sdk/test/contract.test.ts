@@ -4,9 +4,11 @@ import type { ControllerView, JsonValue, PlayerInfo } from "@couchcade/protocol"
 import {
   checkControllerDefinition,
   checkGameDefinition,
+  checkGameMeta,
   clampInputAtMs,
   defineController,
   defineGame,
+  defineGameMeta,
   maxInputAgeMs,
   tickMs,
   tickTimeMs,
@@ -15,6 +17,7 @@ import type {
   CouchcadeController,
   CouchcadeGame,
   GameInput,
+  GameMeta,
   InputContext,
   Outcome,
   Player,
@@ -25,13 +28,17 @@ import drawRaceController from "../testing/fixtures/draw-race/src/controller/ind
 
 const inputSchema = z.object({ type: z.literal("go"), payload: z.object({ n: z.int() }) });
 
-const minimalGame = {
+const minimalMeta = {
   id: "minimal",
   title: "Minimal",
   players: { min: 1, max: 8 },
   realtime: false,
   needsMotion: false,
   scene: "desert",
+};
+
+const minimalGame = {
+  ...minimalMeta,
   inputSchema,
   init: () => ({ count: 0 }),
   onPlayerInput: (state: { count: number }) => ({ count: state.count + 1 }),
@@ -39,6 +46,20 @@ const minimalGame = {
   outcome: () => null,
   hostScene: () => Promise.reject(new Error("none")),
 };
+
+describe("defineGameMeta", () => {
+  it("returns the metadata unchanged", () => {
+    expect(defineGameMeta(minimalMeta)).toBe(minimalMeta);
+    expectTypeOf(defineGameMeta(minimalMeta)).toEqualTypeOf<GameMeta>();
+  });
+
+  it("has exactly the eager fields games/<id>/src/meta.ts exports (CC-3.25)", () => {
+    expectTypeOf<keyof GameMeta>().toEqualTypeOf<
+      "id" | "title" | "players" | "realtime" | "needsMotion" | "scene" | "hidden"
+    >();
+    expectTypeOf<CouchcadeGame>().toExtend<GameMeta>();
+  });
+});
 
 describe("defineGame", () => {
   it("returns the definition unchanged", () => {
@@ -101,6 +122,32 @@ describe("defineController", () => {
     expect(defineController(entry)).toBe(entry);
     expectTypeOf(defineController(entry)).toEqualTypeOf<CouchcadeController>();
     expectTypeOf<keyof CouchcadeController>().toEqualTypeOf<"id" | "component" | "streams">();
+  });
+});
+
+describe("checkGameMeta", () => {
+  it("accepts a game's eager metadata alone, and the fixture games' too", () => {
+    expect(checkGameMeta(minimalMeta)).toEqual([]);
+    expect(checkGameMeta(drawRace)).toEqual([]);
+    expect(checkGameMeta(pickANumber)).toEqual([]);
+  });
+
+  it.each([
+    [{ id: "Quick_Draw" }, "is not kebab-case"],
+    [{ title: "" }, "title is empty"],
+    [{ title: "Seventeen letters" }, "longer than 16 characters"],
+    [{ players: { min: 0, max: 4 } }, "1 <= min <= max <= 8"],
+    [{ players: { min: 5, max: 4 } }, "1 <= min <= max <= 8"],
+    [{ realtime: "yes" }, "realtime is not a boolean"],
+    [{ needsMotion: 1 }, "needsMotion is not a boolean"],
+    [{ hidden: "yes" }, "hidden is not a boolean"],
+    [{ scene: "" }, "scene is empty"],
+  ])("rejects %o", (change, problem) => {
+    expect(checkGameMeta({ ...minimalMeta, ...change }).join("\n")).toContain(problem);
+  });
+
+  it("rejects anything that isn't an object", () => {
+    expect(checkGameMeta(null)).toEqual(["is not an object"]);
   });
 });
 

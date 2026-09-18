@@ -1,6 +1,6 @@
 import type { ClockScheduler } from "@couchcade/game-sdk/clock";
-import type { CouchcadeGame } from "@couchcade/game-sdk/contract";
-import type { GameRegistry } from "@couchcade/game-sdk/registry";
+import type { GameMeta } from "@couchcade/game-sdk/contract";
+import type { GameMetaRegistry } from "@couchcade/game-sdk/registry";
 import type { ControllerView, PayloadOf } from "@couchcade/protocol";
 import { seatedPlayers, vip, type LobbyState } from "../lobby/lobby-state.ts";
 
@@ -41,12 +41,12 @@ export interface Countdown {
 export type UiAction = PayloadOf<"ui:action">;
 
 /** A game fits when `players.min <= seated <= players.max`. A seat kept for a dropped phone counts. */
-export function fits(game: Pick<CouchcadeGame, "players">, seated: number): boolean {
+export function fits(game: Pick<GameMeta, "players">, seated: number): boolean {
   return game.players.min <= seated && seated <= game.players.max;
 }
 
 /** Every registered game, in the registry's title order, with its fit for `seated` players. */
-export function menuGames(games: readonly CouchcadeGame[], seated: number): MenuGame[] {
+export function menuGames(games: readonly GameMeta[], seated: number): MenuGame[] {
   return games.map((game) => ({
     id: game.id,
     title: game.title,
@@ -98,7 +98,7 @@ export function secondsLeft(startsAt: number, roomNow: number): number {
 }
 
 export interface GameMenuOptions {
-  registry: GameRegistry;
+  registry: GameMetaRegistry;
   /** The latest lobby state: who is seated and who is VIP. */
   lobby(): LobbyState | null;
   /** Room time now, in milliseconds. */
@@ -106,8 +106,11 @@ export interface GameMenuOptions {
   schedule: ClockScheduler;
   /** A number in [0, 1) for "Surprise me". Defaults to `Math.random`. */
   random?: () => number;
-  /** The countdown ended on a game that still fits. The runtime starts it. */
-  onStart(game: CouchcadeGame): void;
+  /**
+   * The countdown ended on a game that still fits. The runtime loads and starts it (CC-3.25: the
+   * menu only ever holds metadata, never the game's full rules).
+   */
+  onStart(gameId: string): void;
   /** The menu opened, or its pick or countdown changed. */
   onChange(): void;
 }
@@ -164,7 +167,7 @@ export function createGameMenu(options: GameMenuOptions): GameMenu {
       countdown = null;
       const game = options.registry.get(gameId);
       // Players may have left during the countdown. Then the card turns grey and nothing starts.
-      if (game !== undefined && fits(game, seated())) options.onStart(game);
+      if (game !== undefined && fits(game, seated())) options.onStart(gameId);
       else options.onChange();
     }, countdownMs);
   }

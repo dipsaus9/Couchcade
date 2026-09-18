@@ -1,4 +1,5 @@
 import { defineGame } from "@couchcade/game-sdk/contract";
+import meta from "./meta.ts";
 import {
   init,
   inputSchema,
@@ -12,17 +13,12 @@ import {
 } from "./shared/index.ts";
 
 /**
- * Target Range's complete definition (docs/games/target-range.md). Nothing registers it by hand:
- * the host's registry finds this file by its folder (apps/host/src/runtime/games.ts), and phones
- * find `./controller/index.ts` the same way.
+ * Target Range's complete definition (docs/games/target-range.md). Loaded lazily, once a room
+ * starts this game (apps/host/src/runtime/games.ts, CC-3.25): the host's eager menu reads only
+ * `./meta.ts`. Phones find `./controller/index.ts` the same way.
  */
 export default defineGame({
-  id: "target-range",
-  title: "Target Range",
-  players: { min: 1, max: 8 },
-  realtime: true,
-  needsMotion: true,
-  scene: "range",
+  ...meta,
   inputSchema,
 
   init,
