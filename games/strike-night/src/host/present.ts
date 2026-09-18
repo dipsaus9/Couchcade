@@ -16,8 +16,8 @@ import {
   frameCount,
   pinSpots,
   pitY,
+  type FrameRecord,
   type PinRuntime,
-  type RollMark,
   type StrikeNightPlayer,
   type StrikeNightState,
 } from "../shared/index.ts";
@@ -85,8 +85,11 @@ export interface PinMapDot {
 export interface ScorecardRow {
   id: string;
   name: string;
-  /** One cell per frame: its mark and score, or null before the frame ends. */
-  frames: ReadonlyArray<{ mark: RollMark | "strike" | null; score: number | null }>;
+  /** In seat order (`@couchcade/stage`'s `players` token index), for the row's shape mark. */
+  slot: number;
+  /** One cell per frame, straight from `FrameRecord`: the overlay derives "X", "7 /" or "7 2"
+   * from `roll1`/`roll2` itself, the same numbers the spec's "Mark on the TV" column shows. */
+  frames: readonly FrameRecord[];
   total: number;
 }
 
@@ -173,26 +176,16 @@ function pinViews(state: StrikeNightState, cache: RollCache, shot: Shot): PinVie
   return views;
 }
 
-/** A player's frame score row for the scorecard, current-frame scoring: a completed frame's mark
- * comes back from its score alone (docs/games/strike-night.md rule 5), since that's all a
- * restored snapshot keeps. */
+/** A player's frame row for the scorecard: `FrameRecord`s straight through, so the overlay can
+ * show the spec's own "Mark on the TV" text ("X", "7 /", "7 2") from `roll1`/`roll2` itself. */
 function scorecardRow(player: StrikeNightPlayer): ScorecardRow {
   return {
     id: player.id,
     name: player.name,
-    frames: player.frames.map((frame) => ({
-      mark: frame.score === null ? null : markFromScoreLocal(frame.score),
-      score: frame.score,
-    })),
+    slot: player.seat,
+    frames: player.frames,
     total: player.total,
   };
-}
-
-/** Mirrors `shared/state.ts`'s `markFromScore`, kept local so the host never imports it purely
- * for display (the shared module also carries physics types). */
-function markFromScoreLocal(score: number): RollMark {
-  if (score >= 20) return "strike";
-  return score >= 10 ? "spare" : "open";
 }
 
 /** A strike is a TURKEY! when it's the third in a row (docs/games/strike-night.md, "Callouts"). */

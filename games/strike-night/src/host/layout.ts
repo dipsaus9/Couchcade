@@ -5,7 +5,6 @@
  * start of `rolling`) and the pin shot (the deck, cut to when the ball passes `y = 16`, until
  * `result` ends). Every formula here is copied verbatim from the spec's "TV scene" table.
  */
-import { world } from "@couchcade/theme";
 import { headPinY, laneCenterX } from "../shared/constants.ts";
 
 export interface ScreenPoint {
@@ -109,9 +108,3 @@ export const benchArea = { x: 30, y: 236, seatGapPx: 22 } as const;
 export function benchSlot(n: number): ScreenPoint {
   return { x: benchArea.x + n * benchArea.seatGapPx, y: benchArea.y };
 }
-
-// --- Overlays: the pin map and scorecard live in the world's safe area ---------------------
-
-/** The world box overlays may use: below the scoreboard, above the bottom panels (mirrors
- * target-range's and quick-draw's own `shapeBounds`/`panelTopY`, in world px). */
-export const worldSafeArea = { top: 36, bottom: world.height - 52 } as const;

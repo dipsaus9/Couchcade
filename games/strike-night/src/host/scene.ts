@@ -6,7 +6,7 @@ import { findPlayer, frameCount, type StrikeNightState } from "../shared/index.t
 import { strikeNightCueEvent, cuesBetween } from "./cues.ts";
 import { benchSlot, bowlerStandPoint } from "./layout.ts";
 import { InstructionPanel, PinMap, Scorecard } from "./overlays.ts";
-import { present } from "./present.ts";
+import { nextBowlerId, present } from "./present.ts";
 import type { Places, RollCache } from "./present.ts";
 import { BallActor, LaneBackdrop, PinPool, PipPool } from "./world.ts";
 
@@ -131,9 +131,13 @@ export default class StrikeNightScene extends StageScene<StrikeNightState> {
 
   private places(state: StrikeNightState): Places {
     const bowler = findPlayer(state, state.bowlerId);
+    const next = nextBowlerId(state);
+    // The next bowler stands at the end of the bench (docs/games/strike-night.md, "TV scene",
+    // "Players"): seat order first, the next bowler moved to the last slot whatever their seat.
     const bench = state.players
       .filter((player) => !player.left && player.id !== state.bowlerId)
-      .toSorted((a, b) => a.seat - b.seat);
+      .toSorted((a, b) => a.seat - b.seat)
+      .toSorted((a, b) => Number(a.id === next) - Number(b.id === next));
     return {
       bowler:
         bowler === undefined

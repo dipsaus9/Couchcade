@@ -6,8 +6,8 @@
  * scorecard. They sit on the stage's overlay layer and measure in overlay pixels (1080p TV
  * pixels), so every letter and every pin dot is drawn at the TV's own resolution (CC-4.11).
  */
-import { color, tint, toPhaserColor, typeScale } from "@couchcade/theme";
-import { drawSlab, textStyle } from "@couchcade/stage/draw";
+import { color, players as playerTokens, tint, toPhaserColor, typeScale } from "@couchcade/theme";
+import { SHAPE_SIZE, drawPlayerShape, drawSlab, textStyle } from "@couchcade/stage/draw";
 import { metrics, overlayFrame, safeArea } from "@couchcade/stage/layout";
 import type { Rect } from "@couchcade/stage/layout";
 import { roomCodeMetrics } from "@couchcade/stage/room-code";
@@ -154,6 +154,8 @@ const scorecardMetrics = {
   rowHeight: 56,
   nameWidth: 220,
   cellWidth: 108,
+  /** Space between the row's shape mark and its name. */
+  shapeGap: 16,
 } as const;
 
 const cellStyle = (): Types.GameObjects.Text.TextStyle => ({
@@ -161,11 +163,17 @@ const cellStyle = (): Types.GameObjects.Text.TextStyle => ({
   fontSize: `${typeScale.small.tv}px`,
 });
 
-function markLabel(mark: ScorecardRow["frames"][number]["mark"], score: number | null): string {
-  if (mark === "strike") return "X";
-  if (mark === "spare") return "/";
-  if (score === 0) return "-";
-  return "";
+/** The spec's own "Mark on the TV" text (docs/games/strike-night.md, "Rules and scoring" rule 5):
+ * a strike is `X`, a spare is `7 /` (roll 1's pins, then a slash), an open frame is `7 2` (both
+ * rolls), and a gutter roll (0 pins) shows as `-` in either position. Blank before roll 1. */
+export function frameCellText(frame: ScorecardRow["frames"][number]): string {
+  if (frame.roll1 === null) return "";
+  if (frame.roll1 === 10) return "X";
+  const first = frame.roll1 === 0 ? "-" : String(frame.roll1);
+  if (frame.roll2 === null) return first;
+  if (frame.roll1 + frame.roll2 === 10) return `${first} /`;
+  const second = frame.roll2 === 0 ? "-" : String(frame.roll2);
+  return `${first} ${second}`;
 }
 
 /** The scorecard (docs/games/strike-night.md, "Scorecard"): seat order, one cell per frame with
@@ -213,19 +221,36 @@ export class Scorecard extends GameObjects.Container {
       .setPosition(rect.x + m.pad, rect.y + m.pad + m.titleHeight / 2 - 8);
     this.add(title);
 
+    const shapes = this.scene.make.graphics({}, false);
+    const shapeSize = SHAPE_SIZE * metrics.outline;
+
     rows.forEach((row, rowIndex) => {
       const top = rect.y + m.pad + m.titleHeight + rowIndex * m.rowHeight;
       const middle = top + m.rowHeight / 2;
+
+      // The row's shape mark, next to the name (docs/games/strike-night.md, "Scorecard": "shape,
+      // name"; HOUSE_STYLE: colour is always paired with a shape).
+      const token = playerTokens[row.slot % playerTokens.length] ?? playerTokens[0];
+      if (token) {
+        drawPlayerShape(
+          shapes,
+          token.shape,
+          token.color,
+          rect.x + m.pad,
+          Math.round(middle - shapeSize / 2),
+          metrics.outline,
+        );
+      }
+
       const name = this.scene.make
         .text({ text: row.name, style: textStyle("body") }, false)
         .setOrigin(0, 0.5)
-        .setPosition(rect.x + m.pad, middle);
+        .setPosition(rect.x + m.pad + shapeSize + m.shapeGap, middle);
       this.add(name);
 
       row.frames.forEach((frame, frameIndex) => {
         const x = rect.x + m.pad + m.nameWidth + frameIndex * m.cellWidth + m.cellWidth / 2;
-        const label = markLabel(frame.mark, frame.score);
-        const shown = label !== "" ? label : (frame.score ?? "").toString();
+        const shown = frameCellText(frame);
         const text = this.scene.make
           .text({ text: shown, style: cellStyle() }, false)
           .setOrigin(0.5)
@@ -248,5 +273,6 @@ export class Scorecard extends GameObjects.Container {
         .setPosition(totalX, middle);
       this.add(total);
     });
+    this.add(shapes);
   }
 }
