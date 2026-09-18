@@ -78,8 +78,20 @@ test("a phone closed mid-game rejoins with the same seat and gets its controller
   });
   if (!benAgain) throw new Error("expected Ben's phone again");
 
-  // Same player: same id, name, seat (so colour and shape) and join time.
-  await expect.poll(() => welcomedAs(againFrames)).toEqual(seated);
+  // Same player: same id, name, seat (so colour and shape) and join time. Pip `profile` is not
+  // compared here: the lobby's on-entry reconcile (docs/architecture/pips.md "When the Pip is
+  // sent" item 2, CC-6.5) can send a correction moments after `seated` was captured above, so the
+  // server's player list -- and this reconnect's room:welcome -- may already reflect a profile
+  // `seated` was snapshotted too early to include, even though it is still the very same player.
+  await expect
+    .poll(() => welcomedAs(againFrames))
+    .toMatchObject({
+      id: seated["id"],
+      name: seated["name"],
+      slot: seated["slot"],
+      joinedAt: seated["joinedAt"],
+      connected: seated["connected"],
+    });
   await expect
     .poll(() => ofType(tvFrames, "player:reconnected").map((frame) => frame.d))
     .toContainEqual({ id: seated["id"] });
