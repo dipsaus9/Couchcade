@@ -4,7 +4,7 @@ title: Add E2E tests for the direct link and the relay fallback
 status: Done
 assignee: []
 created_date: '2026-09-17 17:51'
-updated_date: '2026-09-18 07:18'
+updated_date: '2026-09-18 10:00'
 labels:
   - story
 dependencies:
@@ -14,6 +14,9 @@ dependencies:
 references:
   - e2e/platform/realtime-link.spec.ts
   - e2e/src/link.ts
+  - apps/controller/src/runtime/link.ts
+  - apps/controller/src/runtime/link-test-hook.ts
+  - apps/controller/src/App.vue
 parent_task_id: CC-3
 priority: high
 type: chore
@@ -123,6 +126,27 @@ Reviewer round 2 (dipsaus-ai:story-reviewer, sonnet): block. Two findings, both 
    that is genuinely unavoidable: the hook has to live in the app bundle Playwright actually runs,
    the same way the existing window.__couchcadeMotion hook does. Re-verified green on chromium and
    webkit (8/8 including the restored games/target-range.spec.ts).
+
+References amended (owner-approved resolution, same as CC-7.5/CC-3.21): added
+apps/controller/src/runtime/link.ts, apps/controller/src/runtime/link-test-hook.ts and
+apps/controller/src/App.vue alongside the original two. Round 3 reviewer (dipsaus-ai:story-reviewer,
+sonnet) independently confirmed all 4 acceptance criteria met and that this controller-side test
+hook is a necessary, non-avoidable technical prerequisite (Playwright can't reach an in-page
+RTCPeerConnection any other way, mirroring window.__couchcadeMotion in
+apps/controller/src/motion/adapter.ts) but flagged it as a scope violation purely because it sat
+outside the frozen References -- a planning gap, not a defect in the code itself. Per orchestrator
+direction, resolved by expanding References rather than reverting the hook.
+
+This does create a ReferenceCollision with two To Do (not started) stories that also declare
+apps/controller/src/runtime/link.ts: CC-3.23 (skip periodic relay clock samples while direct) and
+CC-3.26 (report the phone's measured link round trip and jitter to the host). Flagging for the
+orchestrator: once CC-3.22 merges this stops mattering for CC-3.22 itself, but CC-3.23 and CC-3.26
+should not be dispatched in parallel with each other (or with any other story touching
+apps/controller/src/runtime/link.ts) until one of them lands first.
+
+Production path unchanged when the hook is absent: debugCut() is inert unless called, and
+exposeLinkTestHook() only runs behind import.meta.env.DEV (App.vue) -- production builds never
+read or set window.__couchcadeLink.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
