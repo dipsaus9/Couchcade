@@ -4,7 +4,7 @@ title: Add the Pip customiser to the controller lobby
 status: Done
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-18 06:01'
+updated_date: '2026-09-18 06:15'
 labels:
   - story
 dependencies:
@@ -13,6 +13,8 @@ dependencies:
 references:
   - apps/controller/src/pips/
   - apps/controller/src/screens/lobby/
+  - apps/controller/test/pips/
+  - apps/controller/src/session/
   - tooling/budgets/src/
   - tooling/budgets/test/
   - .size-limit.json
@@ -48,6 +50,10 @@ Branch: CC-6.5/pip-customiser
 Verify: pnpm check && pnpm test
 
 Reference amendment 2: tooling/budgets and .size-limit.json. docs/architecture/pips.md's Budgets table gives the customiser its own separate ceiling ('Customiser screen as a lazy chunk <= 4 KB', distinct from the 80KB 'Controller initial JS' platform ceiling) precisely because it is meant to be a lazy (dynamic-import) chunk that a phone never downloads unless it opens the customiser. tooling/budgets/src/classify.ts's platform bucket currently sums every non-game chunk regardless of eager/lazy, so once apps/controller/src/screens/lobby/LobbyScreen.vue correctly loads PipCustomiser.vue via defineAsyncComponent (per that same Budgets note), its ~3.5KB gzip chunk still lands in 'Controller initial JS' and tips the repo's real, vitest-measured baseline (77.72 KB / 80 KB, confirmed by stashing this story's changes and rerunning pnpm --filter @couchcade/budgets test) over the limit -- not a size regression in the eager sense, a classification gap versus the doc's own approved budget model. Added a narrow, additive 'lazy' check kind to tooling/budgets (classify.ts's measureApp gets an optional lazyChunks matcher list that excludes a matched chunk from platformGzipBytes and tallies it in a new lazyGzipBytes bucket instead, mirroring the existing per-game exclusion; budgets.ts wires a 'lazy' BudgetCheckConfig kind with a 'path' matcher) and one new .size-limit.json entry for the Pip customiser chunk at the doc's 4KB ceiling. No existing check's kind or numbers change: 'lazy' is opt-in per path pattern and nothing else declares one. Flagged prominently for reviewer/owner scrutiny since it's a cross-cutting CI tool other in-flight stories also rely on.
+
+Reviewer round 1 (block): (a) scope -- apps/controller/test/pips/ wasn't a declared Reference; added it (sibling stories CC-6.3/CC-6.4 declare their test/ paths separately, same convention). (b) advisory, addressed anyway: pips.md's 'Which story builds what' table assigns the join-body profile to CC-6.5 and 'When the Pip is sent' item 2 (room:welcome reconcile) is meant to run for every phone that enters a room, not only one that opens the customiser -- moved the reconcile out of use-pip-customiser.ts's constructor (which only ran if the lazy customiser panel was opened) into a new apps/controller/src/pips/reconcile.ts consumed eagerly by LobbyScreen.vue, and added the stored profile to session.ts's join() body. session/ added to References for the latter. (c) advisory, addressed: the Bald-disables-Colour hint was gated on activeTab==='colour', which selectTab() never allows while bald, so it never rendered -- moved it next to the disabled tab. (d) advisory, addressed: the lobby button copy used whether a record already existed instead of pips.md's actual rule ('Make your Pip' for players, 'Edit my Pip' for the VIP) -- switched to the vip prop.
+
+Reviewer round 1 fixes pushed (commit 8d0bcb5), merged origin/main (CC-11.9 target-range work, no conflicts), full verify green again. Re-running story-reviewer for round 2.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
