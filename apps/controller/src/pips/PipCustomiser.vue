@@ -75,7 +75,7 @@ const colourTiles = Array.from({ length: pipParts.hairColour }, (_, index) => ({
         {{ t.label }}
       </button>
     </div>
-    <p v-if="activeTab === 'colour' && isBald" class="hint">Bald Pips have no hair colour.</p>
+    <p v-if="isBald" class="hint">Bald Pips have no hair colour.</p>
 
     <div v-if="activeTab === 'skin'" class="tiles" role="radiogroup" aria-label="Skin tone">
       <button

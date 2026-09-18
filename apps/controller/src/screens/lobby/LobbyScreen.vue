@@ -3,7 +3,7 @@ import type { PhoneToRelayMessage, PlayerInfo } from "@couchcade/protocol";
 import { players } from "@couchcade/theme";
 import { CcButton, CcPlayerChip } from "@couchcade/ui";
 import { computed, defineAsyncComponent, ref } from "vue";
-import { browserPlayerStorage, playerRecordKey } from "../../pips/pip-record.ts";
+import { reconcileOnEntry } from "../../pips/reconcile.ts";
 import { lookForSlot } from "../../session/look.ts";
 import { menuActions } from "../menu/menu-view.ts";
 
@@ -32,16 +32,12 @@ const playerId = computed(() =>
   props.role === "player" && props.you.slot !== null ? players[props.you.slot]?.id : undefined,
 );
 
-// "Make your Pip" the first time this phone customises, "Edit my Pip" once it already has
-// (docs/design/platform-screens.md, phone "Lobby"). Read once: the record itself is owned by
-// PipCustomiserPanel, this is copy only.
-const hadStoredPip = (() => {
-  try {
-    return browserPlayerStorage()?.getItem(playerRecordKey) != null;
-  } catch {
-    return false;
-  }
-})();
+// Fixes a returning phone's Pip on the TV even if it never opens the customiser (pips.md "When
+// the Pip is sent" item 2): loads or creates `couchcade:player` and sends one `player:profile` if
+// it disagrees with what the room seated `you` with. Runs once per lobby visit, not gated on
+// `customising`, unlike the panel itself, which is a lazy chunk that may never load this session.
+reconcileOnEntry(props.you, (message) => emit("send", message));
+
 const customising = ref(false);
 </script>
 
@@ -80,7 +76,7 @@ const customising = ref(false);
     </template>
 
     <CcButton block @press="customising = !customising">
-      {{ customising ? "Done" : hadStoredPip ? "Edit my Pip" : "Make your Pip" }}
+      {{ customising ? "Done" : vip ? "Edit my Pip" : "Make your Pip" }}
     </CcButton>
 
     <p class="footnote">Room {{ code }}. The first player starts the game.</p>

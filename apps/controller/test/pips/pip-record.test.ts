@@ -1,6 +1,7 @@
 import type { PipProfile } from "@couchcade/protocol";
 import { describe, expect, it } from "vitest";
 import {
+  ensureStoredPlayer,
   loadStoredPlayer,
   playerRecordKey,
   saveStoredPlayer,
@@ -94,5 +95,27 @@ describe("saveStoredPlayer", () => {
     };
     expect(() => saveStoredPlayer(blocked, { v: 1, name: "Noor", profile: fresh })).not.toThrow();
     expect(() => saveStoredPlayer(null, { v: 1, name: "Noor", profile: fresh })).not.toThrow();
+  });
+});
+
+describe("ensureStoredPlayer", () => {
+  it("makes and persists a record with makeProfile() on a first visit (no stored record)", () => {
+    const storage = fakeStorage();
+    const record = ensureStoredPlayer(storage, "Noor", makeFresh);
+
+    expect(record).toEqual({ v: 1, name: "Noor", profile: fresh });
+    expect(JSON.parse(storage.getItem(playerRecordKey) as string)).toEqual(record);
+  });
+
+  it("keeps the stored profile but refreshes the name on a later visit", () => {
+    const storage = fakeStorage({
+      [playerRecordKey]: JSON.stringify({ v: 1, name: "Old name", profile: fresh }),
+    });
+    // loadStoredPlayer always draws a fallback profile to repair with (see its own tests); a
+    // fully valid stored profile like `fresh` never actually uses it.
+    const other: PipProfile = { skin: 1, hair: 1, hairColour: 1 };
+    const record = ensureStoredPlayer(storage, "Noor", () => other);
+
+    expect(record).toEqual({ v: 1, name: "Noor", profile: fresh });
   });
 });

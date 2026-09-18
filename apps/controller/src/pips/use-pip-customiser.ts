@@ -2,16 +2,15 @@ import type { PhoneToRelayMessage, PipProfile, PlayerInfo } from "@couchcade/pro
 import { ref, type Ref } from "vue";
 import {
   browserPlayerStorage,
-  loadStoredPlayer,
+  ensureStoredPlayer,
   saveStoredPlayer,
   type PlayerStorageLike,
 } from "./pip-record.ts";
 import { createProfileSender } from "./profile-sender.ts";
 import { firstRandomPip, shufflePip } from "./random-pip.ts";
-import { profileToReconcile } from "./sync.ts";
 
 export interface PipCustomiserOptions {
-  you: Pick<PlayerInfo, "name" | "profile">;
+  you: Pick<PlayerInfo, "name">;
   /** Sends over the room socket, same as the phone's other screens (session.ts's `send`). */
   send(message: PhoneToRelayMessage): void;
   storage?: PlayerStorageLike | null;
@@ -27,10 +26,11 @@ export interface PipCustomiser {
 }
 
 /**
- * Owns the customiser's state (docs/architecture/pips.md "Customiser"): loads or creates the
- * `couchcade:player` record, reconciles it with the room if the two disagree (the room seats
- * every player as `{0,0,0}` until a later story lands, "Found while writing this spec" item 1),
- * and keeps the record and the room in sync with every change through the Pip send rule.
+ * Owns the customiser panel's state (docs/architecture/pips.md "Customiser"): loads the
+ * remembered `couchcade:player` record (`reconcile.ts`'s `reconcileOnEntry` already made one and
+ * reconciled it with the room before the panel can open) and keeps the record and the room in
+ * sync with every tile tap or Shuffle through the Pip send rule. The panel itself never reconciles
+ * on its own — a phone that never opens it still gets fixed up by `reconcileOnEntry`.
  *
  * Vue-reactivity only (`ref`), no lifecycle hooks, so it runs the same in a component's `setup()`
  * and in a plain unit test.
@@ -40,18 +40,13 @@ export function createPipCustomiser({
   send,
   storage = browserPlayerStorage(),
 }: PipCustomiserOptions): PipCustomiser {
-  const stored = loadStoredPlayer(storage, firstRandomPip);
-  const profile = ref<PipProfile>(stored?.profile ?? firstRandomPip());
-
-  saveStoredPlayer(storage, { v: 1, name: you.name, profile: profile.value });
+  const record = ensureStoredPlayer(storage, you.name, firstRandomPip);
+  const profile = ref<PipProfile>(record.profile);
 
   const sender = createProfileSender({
-    initial: you.profile,
+    initial: record.profile,
     send: (next) => send({ t: "player:profile", d: { profile: next } }),
   });
-
-  const toReconcile = profileToReconcile(profile.value, you.profile);
-  if (toReconcile) sender.update(toReconcile);
 
   function apply(next: PipProfile): void {
     profile.value = next;

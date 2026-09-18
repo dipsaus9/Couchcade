@@ -90,3 +90,21 @@ export function saveStoredPlayer(storage: PlayerStorageLike | null, record: Stor
     // Nothing to do: the phone plays this session without remembering the Pip.
   }
 }
+
+/**
+ * Loads the remembered record, or makes one with `makeProfile()` and persists it immediately
+ * (pips.md "Writing", item 1: "After the first random Pip is made"). Every caller that needs a
+ * Pip to actually use — the join body, the lobby's on-entry reconcile, the customiser — goes
+ * through this instead of `loadStoredPlayer` alone, so a first-visit phone always has a record
+ * before anything asks for one. `name` refreshes the record's saved name on every call.
+ */
+export function ensureStoredPlayer(
+  storage: PlayerStorageLike | null,
+  name: string,
+  makeProfile: () => PipProfile,
+): StoredPlayer {
+  const stored = loadStoredPlayer(storage, makeProfile);
+  const record: StoredPlayer = { v: 1, name, profile: stored?.profile ?? makeProfile() };
+  saveStoredPlayer(storage, record);
+  return record;
+}

@@ -14,38 +14,23 @@ function fakeStorage(initial: Record<string, string> = {}): PlayerStorageLike {
 }
 
 const seated: PipProfile = { skin: 0, hair: 0, hairColour: 0 };
-const stored: PipProfile = { skin: 3, hair: 5, hairColour: 2 };
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
 
 describe("createPipCustomiser", () => {
-  it("reconciles once on creation when the stored Pip differs from the seated one", () => {
-    const storage = fakeStorage({
-      [playerRecordKey]: JSON.stringify({ v: 1, name: "Noor", profile: stored }),
-    });
-    const sent: PhoneToRelayMessage[] = [];
-    createPipCustomiser({
-      you: { name: "Noor", profile: seated },
-      send: (m) => sent.push(m),
-      storage,
-    });
-
-    vi.advanceTimersByTime(1000);
-    expect(sent).toEqual([{ t: "player:profile", d: { profile: stored } }]);
-  });
-
-  it("sends nothing on creation when the stored Pip already matches the seated one", () => {
+  it("loads the stored profile without sending anything on its own (reconcile.ts owns that)", () => {
     const storage = fakeStorage({
       [playerRecordKey]: JSON.stringify({ v: 1, name: "Noor", profile: seated }),
     });
     const sent: PhoneToRelayMessage[] = [];
-    createPipCustomiser({
-      you: { name: "Noor", profile: seated },
+    const customiser = createPipCustomiser({
+      you: { name: "Noor" },
       send: (m) => sent.push(m),
       storage,
     });
 
+    expect(customiser.profile.value).toEqual(seated);
     vi.advanceTimersByTime(1000);
     expect(sent).toEqual([]);
   });
@@ -56,7 +41,7 @@ describe("createPipCustomiser", () => {
     });
     const sent: PhoneToRelayMessage[] = [];
     const customiser = createPipCustomiser({
-      you: { name: "Noor", profile: seated },
+      you: { name: "Noor" },
       send: (m) => sent.push(m),
       storage,
     });
@@ -79,7 +64,7 @@ describe("createPipCustomiser", () => {
     });
     const sent: PhoneToRelayMessage[] = [];
     const customiser = createPipCustomiser({
-      you: { name: "Noor", profile: seated },
+      you: { name: "Noor" },
       send: (m) => sent.push(m),
       storage,
     });
@@ -96,11 +81,7 @@ describe("createPipCustomiser", () => {
 
   it("creates and stores a fresh random Pip on a phone's first visit (no stored record)", () => {
     const storage = fakeStorage();
-    const customiser = createPipCustomiser({
-      you: { name: "Noor", profile: seated },
-      send: () => {},
-      storage,
-    });
+    const customiser = createPipCustomiser({ you: { name: "Noor" }, send: () => {}, storage });
 
     const saved = JSON.parse(storage.getItem(playerRecordKey) as string);
     expect(saved).toEqual({ v: 1, name: "Noor", profile: customiser.profile.value });
@@ -112,7 +93,7 @@ describe("createPipCustomiser", () => {
     });
     const sent: PhoneToRelayMessage[] = [];
     const customiser = createPipCustomiser({
-      you: { name: "Noor", profile: seated },
+      you: { name: "Noor" },
       send: (m) => sent.push(m),
       storage,
     });

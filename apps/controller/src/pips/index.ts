@@ -5,6 +5,7 @@
  */
 export {
   browserPlayerStorage,
+  ensureStoredPlayer,
   loadStoredPlayer,
   playerRecordKey,
   saveStoredPlayer,
@@ -18,6 +19,7 @@ export {
   type ProfileSenderOptions,
 } from "./profile-sender.ts";
 export { profileToReconcile } from "./sync.ts";
+export { reconcileOnEntry } from "./reconcile.ts";
 export {
   createPipCustomiser,
   type PipCustomiser,
