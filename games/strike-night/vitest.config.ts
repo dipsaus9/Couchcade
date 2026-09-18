@@ -28,15 +28,7 @@ export default defineLibConfig({
       },
       {
         plugins: [vue()],
-        test: {
-          name: "controller",
-          include: [controllerTests],
-          environment: "jsdom",
-          // A single worker: these are fast jsdom component tests, and the "node" project's
-          // Planck.js contract check (a hardcoded 30 s test in packages/game-sdk/testing) needs
-          // CI's two cores more than this project competing for a second one does.
-          maxWorkers: 1,
-        },
+        test: { name: "controller", include: [controllerTests], environment: "jsdom" },
       },
     ],
   },
