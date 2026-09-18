@@ -86,7 +86,12 @@ async function startScene(players: number, seed: number): Promise<Run> {
   };
 }
 
-/** Steps frames until the scene finishes loading and starts running. */
+/**
+ * Steps frames until the scene finishes loading and starts running. CC-12.5 gave the scene a real
+ * `preload()` (sprites, `?inline` data URIs): the browser resolves an `Image`'s `onload` on its
+ * own task queue, not a microtask, so waiting on `Promise.resolve()` alone can spin through every
+ * iteration without ever giving that queue a turn. A `setTimeout` turn does.
+ */
 async function waitForRunning(stage: Game): Promise<void> {
   let time = 0;
   for (let i = 0; i < 200; i++) {
@@ -94,7 +99,7 @@ async function waitForRunning(stage: Game): Promise<void> {
     stage.step(time, tickMs);
     const scene = stage.scene.getScene(game.id);
     if (scene?.sys.settings.status === Scenes.RUNNING) return;
-    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
   }
   throw new Error("Strike Night's scene never reached RUNNING");
 }
