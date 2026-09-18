@@ -13,20 +13,30 @@ import { playMotionTrace, type MotionTrace } from "../src/motion.ts";
 // reports `needsMotion: true` on this TV only. Nothing in the apps or games changes, and phones
 // still load the real Quick Draw controller once the step is over.
 
-/** Makes Quick Draw need motion on this TV, for this test only. */
+/**
+ * Makes Quick Draw need motion on this TV, for this test only. Patches both registries
+ * (CC-3.25): `metaRegistry` for the menu's listing, and `gameRegistry` for the full game
+ * `host-runtime.ts` actually checks `needsMotion` on once it loads it.
+ */
 async function makeQuickDrawNeedMotion(host: Page): Promise<void> {
   await host.evaluate(async () => {
+    type Meta = { id: string; needsMotion: boolean };
     type Game = { id: string; needsMotion: boolean };
     const url = "/host/src/runtime/games.ts";
-    const { registry } = (await import(/* @vite-ignore */ url)) as {
-      registry: { games: Game[]; get(id: string): Game | undefined };
+    const { metaRegistry, gameRegistry } = (await import(/* @vite-ignore */ url)) as {
+      metaRegistry: { games: Meta[]; get(id: string): Meta | undefined };
+      gameRegistry: { load(id: string): Promise<Game> };
     };
-    const get = registry.get.bind(registry);
-    registry.games = registry.games.map((game) =>
+    const getMeta = metaRegistry.get.bind(metaRegistry);
+    metaRegistry.games = metaRegistry.games.map((game) =>
       game.id === "quick-draw" ? { ...game, needsMotion: true } : game,
     );
-    registry.get = (id) =>
-      id === "quick-draw" ? registry.games.find((g) => g.id === id) : get(id);
+    metaRegistry.get = (id) =>
+      id === "quick-draw" ? metaRegistry.games.find((game) => game.id === id) : getMeta(id);
+
+    const load = gameRegistry.load.bind(gameRegistry);
+    gameRegistry.load = (id) =>
+      load(id).then((game) => (id === "quick-draw" ? { ...game, needsMotion: true } : game));
   });
 }
 
