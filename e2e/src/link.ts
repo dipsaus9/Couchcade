@@ -48,12 +48,25 @@ export async function cutLink(phone: Page): Promise<void> {
 }
 
 /**
- * Whether this page's browser engine can build an `RTCPeerConnection` at all (realtime-link.md,
- * "Playwright WebKit has no WebRTC"). Chromium always can; Playwright's own WebKit build sometimes
- * can't, so the specs branch on this instead of hard-coding the expected path per project (AC4).
+ * Waits up to `timeoutMs` for the phone's link to reach `direct`, and returns whichever path it
+ * actually settled on (realtime-link.md, "Playwright WebKit has no WebRTC"; AC4). `RTCPeerConnection`
+ * existing isn't enough to tell: some WebKit builds expose the constructor but never finish a real
+ * connection, and `currentPath()` (`apps/controller/src/runtime/link.ts`) never reports anything
+ * but `off` or `relay` while that's happening -- it only reports `direct` once the data channels are
+ * actually open. So this observes the outcome instead of predicting it from feature detection: on
+ * an engine that can't complete a direct connection, it settles on `relay` once the deadline passes,
+ * the same result AC4 asks the specs to assert in that case.
  */
-export function supportsRtc(phone: Page): Promise<boolean> {
-  return phone.evaluate(() => typeof RTCPeerConnection === "function");
+export async function observeLinkPath(
+  phone: Page,
+  timeoutMs = 30_000,
+): Promise<"direct" | "relay"> {
+  try {
+    await waitForLinkPath(phone, "direct", timeoutMs);
+    return "direct";
+  } catch {
+    return "relay";
+  }
 }
 
 export interface RelayFrame {

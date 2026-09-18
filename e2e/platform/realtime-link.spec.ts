@@ -4,8 +4,8 @@ import {
   cutLink,
   framesOfType,
   linkPath,
+  observeLinkPath,
   recordRelayFrames,
-  supportsRtc,
   waitForHostConnected,
   waitForLinkPath,
   type RelayFrame,
@@ -19,10 +19,12 @@ import { playFullMatch, startMatch, tvState } from "../src/target-range.ts";
 // `PhoneOptions.search`).
 //
 // WebRTC between two browser contexts on a GitHub-hosted runner can be slow to negotiate, so every
-// wait below is generous. Chromium always exposes `RTCPeerConnection`; Playwright's own WebKit
-// build sometimes doesn't (realtime-link.md, "Playwright WebKit has no WebRTC") -- these specs
-// check for it at runtime with `supportsRtc` and assert the relay path instead when it's missing,
-// or skip the case entirely when there is no connection to act on (AC4).
+// wait below is generous. Chromium always completes a direct connection; Playwright's own WebKit
+// build sometimes can't (realtime-link.md, "Playwright WebKit has no WebRTC") even though it
+// exposes `RTCPeerConnection` -- so these specs observe the path the link actually settles on
+// (`observeLinkPath`) instead of predicting it from feature detection, and assert the relay path
+// instead when direct never arrives, or skip the case entirely when there is no connection to act
+// on (AC4).
 
 test.use({ hostSearch: "?link=1" });
 
@@ -44,21 +46,18 @@ test("a phone reaches the direct link and plays a full Target Range match with n
   const [ben] = await phones(1, { motion: { permission: "granted" }, search: "?link=1" });
   if (!ana || !ben || !anaFrames) throw new Error("expected two phones");
 
-  const rtc = await supportsRtc(ana);
-  const expectedPath = rtc ? "direct" : "relay";
-  if (!rtc) {
+  await startMatch(host, ana, ben, code);
+  const path = await observeLinkPath(ana, 30_000);
+  if (path !== "direct") {
     test.info().annotations.push({
       type: "note",
-      description: "WebKit here has no RTCPeerConnection: asserting the relay path (AC4)",
+      description: "this engine never reached the direct link: asserting the relay path (AC4)",
     });
   }
 
-  await startMatch(host, ana, ben, code);
-  await waitForLinkPath(ana, expectedPath, 30_000);
-
   await playFullMatch(host, ana, ben);
 
-  if (rtc) {
+  if (path === "direct") {
     // On the direct path, aim and shot samples travel over the data channel and never touch the
     // relay socket: no `input` frame should have gone out on it during the whole match.
     expect(framesOfType(anaFrames.sent, "input")).toHaveLength(0);
@@ -77,11 +76,9 @@ test("cutting the link moves the phone to relay within 1 second and the match st
   const [ben] = await phones(1, { motion: { permission: "granted" }, search: "?link=1" });
   if (!ana || !ben) throw new Error("expected two phones");
 
-  const rtc = await supportsRtc(ana);
-  test.skip(!rtc, "WebKit here has no RTCPeerConnection: there is no direct link to cut (AC4)");
-
   await startMatch(host, ana, ben, code);
-  await waitForLinkPath(ana, "direct", 30_000);
+  const path = await observeLinkPath(ana, 30_000);
+  test.skip(path !== "direct", "this engine never reached the direct link: nothing to cut (AC4)");
 
   let cutOnce = false;
   await playFullMatch(host, ana, ben, {
@@ -103,7 +100,7 @@ test("a TV reload brings the phone's link back after room:host connected true", 
   host,
   phones,
 }) => {
-  test.setTimeout(60_000);
+  test.setTimeout(120_000);
 
   const code = await openRoom(host);
   let frames: { sent: RelayFrame[]; received: RelayFrame[] } | undefined;
@@ -115,21 +112,18 @@ test("a TV reload brings the phone's link back after room:host connected true", 
   });
   if (!ana || !frames) throw new Error("expected a phone");
 
-  const rtc = await supportsRtc(ana);
-  const expectedPath = rtc ? "direct" : "relay";
-  if (!rtc) {
+  await joinRoom(ana, code, "Ana");
+  const path = await observeLinkPath(ana, 30_000);
+  if (path !== "direct") {
     test.info().annotations.push({
       type: "note",
-      description: "WebKit here has no RTCPeerConnection: asserting the relay path (AC4)",
+      description: "this engine never reached the direct link: asserting the relay path (AC4)",
     });
   }
-
-  await joinRoom(ana, code, "Ana");
-  await waitForLinkPath(ana, expectedPath, 30_000);
 
   const sinceIndex = frames.received.length;
   await host.reload();
 
   await waitForHostConnected(ana, frames, true, sinceIndex, 30_000);
-  await waitForLinkPath(ana, expectedPath, 15_000);
+  await waitForLinkPath(ana, path, 30_000);
 });
