@@ -1,7 +1,7 @@
 import { createRng } from "@couchcade/utils";
 import type { Rng } from "@couchcade/utils";
 import type { Player } from "@couchcade/game-sdk/contract";
-import type { Aim, AimTrack } from "@couchcade/game-sdk/input";
+import type { Aim, SampleTrack } from "@couchcade/game-sdk/input";
 import {
   aimHomeX,
   aimHomeY,
@@ -62,8 +62,8 @@ export interface TargetRangePlayer {
   left: boolean;
   /** True while the TV shows this player's crosshair: from the first aim sample until a shot, `lower` or the close. */
   aiming: boolean;
-  /** This volley's aim samples for the crosshair (`aimAt` on the TV). Empty when not aiming. */
-  aim: AimTrack;
+  /** This volley's aim samples for the crosshair (played back with `createPlayback` on the TV). Empty when not aiming. */
+  aim: SampleTrack<[number, number]>;
   /** This volley's result once the player shot, `none` from the reveal on, null before. */
   result: VolleyResult | null;
   /** The last revealed volley's result, null before the first reveal. */

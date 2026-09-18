@@ -1,5 +1,5 @@
 import type { InputContext, Player } from "@couchcade/game-sdk/contract";
-import { addAimSamples } from "@couchcade/game-sdk/input";
+import { addSample } from "@couchcade/game-sdk/input";
 import {
   arrowsPerRound,
   bullseyePoints,
@@ -34,7 +34,7 @@ function updatePlayer(
   };
 }
 
-/** Aim samples while the volley is open and the player hasn't shot: the crosshair shows. */
+/** One aim sample while the volley is open and the player hasn't shot: the crosshair shows. */
 function applyAim(
   state: TargetRangeState,
   player: TargetRangePlayer,
@@ -42,7 +42,10 @@ function applyAim(
   ctx: InputContext,
 ): TargetRangeState {
   if (state.phase !== "open" || player.result !== null) return state;
-  const aim = addAimSamples(player.aim, ctx.atMs, input.payload.aim);
+  const aim = addSample<[number, number]>(player.aim, ctx.atMs, [
+    input.payload.yaw,
+    input.payload.pitch,
+  ]);
   if (aim === player.aim) return state;
   return updatePlayer(state, player.id, { aim, aiming: true });
 }

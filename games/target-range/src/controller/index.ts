@@ -8,4 +8,7 @@ import { defineController } from "@couchcade/game-sdk/contract";
 export default defineController({
   id: "target-range",
   component: () => import("./Controller.vue").then((module) => module.default),
+  // Aim streams through the InputChannel at 30 samples a second (CC-11.9, docs/architecture/
+  // realtime-link.md, "Rates").
+  streams: { aim: { hz: 30 } },
 });

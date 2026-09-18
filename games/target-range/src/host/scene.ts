@@ -1,8 +1,11 @@
 import type { HostSceneData } from "@couchcade/game-sdk/contract";
+import { AIM_PLAYBACK_DELAY_MS } from "@couchcade/game-sdk/input";
 import { StageScene, worldToOverlay } from "@couchcade/stage";
 import type { Callout, Scoreboard } from "@couchcade/stage";
 import { roundCount } from "../shared/index.ts";
 import type { Point, TargetRangeState } from "../shared/index.ts";
+import { createCrosshairPlayback } from "./aim-playback.ts";
+import type { CrosshairPlayback } from "./aim-playback.ts";
 import { loadSprites } from "./art.ts";
 import { cuesBetween, targetRangeCueEvent } from "./cues.ts";
 import { placeTagsBelow } from "./label-layout.ts";
@@ -32,6 +35,7 @@ function joinAddress(joinUrl: string): string {
 export default class TargetRangeScene extends StageScene<TargetRangeState> {
   private host!: HostSceneData<TargetRangeState>;
   #range: RangeWorld | null = null;
+  #crosshairs: CrosshairPlayback = createCrosshairPlayback();
   private scoreboard!: Scoreboard;
   private panel!: InstructionPanel;
   private tags: PointsTag[] = [];
@@ -55,6 +59,7 @@ export default class TargetRangeScene extends StageScene<TargetRangeState> {
     this.lastTarget = null;
     this.slideFrom = null;
     this.tags = [];
+    this.#crosshairs = createCrosshairPlayback();
   }
 
   preload(): void {
@@ -63,7 +68,7 @@ export default class TargetRangeScene extends StageScene<TargetRangeState> {
 
   create(): void {
     const state = this.host.getState();
-    const view = this.present(state);
+    const view = this.present(state, 0);
     this.cameras.main.setRoundPixels(true);
     this.#range = new RangeWorld(this, view, (id) => this.lookOf(id));
 
@@ -86,7 +91,7 @@ export default class TargetRangeScene extends StageScene<TargetRangeState> {
     this.results = new RoundResults(this);
     this.overlay.add([this.panel, ...this.tags, this.results]);
 
-    this.paint(state);
+    this.paint(state, 0);
   }
 
   /** The world objects: the target, the flag, Pips, crosshairs and arrows. */
@@ -95,8 +100,14 @@ export default class TargetRangeScene extends StageScene<TargetRangeState> {
     return this.#range;
   }
 
-  override update(): void {
-    this.paint(this.host.getState());
+  override update(_time: number, delta: number): void {
+    this.paint(this.host.getState(), delta);
+  }
+
+  /** How far behind this player's crosshair plays, from the link (CC-11.9), or the old relay
+   * default before the host runtime has one (tests and tools). */
+  private playbackDelayMsOf(playerId: string): number {
+    return this.host.link?.(playerId).playbackDelayMs ?? AIM_PLAYBACK_DELAY_MS;
   }
 
   /** The world look of a player: jersey and shape from their seat, skin and hair from their Pip. */
@@ -122,24 +133,26 @@ export default class TargetRangeScene extends StageScene<TargetRangeState> {
     return Object.fromEntries(state.players.map((player) => [player.id, player.points]));
   }
 
-  private present(state: TargetRangeState): Presentation {
+  private present(state: TargetRangeState, frameMs: number): Presentation {
     // Remember where the target stood, so a new round's intro slides it from there.
     if (this.lastTarget !== null && this.lastTarget.round !== state.round) {
       this.slideFrom = this.lastTarget.target;
     }
     if (state.phase !== "intro") this.slideFrom = null;
     this.lastTarget = { round: state.round, target: state.target };
+    const crosshairs = this.#crosshairs.at(state, frameMs, (id) => this.playbackDelayMsOf(id));
     return present(state, {
       reducedMotion: this.reducedMotion,
       previousTarget: this.slideFrom,
+      crosshairs,
     });
   }
 
-  private paint(state: TargetRangeState): void {
+  private paint(state: TargetRangeState, frameMs: number): void {
     for (const cue of cuesBetween(this.previous, state)) this.events.emit(targetRangeCueEvent, cue);
     this.previous = state;
 
-    const view = this.present(state);
+    const view = this.present(state, frameMs);
     this.rangeWorld.update(view, this.reducedMotion, state.nowMs);
     this.paintOverlays(state, view);
     this.paintCallout(view);

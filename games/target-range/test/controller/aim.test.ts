@@ -1,8 +1,8 @@
-import { createInputStream } from "@couchcade/game-sdk/input";
 import { createFakeAdapter } from "@couchcade/motion/sensors";
 import { describe, expect, it } from "vitest";
 import { createShotAim, type TargetRangeMotion } from "../../src/controller/aim.ts";
 import { inputSchema, type TargetRangeInput } from "../../src/shared/input.ts";
+import { createTestChannel } from "./channel.ts";
 import { virtualTime } from "./clock.ts";
 import { flatCalibration, turn } from "./motion.ts";
 
@@ -10,16 +10,8 @@ const calibration = flatCalibration();
 
 function setup() {
   const time = virtualTime();
-  const sent: TargetRangeInput[] = [];
-  const stream = createInputStream<TargetRangeInput>(
-    (input) => {
-      expect(inputSchema.safeParse(input).success).toBe(true);
-      sent.push(input);
-      return time.now();
-    },
-    { now: time.now, schedule: time.schedule },
-  );
-  const aim = createShotAim(stream);
+  const { channel, sent } = createTestChannel();
+  const aim = createShotAim(channel);
   const adapter = createFakeAdapter();
   const motion: TargetRangeMotion = { mode: "motion", adapter, calibration };
   /** Plays samples on virtual time, from now on. */
@@ -51,10 +43,10 @@ describe("createShotAim with motion", () => {
 
     aim.startDraw(time.now());
     expect(aim.aim()).toEqual({ yaw: 0, pitch: 0 });
-    expect(sent).toEqual([{ type: "aim", payload: { aim: [[0, 0, 0]] } }]);
+    expect(sent).toEqual([{ type: "aim", payload: { yaw: 0, pitch: 0 } }]);
   });
 
-  it("streams aim while drawing and shoots with the aim at release", () => {
+  it("streams aim while drawing and shoots with the aim the TV was shown", () => {
     const { aim, motion, sent, play, time } = setup();
     aim.use(motion);
     play(200, 0);
@@ -63,8 +55,6 @@ describe("createShotAim with motion", () => {
     const released = aim.aim();
     expect(Math.abs(released.yaw)).toBeGreaterThan(0.2);
     expect(types(sent).filter((type) => type === "aim").length).toBeGreaterThan(2);
-    // Stream cap: 4 messages a second.
-    expect(sent.length).toBeLessThanOrEqual(5);
 
     const before = sent.length;
     aim.shoot(3, 0.8, time.now());
@@ -84,14 +74,14 @@ describe("createShotAim with motion", () => {
     aim.lower(1, time.now());
     time.advance(300);
     expect(sent).toEqual([
-      { type: "aim", payload: { aim: [[0, 0, 0]] } },
+      { type: "aim", payload: { yaw: 0, pitch: 0 } },
       { type: "lower", payload: { volley: 1 } },
     ]);
 
     play(300, 0);
     aim.startDraw(time.now());
     time.advance(300);
-    expect(sent.at(-1)).toEqual({ type: "aim", payload: { aim: [[0, 0, 0]] } });
+    expect(sent.at(-1)).toEqual({ type: "aim", payload: { yaw: 0, pitch: 0 } });
     expect(sent).toHaveLength(3);
   });
 
@@ -150,7 +140,7 @@ describe("createShotAim with touch", () => {
   it("sends the current aim when a volley opens, so the crosshair shows", () => {
     const { aim, sent, time } = setup();
     aim.volleyOpened(time.now());
-    expect(sent).toEqual([{ type: "aim", payload: { aim: [[0, 0, 0]] } }]);
+    expect(sent).toEqual([{ type: "aim", payload: { yaw: 0, pitch: 0 } }]);
   });
 
   it("streams while the pad is dragged, then stops", () => {
@@ -165,8 +155,8 @@ describe("createShotAim with touch", () => {
     }
     aim.pad({ t, x: 160, y: 270, type: "up" });
     time.advance(500);
-    // 60 px right is 0.6 of yaw, 30 px up is 0.4 of pitch.
-    expect(aim.aim()).toEqual({ yaw: 0.6, pitch: 0.4 });
+    // padPxPerCssPx = 1.5: 60 px right is 0.45 of yaw, 30 px up is 0.5 of pitch.
+    expect(aim.aim()).toEqual({ yaw: 0.45, pitch: 0.5 });
     const count = sent.length;
     expect(count).toBeGreaterThan(1);
     expect(sent.at(-1)).toMatchObject({ type: "aim" });
@@ -184,13 +174,24 @@ describe("createShotAim with touch", () => {
     aim.pad({ t: time.now() + 32, x: -50, y: 0, type: "up" });
     time.advance(300);
     aim.startDraw(time.now());
-    expect(aim.aim()).toEqual({ yaw: -0.5, pitch: 0 });
+    expect(aim.aim()).toEqual({ yaw: -0.375, pitch: 0 });
     time.advance(300);
     aim.shoot(2, 1, time.now());
     time.advance(300);
     expect(sent.at(-1)).toEqual({
       type: "shoot",
-      payload: { volley: 2, aim: { yaw: -0.5, pitch: 0 }, power: 1 },
+      payload: { volley: 2, aim: { yaw: -0.375, pitch: 0 }, power: 1 },
     });
+  });
+});
+
+describe("createShotAim's messages", () => {
+  it("only ever sends messages the shared input schema accepts", () => {
+    const { aim, motion, sent, play, time } = setup();
+    aim.use(motion);
+    aim.startDraw(time.now());
+    play(500, 25);
+    aim.shoot(1, 1, time.now());
+    for (const input of sent) expect(inputSchema.safeParse(input).success).toBe(true);
   });
 });

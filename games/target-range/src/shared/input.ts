@@ -1,5 +1,4 @@
 import * as z from "zod/mini";
-import { AIM_SAMPLES_PER_MESSAGE } from "@couchcade/game-sdk/input";
 import { minPower, volleyCount } from "./constants.ts";
 
 /** Yaw and pitch, −1 to 1. */
@@ -9,20 +8,15 @@ const volley = z.int().check(z.gte(1), z.lte(volleyCount));
 
 /**
  * The three inputs from docs/games/target-range.md, "Input message schema", all through one
- * CC-3.6 input stream. `aim` is sent with `set`, `shoot` and `lower` with `fire`. On the wire:
+ * `InputChannel` (CC-11.9). `aim` is one sample streamed with `channel.stream`, `shoot` and
+ * `lower` are events sent with `channel.fire`. On the wire:
  * `{ "type": "shoot", "payload": { "volley": 5, "aim": { "yaw": -0.12, "pitch": 0.31 }, "power": 1 }, "at": 1789571234567 }`.
  */
 export const inputSchema = z.discriminatedUnion("type", [
-  // Packed aim samples, [dtMs, yaw, pitch], newest last, at most 4. createAimSender (CC-3.21) now
-  // streams one sample at a time; the controller's ShotAim wrapper still packs them into this
-  // shape until CC-11.9 moves this game onto the InputChannel and its single-sample aim input.
+  // One aim sample, 3 decimals (createAimSender, CC-3.21), streamed at `streams.aim.hz` (30).
   z.object({
     type: z.literal("aim"),
-    payload: z.object({
-      aim: z
-        .array(z.tuple([z.int().check(z.gte(-10_000), z.lte(0)), unit, unit]))
-        .check(z.minLength(1), z.maxLength(AIM_SAMPLES_PER_MESSAGE)),
-    }),
+    payload: z.object({ yaw: unit, pitch: unit }),
   }),
   // The aim the phone had at release, and the draw power.
   z.object({

@@ -5,8 +5,10 @@ import { mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TargetRangeMotion } from "../../src/controller/aim.ts";
 import Controller from "../../src/controller/Controller.vue";
-import { inputSchema, type TargetRangeInput } from "../../src/shared/input.ts";
+import { inputSchema } from "../../src/shared/input.ts";
+import type { TargetRangeInput } from "../../src/shared/input.ts";
 import type { TargetRangeScreen, TargetRangeView } from "../../src/shared/view.ts";
+import { createTestChannel } from "./channel.ts";
 import { flatCalibration, turn } from "./motion.ts";
 
 // Controller.vue polls `roomClock.synced` through @couchcade/game-sdk/clock. Mocked so tests set
@@ -31,16 +33,15 @@ function mountController(
   data: TargetRangeView,
   motion?: TargetRangeMotion,
 ) {
-  const sent: Array<{ input: TargetRangeInput; t: number | undefined }> = [];
-  const send = vi.fn<(input: TargetRangeInput, t?: number) => number>((input, t) => {
-    sent.push({ input, t });
-    return 1;
-  });
+  // Aim, `shoot` and `lower` all go through the one `InputChannel` now (CC-11.9); `send` stays a
+  // required prop (the game contract's turn-based, one-off path) but Target Range doesn't use it.
+  const send = vi.fn<(input: TargetRangeInput, t?: number) => number>(() => 1);
+  const { channel, sent, timestamps } = createTestChannel();
   const wrapper = mount(Controller, {
-    props: { screen, data, player, send, ...(motion ? { motion } : {}) },
+    props: { screen, data, player, send, input: channel, ...(motion ? { motion } : {}) },
   });
-  const inputs = () => sent.map((entry) => entry.input);
-  return { wrapper, send, sent, inputs };
+  const inputs = () => [...sent];
+  return { wrapper, send, sent, inputs, timestamps };
 }
 
 type Wrapper = ReturnType<typeof mountController>["wrapper"];
@@ -211,7 +212,7 @@ describe("Controller.vue", () => {
     it("shoots with the aim at release and the draw power, stamped with the release time", async () => {
       const adapter = createFakeAdapter();
       const m: TargetRangeMotion = { mode: "motion", adapter, calibration };
-      const { wrapper, sent, inputs } = mountController(
+      const { wrapper, sent, inputs, timestamps } = mountController(
         "tr-shoot",
         view({ round: 2, arrow: 2, volley: 5 }),
         m,
@@ -219,7 +220,7 @@ describe("Controller.vue", () => {
 
       const down = pointer(button(wrapper), "pointerdown", { clientY: 400 });
       await wrapper.vm.$nextTick();
-      expect(inputs()).toEqual([{ type: "aim", payload: { aim: [[0, 0, 0]] } }]);
+      expect(inputs()).toEqual([{ type: "aim", payload: { yaw: 0, pitch: 0 } }]);
 
       // Samples share the event time base, as they do on a phone.
       for (const sample of turn(down.timeStamp + 16, 600, 20)) {
@@ -231,10 +232,10 @@ describe("Controller.vue", () => {
       await wrapper.vm.$nextTick();
       vi.advanceTimersByTime(300);
 
-      const shot = sent.find((entry) => entry.input.type === "shoot");
-      expect(shot?.input).toMatchObject({ type: "shoot", payload: { volley: 5, power: 0.8 } });
-      expect(shot?.t).toBe(release.timeStamp);
-      const payload = shot?.input.payload as { aim: { yaw: number } };
+      const shot = sent.find((input) => input.type === "shoot");
+      expect(shot).toMatchObject({ type: "shoot", payload: { volley: 5, power: 0.8 } });
+      expect(shot && timestamps.get(shot)).toBe(release.timeStamp);
+      const payload = shot?.payload as { aim: { yaw: number } };
       expect(Math.abs(payload.aim.yaw)).toBeGreaterThan(0.1);
       for (const input of inputs()) expect(inputSchema.safeParse(input).success).toBe(true);
 
@@ -329,7 +330,7 @@ describe("Controller.vue", () => {
         hint: "Drag the pad to aim",
       });
       // The volley opened: the crosshair shows at the current aim.
-      expect(inputs()).toEqual([{ type: "aim", payload: { aim: [[0, 0, 0]] } }]);
+      expect(inputs()).toEqual([{ type: "aim", payload: { yaw: 0, pitch: 0 } }]);
       expectShortText(wrapper);
     });
 
@@ -348,7 +349,7 @@ describe("Controller.vue", () => {
       vi.advanceTimersByTime(1000);
       expect(inputs().at(-1)).toEqual({
         type: "shoot",
-        payload: { volley: 1, aim: { yaw: 0.5, pitch: 0 }, power: 1 },
+        payload: { volley: 1, aim: { yaw: 0.375, pitch: 0 }, power: 1 },
       });
       for (const input of inputs()) expect(inputSchema.safeParse(input).success).toBe(true);
       expect(wrapper.find(".pad").exists()).toBe(false);
@@ -380,9 +381,9 @@ describe("Controller.vue", () => {
     });
   });
 
-  it("stops the input stream and the sensors when unmounted", async () => {
+  it("stops the input channel and the sensors when unmounted", async () => {
     const adapter = createFakeAdapter();
-    const { wrapper, send } = mountController("tr-shoot", view(), {
+    const { wrapper, sent } = mountController("tr-shoot", view(), {
       mode: "motion",
       adapter,
       calibration,
@@ -391,6 +392,6 @@ describe("Controller.vue", () => {
     wrapper.unmount();
     for (const sample of turn(performance.now(), 500, 40)) adapter.push(sample);
     vi.advanceTimersByTime(1000);
-    expect(send).toHaveBeenCalledTimes(1);
+    expect(sent).toHaveLength(1);
   });
 });
