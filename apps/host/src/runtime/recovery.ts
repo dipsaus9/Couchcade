@@ -1,6 +1,6 @@
 import { maxGameSnapshotBytes, tickTimeMs } from "@couchcade/game-sdk/contract";
 import type { CouchcadeGame, Player } from "@couchcade/game-sdk/contract";
-import type { GameRegistry } from "@couchcade/game-sdk/registry";
+import type { LazyGameRegistry } from "@couchcade/game-sdk/registry";
 import { jsonValueSchema, maxFrameBytes, utf8ByteLength } from "@couchcade/protocol";
 import type { HostToRelayMessage, JsonValue, PayloadOf, RoomPhase } from "@couchcade/protocol";
 import * as z from "zod/mini";
@@ -180,7 +180,7 @@ export interface RecoveryFacts {
   phase: RoomPhase;
   /** The `room:snapshot` the relay sent after the welcome, or null. */
   snapshot: RoomSnapshot | null;
-  registry: GameRegistry;
+  gameRegistry: LazyGameRegistry;
   /** The seated players the relay told the host about. */
   seated: readonly Player[];
 }
@@ -191,9 +191,16 @@ export interface RecoveryFacts {
  * `results` go to the menu, and `lobby` and `calibration` go to the lobby.
  *
  * The TV only knows the players that are still seated, so a game whose remaining in-game players
- * no longer reach its minimum ends too.
+ * no longer reach its minimum ends too. Resuming a `playing` room awaits the game's full rules
+ * (CC-3.25); an id no build knows, or a dropped chunk, resolves to `undefined` the same as an id
+ * this build never registered.
  */
-export function planRecovery({ phase, snapshot, registry, seated }: RecoveryFacts): RecoveryPlan {
+export async function planRecovery({
+  phase,
+  snapshot,
+  gameRegistry,
+  seated,
+}: RecoveryFacts): Promise<RecoveryPlan> {
   switch (phase) {
     case "lobby":
     case "calibration":
@@ -207,7 +214,10 @@ export function planRecovery({ phase, snapshot, registry, seated }: RecoveryFact
       break;
   }
   const ended = { to: "menu", notice: tvRestartedNotice } as const;
-  const game = snapshot?.gameId == null ? undefined : registry.get(snapshot.gameId);
+  const game =
+    snapshot?.gameId == null
+      ? undefined
+      : await gameRegistry.load(snapshot.gameId).catch(() => undefined);
   const parsed = snapshotDataSchema.safeParse(snapshot?.data);
   if (!snapshot || !game?.restore || !parsed.success) return ended;
   const players = parsed.data.p.flatMap((id) => seated.filter((player) => player.id === id));

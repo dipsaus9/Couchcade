@@ -1,6 +1,5 @@
 import { createRoomClock } from "@couchcade/game-sdk/clock";
 import { defineGame, type CouchcadeGame, type Player } from "@couchcade/game-sdk/contract";
-import { createRegistry } from "@couchcade/game-sdk/registry";
 import type {
   HostToRelayMessage,
   JsonValue,
@@ -22,6 +21,8 @@ import { countdownMs } from "../../src/screens/menu/menu.ts";
 import {
   createVirtualTime,
   echoGame,
+  fakeGameRegistry,
+  fakeMetaRegistry,
   inputMessage,
   lobbyWith,
   pickAction,
@@ -64,16 +65,13 @@ const roomSnapshot = (gameId: string | null, d: JsonValue, round = 3): RoomSnaps
 
 describe("planRecovery", () => {
   const players = lobbyWith(3).players;
-  const registry = createRegistry({
-    "games/rounds/src/index.ts": roundsGame({ min: 2 }),
-    "games/echo/src/index.ts": echoGame(),
-  });
+  const gameRegistry = fakeGameRegistry([roundsGame({ id: "rounds", min: 2 }), echoGame()]);
   const plan = (phase: RoomPhase, saved: RoomSnapshot | null, seated = players) =>
-    planRecovery({ phase, snapshot: saved, registry, seated });
+    planRecovery({ phase, snapshot: saved, gameRegistry, seated });
   const ids = players.map((player) => player.id);
 
-  it("resumes a restorable game with the in-game players still seated, in init order", () => {
-    const result = plan(
+  it("resumes a restorable game with the in-game players still seated, in init order", async () => {
+    const result = await plan(
       "playing",
       roomSnapshot("rounds", snapshotData([ids[2]!, ids[0]!, "GONEGONE"])),
     );
@@ -83,27 +81,27 @@ describe("planRecovery", () => {
     expect(result.players.map((player) => player.id)).toEqual([ids[2], ids[0]]);
   });
 
-  it("ends the game with a notice when it can't resume", () => {
+  it("ends the game with a notice when it can't resume", async () => {
     const ended = { to: "menu", notice: tvRestartedNotice };
     // No snapshot, a game without snapshots, an unknown game, data that isn't SnapshotData.
-    expect(plan("playing", null)).toEqual(ended);
-    expect(plan("playing", roomSnapshot("echo", null, 0))).toEqual(ended);
-    expect(plan("playing", roomSnapshot("nope", snapshotData(ids)))).toEqual(ended);
-    expect(plan("playing", roomSnapshot("rounds", { said: {} }))).toEqual(ended);
-    expect(plan("playing", roomSnapshot(null, null))).toEqual(ended);
+    await expect(plan("playing", null)).resolves.toEqual(ended);
+    await expect(plan("playing", roomSnapshot("echo", null, 0))).resolves.toEqual(ended);
+    await expect(plan("playing", roomSnapshot("nope", snapshotData(ids)))).resolves.toEqual(ended);
+    await expect(plan("playing", roomSnapshot("rounds", { said: {} }))).resolves.toEqual(ended);
+    await expect(plan("playing", roomSnapshot(null, null))).resolves.toEqual(ended);
     // Fewer in-game players left than the game needs.
-    expect(plan("playing", roomSnapshot("rounds", snapshotData([ids[0]!, "GONEGONE"])))).toEqual(
-      ended,
-    );
+    await expect(
+      plan("playing", roomSnapshot("rounds", snapshotData([ids[0]!, "GONEGONE"]))),
+    ).resolves.toEqual(ended);
   });
 
-  it("goes to the menu from menu, motion-check and results, and to the lobby otherwise", () => {
+  it("goes to the menu from menu, motion-check and results, and to the lobby otherwise", async () => {
     const saved = roomSnapshot("rounds", snapshotData(ids));
     for (const phase of ["menu", "motion-check", "results"] as const) {
-      expect(plan(phase, saved)).toEqual({ to: "menu", notice: null });
+      await expect(plan(phase, saved)).resolves.toEqual({ to: "menu", notice: null });
     }
     for (const phase of ["lobby", "calibration"] as const) {
-      expect(plan(phase, saved)).toEqual({ to: "lobby" });
+      await expect(plan(phase, saved)).resolves.toEqual({ to: "lobby" });
     }
   });
 });
@@ -257,9 +255,8 @@ describe("host runtime recovery", () => {
       stop: (game) => stageLog.push(`stop ${game.id}`),
     };
     const runtime = createHostRuntime({
-      registry: createRegistry(
-        Object.fromEntries(games.map((game) => [`games/${game.id}/src/index.ts`, game])),
-      ),
+      metaRegistry: fakeMetaRegistry(games),
+      gameRegistry: fakeGameRegistry(games),
       stage,
       clock: createRoomClock({ now: time.now, schedule: time.schedule }),
       send: (message) => sent.push(message),

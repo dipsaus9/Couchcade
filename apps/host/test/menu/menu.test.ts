@@ -1,5 +1,4 @@
 import type { CouchcadeGame } from "@couchcade/game-sdk/contract";
-import { createRegistry } from "@couchcade/game-sdk/registry";
 import { encode } from "@couchcade/protocol";
 import { describe, expect, it } from "vitest";
 import type { LobbyState } from "../../src/screens/lobby/lobby-state.ts";
@@ -15,7 +14,7 @@ import {
   type MenuGame,
   type UiAction,
 } from "../../src/screens/menu/menu.ts";
-import { createVirtualTime, echoGame, lobbyWith } from "../runtime/fixtures.ts";
+import { createVirtualTime, echoGame, fakeMetaRegistry, lobbyWith } from "../runtime/fixtures.ts";
 
 const game = (id: string, min: number, max: number, title = id) =>
   ({ ...echoGame({ id, min, max }), title }) as CouchcadeGame;
@@ -30,17 +29,15 @@ function setup({
   let changes = 0;
   let lobby: LobbyState = lobbyWith(players);
   const menu = createGameMenu({
-    registry: createRegistry(
-      Object.fromEntries(games.map((g) => [`games/${g.id}/src/index.ts`, g])),
-    ),
+    registry: fakeMetaRegistry(games),
     lobby: () => lobby,
     // The room clock runs 1 second ahead of the laptop.
     roomNow: () => time.now() + 1000,
     schedule: time.schedule,
     random,
-    onStart: (g) => {
-      started.push(g.id);
-      menu.close(g.id);
+    onStart: (gameId) => {
+      started.push(gameId);
+      menu.close(gameId);
     },
     onChange: () => (changes += 1),
   });

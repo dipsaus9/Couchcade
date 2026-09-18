@@ -6,7 +6,7 @@ import {
 } from "@couchcade/game-sdk/clock";
 import type { RoomClock, StoredDisplayLag } from "@couchcade/game-sdk/clock";
 import type { CouchcadeGame, Outcome, Player } from "@couchcade/game-sdk/contract";
-import type { GameRegistry } from "@couchcade/game-sdk/registry";
+import type { GameMetaRegistry, LazyGameRegistry } from "@couchcade/game-sdk/registry";
 import type {
   ControllerView,
   HostToRelayMessage,
@@ -43,7 +43,10 @@ import type { Scheduler } from "./timing.ts";
 import { createViewSync } from "./view-sync.ts";
 
 export interface HostRuntimeOptions {
-  registry: GameRegistry;
+  /** Eager: every game's title and player count, for the menu (CC-3.25). */
+  metaRegistry: GameMetaRegistry;
+  /** Lazy: a game's full rules, loaded once when a room actually starts it (CC-3.25). */
+  gameRegistry: LazyGameRegistry;
   send(message: HostToRelayMessage): void;
   stage: GameStage;
   /** Called when the phase, the menu or the running game changes, so the TV can redraw. */
@@ -236,6 +239,8 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
   let phase: HostPhase = "lobby";
   /** True once the relay welcomed this runtime. Only the first welcome of a new TV tab recovers. */
   let welcomed = false;
+  /** True once `dispose()` ran: a game load already in flight (CC-3.25) must not resurrect it. */
+  let disposed = false;
   /**
    * Set from a refreshed TV's `room:welcome` until its clock is synced: the phase the relay stored
    * and the `room:snapshot` it sent. Platform actions and views wait meanwhile.
@@ -247,13 +252,13 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
   let menuNotice: string | null = null;
 
   const menu: GameMenu = createGameMenu({
-    registry: options.registry,
+    registry: options.metaRegistry,
     lobby: () => lobby,
     roomNow: () => clock.toHostTime(now()),
     schedule,
     random: options.random,
-    onStart: (game) => {
-      if (lobby !== null && running === null) begin(game);
+    onStart: (gameId) => {
+      if (lobby !== null && running === null) begin(gameId);
     },
     onChange: () => {
       if (running !== null || motionCheck !== null) return;
@@ -338,8 +343,28 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
     show(null, results.views());
   }
 
+  /** Loads `gameId`'s full rules (CC-3.25), then starts it. A dropped chunk goes back to the menu. */
+  function begin(gameId: string): void {
+    if (lobby === null) return;
+    void options.gameRegistry.load(gameId).then(
+      (game) => {
+        if (!disposed && lobby !== null && running === null) beginLoaded(game);
+      },
+      (error: unknown) => {
+        warn(`${gameId} failed to load: ${String(error)}`);
+        if (disposed || lobby === null || running !== null) return;
+        menuNotice = "That game couldn't load. Try again.";
+        const leaderId = vip(lobby)?.id;
+        if (leaderId !== undefined) menu.action(leaderId, { action: "start" });
+        setPhase(menu.open ? "menu" : "lobby");
+        showPlatformViews();
+        options.onChange?.();
+      },
+    );
+  }
+
   /** Starts `game`, with the motion step first when it needs motion. */
-  function begin(game: CouchcadeGame): void {
+  function beginLoaded(game: CouchcadeGame): void {
     if (lobby === null) return;
     if (!game.needsMotion) {
       start(game, lobby, new Set());
@@ -472,7 +497,8 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
       lobby: () => lobby,
       onPlayAgain: (g) => {
         results = null;
-        begin(g);
+        // Already loaded once: the registry caches it, so this resolves at once.
+        begin(g.id);
       },
       onBackToMenu: () => {
         results = null;
@@ -499,24 +525,30 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
     recovery = { phase: relayPhase, snapshot: null };
     clock.whenSynced().then(
       () => {
-        if (attempt === recoveries) finishRecovery();
+        if (attempt === recoveries) void finishRecovery();
       },
       () => {},
     );
   }
 
-  /** Goes where the recovery table says (session-flow.md, "Recovery"). */
-  function finishRecovery(): void {
+  /**
+   * Goes where the recovery table says (session-flow.md, "Recovery"). `planRecovery` awaits a
+   * lazy game load (CC-3.25), so a newer recovery or a lost lobby while it was in flight cancels
+   * this one instead of clobbering it.
+   */
+  async function finishRecovery(): Promise<void> {
     if (recovery === null) return;
     const { phase: relayPhase, snapshot } = recovery;
     recovery = null;
     if (lobby === null) return;
-    const plan = planRecovery({
+    const attempt = recoveries;
+    const plan = await planRecovery({
       phase: relayPhase,
       snapshot,
-      registry: options.registry,
+      gameRegistry: options.gameRegistry,
       seated: seatedPlayers(lobby),
     });
+    if (attempt !== recoveries || lobby === null) return;
     // The relay is in `relayPhase`, so `room:phase` only goes out when recovery lands elsewhere.
     // This runtime has no party phase yet (CC-8), so a room stored in it goes back to the lobby.
     if (relayPhase === "party") options.send({ t: "room:phase", d: { phase: "lobby" } });
@@ -735,6 +767,7 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
     },
 
     dispose() {
+      disposed = true;
       // Closes every link: the room ends here, whether the host sent `room:end` or the socket
       // closed for another reason (AC4, "Kicks, leaving and expiry" and "on room:end").
       links.closeAll();

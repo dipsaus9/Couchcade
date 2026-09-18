@@ -122,11 +122,17 @@ export interface ControllerProps<TView, TInput extends GameInput, TMotion = Cont
   motion?: TMotion;
 }
 
-export interface CouchcadeGame<
-  TInput extends GameInput = GameInput,
-  TState = unknown,
-  TView extends JsonValue = JsonValue,
-> {
+/**
+ * A game's eagerly-safe metadata: everything the menu (and a host refresh's player-count check)
+ * needs before any room has picked a game (docs/architecture/platform.md, "Auto-discovery
+ * registry"). `games/<id>/src/meta.ts` default-exports one of these, with no other imports beyond
+ * plain literals — `apps/host/src/runtime/games.ts` globs it *eagerly*, so it lands in the
+ * platform bundle that loads before any game is chosen. The full `CouchcadeGame` (`src/index.ts`,
+ * everything below plus the rules) loads lazily, once, only when a room actually starts that game
+ * — the same lazy pattern `hostScene` already uses. `index.ts` imports its own `meta.ts` and
+ * spreads it into `defineGame`, so the two never drift apart.
+ */
+export interface GameMeta {
   /** Kebab-case, equal to the folder name games/<id>. */
   id: string;
   /** Sentence case, shown in menus. */
@@ -145,6 +151,13 @@ export interface CouchcadeGame<
    * nothing can start it. The story that registers the game removes the flag.
    */
   hidden?: boolean;
+}
+
+export interface CouchcadeGame<
+  TInput extends GameInput = GameInput,
+  TState = unknown,
+  TView extends JsonValue = JsonValue,
+> extends GameMeta {
   /** Every input is validated before onPlayerInput. */
   inputSchema: ZodMiniType<TInput>;
 
@@ -195,6 +208,11 @@ export function defineGame<TInput extends GameInput, TState, TView extends JsonV
   return game;
 }
 
+/** Declares a game's eager metadata (`games/<id>/src/meta.ts`). Returns it unchanged. */
+export function defineGameMeta(meta: GameMeta): GameMeta {
+  return meta;
+}
+
 /** Declares a game's phone entry. Returns it unchanged; it exists for type inference. */
 export function defineController(controller: CouchcadeController): CouchcadeController {
   return controller;
@@ -238,14 +256,14 @@ export function isGameId(id: unknown): id is string {
 }
 
 /**
- * The static problems with a game definition: missing members, an id that isn't kebab-case, a
+ * The static problems with a game's metadata: missing members, an id that isn't kebab-case, a
  * title over 16 characters, or player bounds outside `1 <= min <= max <= 8`. An empty list means
- * the shape is valid. Behaviour (purity, determinism) is checked by `testGameContract` in
- * `@couchcade/game-sdk/testing`.
+ * the shape is valid. Shared by `checkGameDefinition` (the full game) and the eager metadata
+ * registry, so `games/<id>/src/meta.ts` and `src/index.ts` are checked the same way.
  */
-export function checkGameDefinition(game: unknown): string[] {
-  if (typeof game !== "object" || game === null) return ["is not an object"];
-  const g = game as Record<string, unknown>;
+export function checkGameMeta(meta: unknown): string[] {
+  if (typeof meta !== "object" || meta === null) return ["is not an object"];
+  const g = meta as Record<string, unknown>;
   const problems: string[] = [];
 
   if (!isGameId(g.id)) problems.push(`id ${JSON.stringify(g.id)} is not kebab-case`);
@@ -274,6 +292,19 @@ export function checkGameDefinition(game: unknown): string[] {
   if (g.hidden !== undefined && typeof g.hidden !== "boolean")
     problems.push("hidden is not a boolean");
   if (typeof g.scene !== "string" || g.scene === "") problems.push("scene is empty");
+
+  return problems;
+}
+
+/**
+ * The static problems with a full game definition: everything `checkGameMeta` checks, plus a
+ * missing `inputSchema` or rule function. An empty list means the shape is valid. Behaviour
+ * (purity, determinism) is checked by `testGameContract` in `@couchcade/game-sdk/testing`.
+ */
+export function checkGameDefinition(game: unknown): string[] {
+  if (typeof game !== "object" || game === null) return ["is not an object"];
+  const g = game as Record<string, unknown>;
+  const problems = checkGameMeta(g);
 
   const schema = g.inputSchema as { safeParse?: unknown } | undefined;
   if (typeof schema?.safeParse !== "function") problems.push("inputSchema is not a zod schema");
