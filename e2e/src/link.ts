@@ -35,8 +35,7 @@ export async function waitForLinkPath(
   timeoutMs = 20_000,
 ): Promise<void> {
   await phone.waitForFunction(
-    ([name, expected]) =>
-      (window as unknown as Record<string, { path?: string } | undefined>)[name]?.path === expected,
+    ([name, expected]) => (window as unknown as LinkHookWindow)[name]?.path === expected,
     [linkHookName, path] as const,
     { timeout: timeoutMs },
   );
