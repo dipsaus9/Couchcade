@@ -114,5 +114,6 @@ export default defineConfig({
     // Bind on the LAN too, not just localhost -- the cloudflared quick tunnel
     // in the README points at this port from the phone.
     host: true,
+    allowedHosts: [".trycloudflare.com"],
   },
 });
