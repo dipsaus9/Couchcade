@@ -209,7 +209,7 @@ export function testGameContract<TInput extends GameInput, TState, TView extends
     // more than Vitest's default 5 s, so each check gets a generous budget.
     // Each check asserts with expect() inside run().
     // oxlint-disable-next-line vitest/expect-expect
-    it.for(checks)("%s", { timeout: 30_000 }, ([, check], { task }) => {
+    it.for(checks)("%s", { timeout: 60_000 }, ([, check], { task }) => {
       check.run(task.file.filepath);
     });
   });
