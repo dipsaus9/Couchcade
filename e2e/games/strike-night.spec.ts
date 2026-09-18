@@ -99,13 +99,13 @@ function swingTrace(ms: number): MotionTrace {
   for (let t = 0; t <= ms; t += 1000 / 60) {
     // z-axis rotation (yaw for bowling swing): ramp up to 300 then fade
     const phase = Math.min(t, 200) / 200; // 0..1 over ~200ms
-    const rz = phase < 0.5 ? phase * 2 * 300 : (1 - phase) * 600; // Triangle wave peak 300
+    const rz = phase < 0.5 ? phase * 2 * 300 : (1 - phase) * 600; // Triangle wave peak 300 deg/s
     samples.push([
       Math.round(t),
       16.7,
       [0, 0, 0], // accel (still)
       [0, 6.94, 6.94], // gravity
-      [0.4, -0.2, rz / 360], // rotation rate: z-axis in rad/s (~rz / 360 converts deg to rad)
+      [0.4, -0.2, rz], // rotation rate: z-axis already in deg/s per trace.ts format, no conversion
     ]);
   }
   return {
@@ -125,22 +125,24 @@ function swingTrace(ms: number): MotionTrace {
 /** Simulates a bowl for the given mode (touch or motion). */
 async function simpleBowl(phone: Page, mode: "touch" | "motion"): Promise<void> {
   if (mode === "touch") {
-    // Touch mode: use mouse swipe on the grip element
+    // Touch mode: use a large swipe up on the grip element to trigger the swipe detector.
+    // The swipe must exceed SWIPE_MIN_PX (packages/motion/src/fallbacks/swing.ts) to qualify.
     const locator = phone.locator("div.grip");
     const box = await locator.boundingBox();
     if (box === null) throw new Error("the grip area is not on screen");
 
     const x = box.x + box.width / 2;
     const y = box.y + box.height / 2;
-    const swipeDistance = box.height * 0.4;
+    // Use a large swipe distance (at least 150px) to ensure it meets minimum swipe threshold
+    const swipeDistance = Math.max(150, box.height * 0.8);
 
     await phone.mouse.move(x, y);
     await phone.mouse.down();
-    await phone.mouse.move(x, y - swipeDistance, { steps: 3 });
+    await phone.mouse.move(x, y - swipeDistance, { steps: 5 });
     await phone.mouse.up();
     await phone.waitForTimeout(100);
   } else {
-    // Motion mode: inject a swing-shaped motion trace with rotation-rate spike
+    // Motion mode: inject a swing-shaped motion trace with rotation-rate spike (300 deg/s peak)
     await playMotionTrace(phone, swingTrace(300));
   }
 }
