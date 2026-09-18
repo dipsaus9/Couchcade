@@ -8,6 +8,7 @@ import { enterMotionFullscreen, exitMotionFullscreen, phonePlatform } from "./mo
 import { createMotionSession } from "./motion/session.ts";
 import GameController from "./runtime/GameController.vue";
 import { showsGameController } from "./runtime/controller.ts";
+import { exposeLinkTestHook } from "./runtime/link-test-hook.ts";
 import { parseAudienceView } from "./screens/audience/audience-view.ts";
 import AudienceScreen from "./screens/audience/AudienceScreen.vue";
 import { parseCalibrationView } from "./screens/calibration/calibration-view.ts";
@@ -29,6 +30,9 @@ import { createPhoneSession } from "./session/session.ts";
 import { screenOf } from "./session/state.ts";
 
 const session = createPhoneSession({ turnstile: createTurnstile({ action: "join" }) });
+// The link's E2E test hook (docs/architecture/realtime-link.md, "Testing"): production builds
+// never read or set the global, since the call site sits behind `import.meta.env.DEV`.
+if (import.meta.env.DEV) exposeLinkTestHook(session.link);
 const state = session.state;
 const screen = computed(() => screenOf(state.value));
 const kicked = computed(() => kickedFrom(state.value));
