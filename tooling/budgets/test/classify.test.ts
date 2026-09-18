@@ -85,4 +85,40 @@ describe("measureApp", () => {
     expect(perGame.size).toBe(0);
     expect(platformGzipBytes).toBe(gzipSize("// index-abc.js\n"));
   });
+
+  it("excludes a matched lazy chunk from the platform total and tallies it on its own", () => {
+    const items = [
+      chunk("index-abc.js", "/repo/apps/controller/src/main.ts"),
+      chunk("PipCustomiser-xyz.js", "/repo/apps/controller/src/pips/PipCustomiser.vue"),
+    ];
+    const { platformGzipBytes, lazyGzipBytes } = measureApp(
+      items,
+      [],
+      [{ name: "Controller Pip customiser chunk", path: "apps/controller/src/pips/" }],
+    );
+    expect(platformGzipBytes).toBe(gzipSize("// index-abc.js\n"));
+    expect(lazyGzipBytes.get("Controller Pip customiser chunk")).toBe(
+      gzipSize("// PipCustomiser-xyz.js\n"),
+    );
+  });
+
+  it("reports zero for a configured lazy matcher no chunk resolves into", () => {
+    const items = [chunk("index-abc.js", "/repo/apps/controller/src/main.ts")];
+    const { lazyGzipBytes } = measureApp(items, [], [{ name: "Never matched", path: "nowhere/" }]);
+    expect(lazyGzipBytes.get("Never matched")).toBe(0);
+  });
+
+  it("still excludes a game chunk from platform even when a lazy matcher is configured", () => {
+    const items = [
+      chunk("index-abc.js", "/repo/apps/controller/src/main.ts"),
+      chunk("controller-a1.js", "/repo/games/quick-draw/src/controller/index.ts"),
+    ];
+    const { platformGzipBytes, perGame } = measureApp(
+      items,
+      [],
+      [{ name: "Controller Pip customiser chunk", path: "apps/controller/src/pips/" }],
+    );
+    expect(perGame.get("quick-draw")).toBe(gzipSize("// controller-a1.js\n"));
+    expect(platformGzipBytes).toBe(gzipSize("// index-abc.js\n"));
+  });
 });

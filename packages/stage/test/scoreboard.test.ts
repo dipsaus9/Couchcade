@@ -1,4 +1,4 @@
-import { color, players as playerTokens } from "@couchcade/theme";
+import { color, pip as pipColours, players as playerTokens } from "@couchcade/theme";
 import { describe, expect, it } from "vitest";
 import { metrics, safeArea } from "../src/layout/index.ts";
 import { StageScene } from "../src/scene/index.ts";
@@ -25,7 +25,7 @@ function chip(scoreboard: Scoreboard, id: string): ScoreboardChip {
 }
 
 describe("Scoreboard", () => {
-  it("shows seated players in join order with their shape and score", async () => {
+  it("shows seated players in join order with their Pip head and score", async () => {
     const { game, scene } = await boot(StageScene);
     const scoreboard = scene.addScoreboard({
       players: room,
@@ -44,23 +44,17 @@ describe("Scoreboard", () => {
     const xs = scoreboard.chips.map((c) => c.bounds.x);
     expect(xs).toEqual(xs.toSorted((a, b) => a - b));
 
-    for (const [id, slot] of [
-      ["sam", 0],
-      ["noor", 1],
-      ["jesse", 2],
-      ["lotte", 3],
-      ["daan", 4],
-    ] as const) {
+    for (const id of ["sam", "noor", "jesse", "lotte", "daan"]) {
       const { bounds } = chip(scoreboard, id);
-      // The centre of the 36×36 shape carries the player's colour, Ink around it, Chalk around that.
-      const { padStart, shapeSize } = scoreboardMetrics;
-      const shapeX = bounds.x + padStart;
-      const shapeY = bounds.y + Math.floor((bounds.height - shapeSize) / 2);
-      const token = playerTokens[slot];
+      // The centre of the head crop sits inside the head circle, so it carries the skin tone
+      // (`player()` in boot.ts gives every test player the same default profile, skin index 0).
+      const { padStart, pipHeadSize } = scoreboardMetrics;
+      const pipHeadX = bounds.x + padStart;
+      const pipHeadY = bounds.y + Math.floor((bounds.height - pipHeadSize) / 2);
       expect(
-        hex(await pixel(game, shapeX + shapeSize / 2, shapeY + shapeSize / 2)),
-        `${id} shape`,
-      ).toBe(expectedColour(token.color));
+        hex(await pixel(game, pipHeadX + pipHeadSize / 2, pipHeadY + pipHeadSize / 2)),
+        `${id} Pip head`,
+      ).toBe(expectedColour(pipColours.skin[0]));
       expect(
         hex(await pixel(game, bounds.x + metrics.outline + 2, bounds.y + bounds.height / 2)),
         `${id} fill`,
@@ -128,14 +122,13 @@ describe("Scoreboard", () => {
     });
     expect(scoreboard.chips).toHaveLength(8);
     for (const c of scoreboard.chips) {
-      const slot = Number(c.playerId.slice(1));
-      const { padStart, shapeSize } = scoreboardMetrics;
-      const shapeX = c.bounds.x + padStart;
-      const shapeY = c.bounds.y + Math.floor((c.bounds.height - shapeSize) / 2);
-      const centre = shapeSize / 2;
-      expect(hex(await pixel(game, shapeX + centre, shapeY + centre)), `${c.playerId} shape`).toBe(
-        expectedColour(playerTokens[slot]!.color),
-      );
+      const { padStart, pipHeadSize } = scoreboardMetrics;
+      const pipHeadX = c.bounds.x + padStart;
+      const pipHeadY = c.bounds.y + Math.floor((c.bounds.height - pipHeadSize) / 2);
+      expect(
+        hex(await pixel(game, pipHeadX + pipHeadSize / 2, pipHeadY + pipHeadSize / 2)),
+        `${c.playerId} Pip head`,
+      ).toBe(expectedColour(pipColours.skin[0]));
       expect(c.bounds.x).toBeGreaterThanOrEqual(safeArea.left + metrics.outline);
       expect(c.bounds.x + c.bounds.width).toBeLessThanOrEqual(safeArea.right - metrics.outline);
       expect(c.bounds.y - metrics.outline).toBeGreaterThanOrEqual(safeArea.top);

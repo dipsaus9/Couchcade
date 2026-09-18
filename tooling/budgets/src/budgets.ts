@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { build } from "vite";
-import type { AppMeasurements, BuiltItem } from "./classify.ts";
+import type { AppMeasurements, BuiltItem, LazyChunkMatcher } from "./classify.ts";
 import { measureApp } from "./classify.ts";
 import { formatReport, type CheckResult } from "./report.ts";
 import { parseSize } from "./size.ts";
@@ -12,13 +12,18 @@ export interface BudgetCheckConfig {
   /** Which app's build to measure. Its Vite config is read from `apps/<app>/vite.config.ts`. */
   app: "controller" | "host";
   /**
-   * - `platform`: everything the app loads before a game is picked (see `classify.ts`).
+   * - `platform`: everything the app loads before a game is picked or a lazy screen opens (see `classify.ts`).
    * - `per-game`: checked once per `games/<id>/` the build actually emits a chunk for.
    * - `fonts`: raw size of every `.woff2` asset the app's build emits.
    * - `vendor`: gzip size of chunks built from the npm package named in `vendor`.
+   * - `lazy`: gzip size of the chunk(s) whose `facadeModuleId` contains `path` — a platform screen
+   *   loaded through a dynamic `import()`, so it's excluded from `platform` (it never loads before
+   *   the screen it belongs to opens).
    */
-  kind: "platform" | "per-game" | "fonts" | "vendor";
+  kind: "platform" | "per-game" | "fonts" | "vendor" | "lazy";
   vendor?: string;
+  /** Required for `kind: "lazy"`: a substring of the matching chunk's `facadeModuleId`. */
+  path?: string;
   /** `true` measures gzip size (code budgets); `false` measures the file as built (fonts). */
   gzip: boolean;
   limit: string;
@@ -49,6 +54,9 @@ function loadConfig(configFile: string): BudgetCheckConfig[] {
       throw new Error(
         `${configFile}: "${entry.name as string}" has kind "vendor" but no "vendor".`,
       );
+    }
+    if (entry.kind === "lazy" && typeof entry.path !== "string") {
+      throw new Error(`${configFile}: "${entry.name as string}" has kind "lazy" but no "path".`);
     }
   }
   return parsed as BudgetCheckConfig[];
@@ -130,7 +138,10 @@ export async function runBudgets({
     const vendors = checks
       .filter((c) => c.app === app && c.kind === "vendor")
       .map((c) => c.vendor as string);
-    measurements.set(app, measureApp(await buildApp(rootDir, app), vendors));
+    const lazyChunks: LazyChunkMatcher[] = checks
+      .filter((c) => c.app === app && c.kind === "lazy")
+      .map((c) => ({ name: c.name, path: c.path as string }));
+    measurements.set(app, measureApp(await buildApp(rootDir, app), vendors, lazyChunks));
   }
 
   const results: CheckResult[] = [];
@@ -168,6 +179,16 @@ export async function runBudgets({
             results.push(checkResult(`${check.name} (${gameId})`, bytes, limitBytes, check.note));
           }
         }
+        break;
+      case "lazy":
+        results.push(
+          checkResult(
+            check.name,
+            measurement.lazyGzipBytes.get(check.name) ?? 0,
+            limitBytes,
+            check.note,
+          ),
+        );
         break;
     }
   }
