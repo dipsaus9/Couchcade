@@ -35,6 +35,30 @@ Every CC0 asset Couchcade uses, collected from each game's `CREDITS.md` and ever
 | Standoff wind loop (`assets/sounds/wind-loop.ogg`) | SketchMan3 | https://opengameart.org/content/wind-whoosh-loop | CC0 |
 | Crow caw, fake-out (`assets/sounds/crow-caw.wav`) | zeroisnotnull | https://opengameart.org/content/crow-caw | CC0 |
 
+## Strike Night
+
+| Asset | Author | Source | Licence |
+| --- | --- | --- | --- |
+| Bench (`assets/sprites/bench.png`, Roguelike Indoors tile at sheet position 68,102) | Kenney | https://kenney.nl/assets/roguelike-indoors | CC0 |
+| Chair (`assets/sprites/chair.png`, tile at 34,34) | Kenney | https://kenney.nl/assets/roguelike-indoors | CC0 |
+| Small table (`assets/sprites/table.png`, tile at 34,0) | Kenney | https://kenney.nl/assets/roguelike-indoors | CC0 |
+| Framed picture (`assets/sprites/picture-frame.png`, tile at 306,0) | Kenney | https://kenney.nl/assets/roguelike-indoors | CC0 |
+| Potted plant (`assets/sprites/potted-plant.png`, tile at 272,0) | Kenney | https://kenney.nl/assets/roguelike-indoors | CC0 |
+| Ball rolling on the lane (`assets/sounds/bowling-roll.ogg`, `qubodup-bowling_roll.ogg`) | qubodup | https://opengameart.org/content/bowling-ball-rolling | CC0 |
+| Ball rolling, no fade-out, for a gutter ball (`assets/sounds/bowling-roll-nofade.ogg`, `qubodup-bowling_roll-nofadeout.ogg`) | qubodup | https://opengameart.org/content/bowling-ball-rolling | CC0 |
+| Ball into pins, heavy crash x5 (`assets/sounds/pin-crash-heavy-1.ogg` to `-5.ogg`, Impact Sounds `impactWood_heavy_000` to `_004`) | Kenney | https://kenney.nl/assets/impact-sounds | CC0 |
+| Ball into pins, medium crash x5 (`assets/sounds/pin-crash-medium-1.ogg` to `-5.ogg`, Impact Sounds `impactWood_medium_000` to `_004`) | Kenney | https://kenney.nl/assets/impact-sounds | CC0 |
+| Ball into pins, light crash x5 (`assets/sounds/pin-crash-light-1.ogg` to `-5.ogg`, Impact Sounds `impactWood_light_000` to `_004`) | Kenney | https://kenney.nl/assets/impact-sounds | CC0 |
+| Pin into a kickback x5 (`assets/sounds/kickback-thud-1.ogg` to `-5.ogg`, Impact Sounds `impactPlank_medium_000` to `_004`) | Kenney | https://kenney.nl/assets/impact-sounds | CC0 |
+| Sweep bar clunk x5 (`assets/sounds/sweep-clunk-1.ogg` to `-5.ogg`, Impact Sounds `impactMetal_light_000` to `_004`) | Kenney | https://kenney.nl/assets/impact-sounds | CC0 |
+| Clock tick, last 5 seconds (`assets/sounds/clock-tick.ogg`, Interface Sounds `tick_001`) | Kenney | https://kenney.nl/assets/interface-sounds | CC0 |
+| Spare ding (`assets/sounds/spare-ding.ogg`, Interface Sounds `glass_001`) | Kenney | https://kenney.nl/assets/interface-sounds | CC0 |
+| Strike jingle (`assets/sounds/strike-jingle.ogg`, Music Jingles "8-Bit jingles/jingles_NES00") | Kenney | https://kenney.nl/assets/music-jingles | CC0 |
+| Turkey jingle (`assets/sounds/turkey-jingle.ogg`, Music Jingles "8-Bit jingles/jingles_NES03") | Kenney | https://kenney.nl/assets/music-jingles | CC0 |
+| Match end jingle (`assets/sounds/match-end.ogg`, Music Jingles "Hit jingles/jingles_HIT02") | Kenney | https://kenney.nl/assets/music-jingles | CC0 |
+| Game music loop (`assets/sounds/game-music-loop.mp3`) | iamoneabe (Aron Elal) | https://opengameart.org/content/funky-menu-loop | CC0 |
+| Music backup (`assets/sounds/music-backup.mp3`), Target Range's backup too | TinyWorlds | https://opengameart.org/content/happy-adventure-loop | CC0 |
+
 ## Target Range
 
 | Asset | Author | Source | Licence |

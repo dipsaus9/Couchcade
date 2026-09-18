@@ -8,6 +8,7 @@ import { benchSlot, bowlerStandPoint } from "./layout.ts";
 import { InstructionPanel, PinMap, Scorecard } from "./overlays.ts";
 import { nextBowlerId, present } from "./present.ts";
 import type { Places, RollCache } from "./present.ts";
+import { loadSprites } from "./sprites.ts";
 import { BallActor, LaneBackdrop, PinPool, PipPool } from "./world.ts";
 
 /** Scene key: the game id, which the host stage uses to add and remove the scene. */
@@ -53,6 +54,10 @@ export default class StrikeNightScene extends StageScene<StrikeNightState> {
     this.previous = null;
     this.rollCache = emptyCache;
     this.callout = null;
+  }
+
+  preload(): void {
+    loadSprites(this.load, this.textures);
   }
 
   create(): void {
