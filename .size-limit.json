@@ -24,6 +24,15 @@
     "note": "README.md, Performance budgets > Phone controller > Fonts (2 subsetted WOFF2 files). WOFF2 is already compressed, so this is the raw file size, not gzip."
   },
   {
+    "name": "Controller Pip customiser chunk",
+    "app": "controller",
+    "kind": "lazy",
+    "path": "apps/controller/src/pips/",
+    "gzip": true,
+    "limit": "4 KB",
+    "note": "docs/architecture/pips.md, Budgets: \"Customiser screen as a lazy chunk <= 4 KB\". LobbyScreen.vue loads it through a dynamic import() (defineAsyncComponent), so it never reaches a phone that doesn't open \"Make your Pip\" and is excluded from Controller initial JS."
+  },
+  {
     "name": "Host platform JS",
     "app": "host",
     "kind": "platform",
