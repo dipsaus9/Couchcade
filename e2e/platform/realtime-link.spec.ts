@@ -2,9 +2,9 @@ import { expect, test } from "../src/fixtures.ts";
 import { joinRoom, openRoom } from "../src/flows.ts";
 import {
   cutLink,
+  expectedLinkPath,
   framesOfType,
   linkPath,
-  observeLinkPath,
   recordRelayFrames,
   waitForHostConnected,
   waitForLinkPath,
@@ -19,18 +19,20 @@ import { playFullMatch, startMatch, tvState } from "../src/target-range.ts";
 // `PhoneOptions.search`).
 //
 // WebRTC between two browser contexts on a GitHub-hosted runner can be slow to negotiate, so every
-// wait below is generous. Chromium always completes a direct connection; Playwright's own WebKit
-// build sometimes can't (realtime-link.md, "Playwright WebKit has no WebRTC") even though it
-// exposes `RTCPeerConnection` -- so these specs observe the path the link actually settles on
-// (`observeLinkPath`) instead of predicting it from feature detection, and assert the relay path
-// instead when direct never arrives, or skip the case entirely when there is no connection to act
-// on (AC4).
+// wait below is generous. Chromium must always complete a direct connection -- `expectedLinkPath`
+// requires it there, failing the test if it doesn't, since AC1 says the direct path must be shown,
+// not merely attempted. Playwright's own WebKit build sometimes can't (realtime-link.md, "Playwright
+// WebKit has no WebRTC") even though it exposes `RTCPeerConnection`, so only on webkit does
+// `expectedLinkPath` observe the path the link actually settles on instead of requiring "direct",
+// and the specs assert the relay path instead when direct never arrives there, or skip the case
+// entirely when there is no connection to act on (AC4).
 
 test.use({ hostSearch: "?link=1" });
 
 test("a phone reaches the direct link and plays a full Target Range match with no input on the relay socket", async ({
   host,
   phones,
+  browserName,
 }) => {
   test.setTimeout(240_000);
 
@@ -47,7 +49,7 @@ test("a phone reaches the direct link and plays a full Target Range match with n
   if (!ana || !ben || !anaFrames) throw new Error("expected two phones");
 
   await startMatch(host, ana, ben, code);
-  const path = await observeLinkPath(ana, 30_000);
+  const path = await expectedLinkPath(ana, browserName, 30_000);
   if (path !== "direct") {
     test.info().annotations.push({
       type: "note",
@@ -68,6 +70,7 @@ test("a phone reaches the direct link and plays a full Target Range match with n
 test("cutting the link moves the phone to relay within 1 second and the match still completes", async ({
   host,
   phones,
+  browserName,
 }) => {
   test.setTimeout(240_000);
 
@@ -77,7 +80,7 @@ test("cutting the link moves the phone to relay within 1 second and the match st
   if (!ana || !ben) throw new Error("expected two phones");
 
   await startMatch(host, ana, ben, code);
-  const path = await observeLinkPath(ana, 30_000);
+  const path = await expectedLinkPath(ana, browserName, 30_000);
   test.skip(path !== "direct", "this engine never reached the direct link: nothing to cut (AC4)");
 
   let cutOnce = false;
@@ -99,6 +102,7 @@ test("cutting the link moves the phone to relay within 1 second and the match st
 test("a TV reload brings the phone's link back after room:host connected true", async ({
   host,
   phones,
+  browserName,
 }) => {
   test.setTimeout(120_000);
 
@@ -113,7 +117,7 @@ test("a TV reload brings the phone's link back after room:host connected true", 
   if (!ana || !frames) throw new Error("expected a phone");
 
   await joinRoom(ana, code, "Ana");
-  const path = await observeLinkPath(ana, 30_000);
+  const path = await expectedLinkPath(ana, browserName, 30_000);
   if (path !== "direct") {
     test.info().annotations.push({
       type: "note",

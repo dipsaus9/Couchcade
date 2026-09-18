@@ -69,6 +69,25 @@ export async function observeLinkPath(
   }
 }
 
+/**
+ * The path a spec should expect for `browserName`, per AC4: Chromium always completes a direct
+ * connection, so this *requires* it -- `waitForLinkPath` throws (failing the test) if it doesn't,
+ * the way AC1 says the direct path must be shown, not merely attempted. Only on `webkit` does this
+ * fall back leniently through `observeLinkPath`, since that's the one engine realtime-link.md
+ * documents as sometimes lacking a working WebRTC implementation.
+ */
+export async function expectedLinkPath(
+  phone: Page,
+  browserName: string,
+  timeoutMs = 30_000,
+): Promise<"direct" | "relay"> {
+  if (browserName !== "webkit") {
+    await waitForLinkPath(phone, "direct", timeoutMs);
+    return "direct";
+  }
+  return observeLinkPath(phone, timeoutMs);
+}
+
 export interface RelayFrame {
   t: string;
   d: Record<string, unknown>;
