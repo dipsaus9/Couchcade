@@ -4,7 +4,7 @@ title: Split the game registry into eager metadata and lazily loaded rules
 status: Done
 assignee: []
 created_date: '2026-09-17 22:18'
-updated_date: '2026-09-18 04:41'
+updated_date: '2026-09-18 05:18'
 labels:
   - story
 dependencies: []
@@ -120,6 +120,19 @@ pnpm --filter @couchcade/budgets test (22/22) and pnpm --filter ./tooling/check-
 check:deps (clean) in the worktree itself.
 
 CI e2e run on PR #130 caught a real regression the review missed: e2e/platform/motion-permission.spec.ts reached into apps/host/src/runtime/games.ts's old single-registry export at runtime via a dynamic import in the browser (not statically importable/typecheckable from a Node context, so pnpm check's typecheck never saw it). Fixed by patching both metaRegistry and gameRegistry there; verified locally (playwright test, chromium project) for motion-permission, quick-draw and host-recovery specs before re-pushing. Added e2e/platform/motion-permission.spec.ts to References.
+
+Merged origin/main again (2026-09-18, later): CC-3.20 (WebRTC links on the host), CC-3.21 (aim
+through the input channel), CC-6.3/CC-6.4 (pips) had landed since the first push. One real conflict
+in apps/host/src/runtime/host-runtime.ts's dispose() (kept both: disposed = true and
+links.closeAll()) and its test's import block (kept both createLazyGameRegistry and the
+HostSceneData type CC-3.20's tests need); game-runner.ts, links.ts, link-switch.ts and everything
+outside apps/host/src/runtime/host-runtime.ts merged automatically. One CC-3.20 test needed a fix
+after the merge (not a conflict, a behavioural gap): "gives the running game's scene a link()
+accessor..." asserted right after play() with no await, so it ran before the now-async game load
+resolved - added the missing await settle(). Re-verified: pnpm check, check:deps, test (all 24
+packages, 267 apps/host tests) and build all green. Budgets: Host platform JS 419.92 KB / 450 KB,
+all 8 budgets pass. Stayed out of apps/host/src/audio/platform-sounds.ts, App.vue and
+public/audio - didn't touch them, no conflict there for me to report.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
