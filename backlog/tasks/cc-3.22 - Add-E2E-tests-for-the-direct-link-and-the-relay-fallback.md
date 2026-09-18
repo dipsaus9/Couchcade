@@ -4,7 +4,7 @@ title: Add E2E tests for the direct link and the relay fallback
 status: Done
 assignee: []
 created_date: '2026-09-17 17:51'
-updated_date: '2026-09-18 07:00'
+updated_date: '2026-09-18 07:18'
 labels:
   - story
 dependencies:
@@ -98,6 +98,31 @@ ground truth instead of a constructor-existence check that doesn't reflect wheth
 can actually complete. Re-verified green locally on chromium and webkit (both reach direct here);
 CI's webkit outcome (direct or relay) will show once this push's CI run completes -- either way the
 specs now assert correctly instead of failing.
+
+Reviewer round 2 (dipsaus-ai:story-reviewer, sonnet): block. Two findings, both fixed:
+1. Blocking (AC1 not met): observeLinkPath()'s catch-and-fall-back-to-relay applied to every
+   engine, so a real regression breaking the direct link on Chromium would silently pass on relay
+   instead of failing. Fixed: added expectedLinkPath(phone, browserName, timeoutMs) which requires
+   "direct" on every engine except webkit (throws/fails the test if Chromium doesn't reach it,
+   matching AC1's "shows a Chromium phone reaching the direct path"), and only falls back leniently
+   through observeLinkPath on webkit. All three specs updated to use it with the browserName
+   fixture.
+2. Blocking (scope): apps/controller/src/App.vue, runtime/link-test-hook.ts, runtime/link.ts,
+   e2e/games/target-range.spec.ts, e2e/src/fixtures.ts and e2e/src/target-range.ts are all outside
+   the declared References (e2e/platform/realtime-link.spec.ts, e2e/src/link.ts). Round 1's
+   reviewer independently judged this a necessary prerequisite (not a violation); round 2's
+   reviewer applied the check mechanically regardless of justification. Rather than editing the
+   story's frozen References to route around the disagreement -- and after finding that doing so
+   creates a real ReferenceCollision with CC-3.23 and CC-3.26 (both To Do, both also declare
+   apps/controller/src/runtime/link.ts) -- chose instead to shrink the actual diff: reverted the
+   games/target-range.spec.ts extraction and the fixtures.ts hostSearch/search options, and made
+   realtime-link.spec.ts fully self-contained (its own copy of the match-driving helpers, ?link=1
+   via a direct goto() instead of a fixture option). The diff against declared References is now
+   only the two spec/link.ts files plus the controller-side test hook (App.vue,
+   runtime/link-test-hook.ts, runtime/link.ts) -- which is the one piece of out-of-reference work
+   that is genuinely unavoidable: the hook has to live in the app bundle Playwright actually runs,
+   the same way the existing window.__couchcadeMotion hook does. Re-verified green on chromium and
+   webkit (8/8 including the restored games/target-range.spec.ts).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
