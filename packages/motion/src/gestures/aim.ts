@@ -4,27 +4,23 @@
  *
  * - `createAimDetector` turns the pose tracker's readings into `{ yaw, pitch }`, −1 to 1, relative
  *   to the recentre point. It is pure: time comes only from the readings.
- * - `createAimSender` samples the latest aim at most 15 times a second and sends the samples packed
- *   through the CC-3.6 input stream, which allows at most 4 messages a second.
+ * - `createAimSender` skips a sample that barely moved, then streams every kept one through the
+ *   game's `InputChannel` (docs/architecture/realtime-link.md, "Game SDK API sketch"). Pacing and
+ *   packing for the direct link and the relay path both live in the channel now, not here.
  * - `fallbacks/aim.ts` is the drag pad that emits the same readings on phones without a gyroscope.
  *
  * ```ts
  * const tracker = createPoseTracker(calibration);   // one per controller
  * const aim = createAimDetector();
- * const sender = createAimSender(stream);          // the game's one input stream
+ * const sender = createAimSender(input);           // the controller's one InputChannel
  * aim.on((reading) => sender.update(reading));
  * adapter.start((sample) => aim.push(tracker.push(sample)));
  * // A shot carries the aim at the moment of firing (motion.md, "Fitting the input budget", rule 3):
- * stream.fire({ type: "shot", payload: { aim: aim.aim() } }, event.timeStamp);
+ * input.fire({ type: "shot", payload: { aim: aim.aim() } }, event.timeStamp);
  * ```
  */
-import type { ClockScheduler } from "@couchcade/game-sdk/clock";
-import {
-  AIM_SAMPLES_PER_MESSAGE,
-  AIM_SAMPLES_PER_SECOND,
-  type Aim,
-  type InputStream,
-} from "@couchcade/game-sdk/input";
+import type { GameInput, InputChannel } from "@couchcade/game-sdk/contract";
+import type { Aim } from "@couchcade/game-sdk/input";
 import type { PoseReading } from "../calibration/pose.ts";
 import { rotate, vec } from "../calibration/vector.ts";
 
@@ -32,10 +28,8 @@ import { rotate, vec } from "../calibration/vector.ts";
 export const AIM_YAW_RANGE_DEG = 25;
 /** Degrees of pitch that map to ±1 (game may tune). */
 export const AIM_PITCH_RANGE_DEG = 15;
-/** Time between two aim samples: 15 per second. */
-export const AIM_SAMPLE_INTERVAL_MS = 1000 / AIM_SAMPLES_PER_SECOND;
 /** A sample that moved less than this on both axes since the last one sent is skipped. */
-export const AIM_MIN_STEP = 0.01;
+export const AIM_MIN_STEP = 0.001;
 
 /** The aim at one moment: yaw and pitch from −1 to 1, and the local event or sample time in ms. */
 export interface AimReading extends Aim {
@@ -58,7 +52,7 @@ export interface AimSource<TInput> {
   recentre(t?: number): void;
   /** Forgets the recentre point and the aim. Listeners stay. */
   reset(): void;
-  /** The current aim, rounded to 2 decimals. `{ yaw: 0, pitch: 0 }` before any input. */
+  /** The current aim, rounded to 3 decimals. `{ yaw: 0, pitch: 0 }` before any input. */
   aim(): Aim;
   /** Called whenever the rounded aim changes. Returns a function that removes the listener. */
   on(listener: AimListener): () => void;
@@ -96,7 +90,7 @@ const MIN_HORIZONTAL = 1e-6;
  * - `yaw` is the change in the top edge's heading around up (motion Z) since the recentre point,
  *   positive to the right. `pitch` is the change in the top edge's elevation, positive up. Both are
  *   measured around world axes, so rolling the wrist doesn't move the aim.
- * - ±25° of yaw and ±15° of pitch map to ±1, clamped, rounded to 2 decimals.
+ * - ±25° of yaw and ±15° of pitch map to ±1, clamped, rounded to 3 decimals.
  * - Until `recentre()` is called, the first reading is the recentre point.
  *
  * Feed it what the controller's one pose tracker returns: `aim.push(tracker.push(sample))`. The
@@ -182,132 +176,60 @@ export function createAimOutput(): AimOutput {
   };
 }
 
-/** One packed sample as it goes over the socket: offset from the input's `at`, yaw, pitch. */
-export type PackedAimSample = [dtMs: number, yaw: number, pitch: number];
-
-/** The input the sender streams. The game's input schema includes it. */
-export interface AimInput {
-  type: string;
-  payload: { aim: PackedAimSample[] };
-}
-
-/**
- * Packs readings, oldest first, into the format `addAimSamples` on the host reads: at most the
- * newest 4, newest last, each `dtMs` its offset from the newest reading in whole milliseconds (so
- * 0 for the newest and negative for older ones). The newest reading's `t` is the input's
- * `eventTimeStamp`, so the send helper stamps `at` with it.
- */
-export function packAim(readings: readonly AimReading[]): PackedAimSample[] {
-  const window = readings.slice(-AIM_SAMPLES_PER_MESSAGE);
-  const newest = window.at(-1);
-  if (newest === undefined) return [];
-  return window.map(({ t, yaw, pitch }) => [Math.round(t - newest.t) + 0, yaw, pitch]);
-}
+/** The input `createAimSender` streams: one aim sample, matching the Game SDK API sketch. */
+export type AimInput = { type: string; payload: { yaw: number; pitch: number } };
 
 export interface AimSenderOptions {
   /** The input type. Defaults to `"aim"`. */
   type?: string;
-  /** Local clock in ms, the time base of the readings. Defaults to `performance.now()`. */
-  now?: () => number;
-  /** Defaults to `setTimeout` and `clearTimeout`. */
-  schedule?: ClockScheduler;
 }
 
 export interface AimSender {
-  /** The latest aim. Called on every change; the sender takes a sample at most 15 times a second. */
+  /** The latest aim. Streamed at once unless it barely moved from the last one sent. */
   update(reading: AimReading): void;
-  /** Forgets the samples and the last one sent, such as when a turn ends. The next sample goes out. */
+  /** Forgets the last sample sent, such as when a turn ends. The next update always goes out. */
   reset(): void;
   /** Resets and ignores every later call. */
   dispose(): void;
 }
 
-interface TimerGlobals {
-  performance: { now(): number };
-  setTimeout(callback: () => void, delayMs: number): unknown;
-  clearTimeout(handle: unknown): void;
-}
-
-// The lib tsconfig has no DOM types. Browsers and Node both provide these.
-const globals = globalThis as unknown as TimerGlobals;
-
-const scheduleTimeout: ClockScheduler = (callback, delayMs) => {
-  const handle = globals.setTimeout(callback, delayMs);
-  return () => globals.clearTimeout(handle);
-};
-
 /**
- * Streams aim through the game's CC-3.6 input stream (motion.md, "Aim", sending):
+ * Streams aim through the controller's `InputChannel` (docs/architecture/realtime-link.md, "Game
+ * SDK API sketch"): one call to `channel.stream` per aim sample, rounded to 3 decimals. Pacing to
+ * the direct link's rate and packing for the relay path both live in the channel now, so the sender
+ * itself no longer batches or times anything.
  *
- * - Samples the latest aim at most once per 66.7 ms (15 per second): at once when the last sample
- *   is at least that old, else when it is. One timer, set only while an update waits.
- * - Skips a sample that moved less than 0.01 on both axes from the last one sent, so a phone held
- *   still sends nothing.
- * - Every kept sample calls `stream.set` with the rolling window of the latest 4 kept samples,
- *   packed by `packAim`. The stream sends at most 4 messages a second and its latest-wins rule
- *   drops the windows in between, so each message carries the samples taken since the one before.
+ * Skips a sample that moved less than `AIM_MIN_STEP` on both axes from the last one sent, so a
+ * phone held still sends nothing.
  */
-export function createAimSender(
-  stream: Pick<InputStream<AimInput>, "set">,
+export function createAimSender<TInput extends GameInput = AimInput>(
+  channel: Pick<InputChannel<TInput>, "stream">,
   options: AimSenderOptions = {},
 ): AimSender {
   const type = options.type ?? "aim";
-  const now = options.now ?? (() => globals.performance.now());
-  const schedule = options.schedule ?? scheduleTimeout;
 
-  let window: AimReading[] = [];
-  let latest: AimReading | null = null;
-  let lastSampleAt = Number.NEGATIVE_INFINITY;
-  let cancelTimer: (() => void) | null = null;
+  let lastSent: Aim | null = null;
   let disposed = false;
-
-  const takeSample = () => {
-    const reading = latest;
-    latest = null;
-    if (reading === null) return;
-    lastSampleAt = now();
-    const last = window.at(-1);
-    if (last !== undefined && !movedFrom(last, reading)) return;
-    window = [...window, reading].slice(-AIM_SAMPLES_PER_MESSAGE);
-    stream.set({ type, payload: { aim: packAim(window) } }, reading.t);
-  };
-
-  // Timers may round their delay, so a timer that fires early waits again rather than sampling.
-  const pump = () => {
-    if (disposed || cancelTimer !== null || latest === null) return;
-    const waitMs = lastSampleAt + AIM_SAMPLE_INTERVAL_MS - now();
-    if (waitMs <= 0) {
-      takeSample();
-      return;
-    }
-    cancelTimer = schedule(() => {
-      cancelTimer = null;
-      pump();
-    }, Math.ceil(waitMs));
-  };
-
-  const reset = () => {
-    cancelTimer?.();
-    cancelTimer = null;
-    window = [];
-    latest = null;
-  };
 
   return {
     update(reading) {
       if (disposed) return;
-      latest = reading;
-      pump();
+      if (lastSent !== null && !movedFrom(lastSent, reading)) return;
+      const payload: Aim = { yaw: round3(reading.yaw), pitch: round3(reading.pitch) };
+      lastSent = payload;
+      channel.stream({ type, payload } as unknown as TInput, reading.t);
     },
-    reset,
+    reset() {
+      lastSent = null;
+    },
     dispose() {
-      reset();
+      lastSent = null;
       disposed = true;
     },
   };
 }
 
-// Aim values are rounded to 2 decimals, so a real step is 0.01 give or take float error.
+// Aim values are rounded to 3 decimals, so a real step is 0.001 give or take float error.
 const STEP_TOLERANCE = 1e-9;
 
 function movedFrom(last: Aim, next: Aim): boolean {
@@ -315,10 +237,15 @@ function movedFrom(last: Aim, next: Aim): boolean {
   return Math.abs(next.yaw - last.yaw) >= step || Math.abs(next.pitch - last.pitch) >= step;
 }
 
-/** Clamped to −1..1 and rounded to 2 decimals, without `-0`. */
+/** Clamped to −1..1 and rounded to 3 decimals, without `-0`. */
 function roundUnit(value: number): number {
   const clamped = Math.min(1, Math.max(-1, value));
-  return Math.round(clamped * 100) / 100 + 0;
+  return round3(clamped) + 0;
+}
+
+/** Rounds to 3 decimals, without `-0`. */
+function round3(value: number): number {
+  return Math.round(value * 1000) / 1000 + 0;
 }
 
 /** An angle difference in degrees, wrapped to −180..180. */

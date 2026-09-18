@@ -40,7 +40,7 @@ describe("createAimDrag", () => {
     // 50 px right is a quarter of 200 px across −1..1, and 37.5 px up a quarter of 150 px.
     expect(aim.aim()).toEqual({ yaw: 0.5, pitch: 0.5 });
     expect(emitted).toEqual([
-      { t: 16, yaw: 0.25, pitch: 0.13 },
+      { t: 16, yaw: 0.25, pitch: 0.133 },
       { t: 33, yaw: 0.5, pitch: 0.5 },
     ]);
   });
@@ -78,7 +78,7 @@ describe("createAimDrag", () => {
       aim,
     );
     // 400 px right and 300 px up pin both at 1; 10 px back moves off the edge straight away.
-    expect(aim.aim()).toEqual({ yaw: 0.9, pitch: 0.87 });
+    expect(aim.aim()).toEqual({ yaw: 0.9, pitch: 0.867 });
   });
 
   it("ignores moves without a finger down", () => {
