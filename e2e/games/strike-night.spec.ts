@@ -125,19 +125,22 @@ function swingTrace(ms: number): MotionTrace {
 /** Simulates a bowl for the given mode (touch or motion). */
 async function simpleBowl(phone: Page, mode: "touch" | "motion"): Promise<void> {
   if (mode === "touch") {
-    // Touch mode: use a large swipe up on the grip element to trigger the swipe detector.
-    // The swipe must exceed SWIPE_MIN_PX (packages/motion/src/fallbacks/swing.ts) to qualify.
-    const locator = phone.locator("div.grip");
-    const box = await locator.boundingBox();
-    if (box === null) throw new Error("the grip area is not on screen");
+    // Touch mode: target the CcBigAction button element for the press event.
+    // The button is nested inside div.grip and emits @press on pointerdown.
+    // Controller.vue:153 shows <CcBigAction ... @press="onPress" /> inside div.grip.
+    const button = phone.locator("div.grip").locator("button");
+    const box = await button.boundingBox();
+    if (box === null) throw new Error("the button is not on screen");
 
     const x = box.x + box.width / 2;
     const y = box.y + box.height / 2;
-    // Use a large swipe distance (at least 150px) to ensure it meets minimum swipe threshold
-    const swipeDistance = Math.max(150, box.height * 0.8);
+    // Use a large swipe distance (at least 150px) to ensure it exceeds SWIPE_MIN_PX threshold
+    const swipeDistance = Math.max(150, box.height);
 
+    // Pointer sequence: down (grip) -> move up (swipe) -> up (release)
     await phone.mouse.move(x, y);
     await phone.mouse.down();
+    await phone.waitForTimeout(50); // Brief hold before swiping
     await phone.mouse.move(x, y - swipeDistance, { steps: 5 });
     await phone.mouse.up();
     await phone.waitForTimeout(100);
