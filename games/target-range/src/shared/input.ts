@@ -13,7 +13,9 @@ const volley = z.int().check(z.gte(1), z.lte(volleyCount));
  * `{ "type": "shoot", "payload": { "volley": 5, "aim": { "yaw": -0.12, "pitch": 0.31 }, "power": 1 }, "at": 1789571234567 }`.
  */
 export const inputSchema = z.discriminatedUnion("type", [
-  // Packed aim samples from createAimSender: [dtMs, yaw, pitch], newest last, at most 4.
+  // Packed aim samples, [dtMs, yaw, pitch], newest last, at most 4. createAimSender (CC-3.21) now
+  // streams one sample at a time; the controller's ShotAim wrapper still packs them into this
+  // shape until CC-11.9 moves this game onto the InputChannel and its single-sample aim input.
   z.object({
     type: z.literal("aim"),
     payload: z.object({

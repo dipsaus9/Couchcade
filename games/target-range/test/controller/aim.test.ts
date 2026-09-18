@@ -19,7 +19,7 @@ function setup() {
     },
     { now: time.now, schedule: time.schedule },
   );
-  const aim = createShotAim(stream, { now: time.now, schedule: time.schedule });
+  const aim = createShotAim(stream);
   const adapter = createFakeAdapter();
   const motion: TargetRangeMotion = { mode: "motion", adapter, calibration };
   /** Plays samples on virtual time, from now on. */
