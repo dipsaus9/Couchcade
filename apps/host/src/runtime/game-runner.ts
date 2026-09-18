@@ -6,6 +6,7 @@ import type {
   Outcome,
   Player,
 } from "@couchcade/game-sdk/contract";
+import { createEventDedupe } from "@couchcade/game-sdk/link";
 import type { ControllerView, JsonValue, PayloadOf } from "@couchcade/protocol";
 
 export type InputPayload = PayloadOf<"input">;
@@ -42,6 +43,12 @@ export interface GameRunner {
   /**
    * Queues an input for the next tick. Returns false and drops it when the sender isn't in this
    * game or the input fails the game's `inputSchema`.
+   *
+   * Unpacks a relay message's `more` into one queued sample per entry plus the newest, each with
+   * its own `atMs`, so `onPlayerInput` sees the same sequence of single samples the direct link
+   * would have sent (docs/architecture/realtime-link.md, "Game SDK API sketch" > "Host side").
+   * An event's `e` is applied once per player across both paths (`@couchcade/game-sdk/link`'s
+   * `createEventDedupe`): a duplicate is accepted without effect and without counting as a drop.
    */
   queue(from: string, input: InputPayload): boolean;
   /**
@@ -79,6 +86,21 @@ export function createGameRunner(game: CouchcadeGame, options: GameRunnerOptions
   let startRoomMs = 0;
   let outcome = game.outcome(state);
   let pending: QueuedInput[] = [];
+  /** One event id is applied once per player, whichever path (or both) delivers it. */
+  const dedupe = createEventDedupe();
+
+  /** Validates and queues one sample. False and dropped on a schema mismatch. */
+  function queueSample(
+    player: Player,
+    type: string,
+    payload: JsonValue | undefined,
+    at: number,
+  ): boolean {
+    const parsed = game.inputSchema.safeParse(payload === undefined ? { type } : { type, payload });
+    if (!parsed.success) return false;
+    pending.push({ player, input: parsed.data, at });
+    return true;
+  }
 
   return {
     game,
@@ -98,15 +120,23 @@ export function createGameRunner(game: CouchcadeGame, options: GameRunnerOptions
       startRoomMs = roomTimeMs;
     },
 
-    queue(from, { type, payload, at }) {
+    queue(from, { type, payload, at, e, more }) {
       const player = byId.get(from);
       if (player === undefined || outcome !== null) return false;
-      const parsed = game.inputSchema.safeParse(
-        payload === undefined ? { type } : { type, payload },
-      );
-      if (!parsed.success) return false;
-      pending.push({ player, input: parsed.data, at });
-      return true;
+      if (e !== undefined) {
+        // A resend after a direct -> relay switch, or a duplicate delivery: accepted, not a drop.
+        if (!dedupe.apply(from, e)) return true;
+        return queueSample(player, type, payload, at);
+      }
+      if (more !== undefined && more.length > 0) {
+        let ok = true;
+        for (const [dtMs, morePayload] of more) {
+          if (!queueSample(player, type, morePayload ?? undefined, at - dtMs)) ok = false;
+        }
+        if (!queueSample(player, type, payload, at)) ok = false;
+        return ok;
+      }
+      return queueSample(player, type, payload, at);
     },
 
     leave(id) {

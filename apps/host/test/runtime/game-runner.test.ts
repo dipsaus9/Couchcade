@@ -130,4 +130,58 @@ describe("createGameRunner", () => {
     expect(r.queue(sam, { type: "say", payload: { text: "x" }, at: 0 })).toBe(false);
     expect(r.outcome).toBeNull();
   });
+
+  // CC-3.20, AC5: relay `more` samples reach onPlayerInput as one input per sample with its own
+  // atMs, oldest first, and each event id is applied once across both paths.
+  it("unpacks a relay message's more into one queued sample per entry, oldest first", () => {
+    const r = runner();
+    r.begin(0);
+    expect(
+      r.queue(sam, {
+        type: "say",
+        payload: { text: "c" },
+        at: 10,
+        more: [
+          [6, { text: "a" }],
+          [3, { text: "b" }],
+        ],
+      }),
+    ).toBe(true);
+    r.step();
+    expect(stateOf(r).log).toEqual([
+      `${sam}:say@4/${1000 / 60}`,
+      `${sam}:say@7/${1000 / 60}`,
+      `${sam}:say@10/${1000 / 60}`,
+      "tick",
+    ]);
+  });
+
+  it("returns false from more when every unpacked sample fails the schema", () => {
+    const r = runner();
+    r.begin(0);
+    expect(r.queue(sam, { type: "dance", at: 10, more: [[3, { text: "a" }]] })).toBe(false);
+  });
+
+  it("applies an event once, whichever path (or both) delivers its id", () => {
+    const r = runner();
+    r.begin(0);
+    expect(r.queue(sam, { type: "say", payload: { text: "a" }, at: 0, e: 0 })).toBe(true);
+    // The same event id resent after a direct -> relay switch: accepted, not applied again.
+    expect(r.queue(sam, { type: "say", payload: { text: "a" }, at: 0, e: 0 })).toBe(true);
+    r.step();
+    expect(stateOf(r).log).toEqual([`${sam}:say@0/${1000 / 60}`, "tick"]);
+  });
+
+  it("keeps dedupe per player, so the same event id from two players both apply", () => {
+    const r = runner();
+    r.begin(0);
+    r.queue(sam, { type: "say", payload: { text: "a" }, at: 0, e: 0 });
+    r.queue(noor, { type: "say", payload: { text: "b" }, at: 0, e: 0 });
+    r.step();
+    expect(stateOf(r).log).toEqual([
+      `${sam}:say@0/${1000 / 60}`,
+      `${noor}:say@0/${1000 / 60}`,
+      "tick",
+    ]);
+  });
 });
