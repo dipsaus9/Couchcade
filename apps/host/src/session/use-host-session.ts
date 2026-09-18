@@ -1,4 +1,6 @@
+import { audio } from "@couchcade/audio";
 import type { StoredDisplayLag } from "@couchcade/game-sdk/clock";
+import type { RelayToHostMessage } from "@couchcade/protocol";
 import { onBeforeUnmount, shallowRef } from "vue";
 import { ApiError, createRoom } from "../net/api.ts";
 import {
@@ -26,6 +28,18 @@ import {
 import { createTurnstile } from "../security/turnstile.ts";
 import { settings } from "../settings/store.ts";
 import { clearSession, loadSession, saveSession, type StoredSession } from "./storage.ts";
+
+/**
+ * True for a `player:joined` message that actually adds someone new to `before` -- not the burst
+ * of `player:joined` replays the relay sends for every already-known player right after
+ * `room:welcome` rebuilds the roster from scratch (lobby-state.ts's `room:welcome` case), which
+ * would otherwise play a `ui` pop for every seated player each time the TV reconnects or
+ * refreshes. Exported for the unit test (CC-7.7, docs/architecture/audio.md's token table:
+ * "ui... a player joins the lobby").
+ */
+export function isNewLobbyJoin(before: LobbyState, message: RelayToHostMessage): boolean {
+  return message.t === "player:joined" && !before.players.some((p) => p.id === message.d.player.id);
+}
 
 export type HostScreen =
   | { name: "passcode"; notice: string | null }
@@ -117,6 +131,7 @@ export function useHostSession() {
       rejoinToken: session.rejoinToken,
       ticket,
       onMessage: (message) => {
+        if (isNewLobbyJoin(lobby, message)) audio.play("ui");
         const next = applyRelayMessage(lobby, message);
         const changed = next !== lobby;
         lobby = next;

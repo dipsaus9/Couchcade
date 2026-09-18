@@ -53,7 +53,11 @@ const platformMusic = defineSounds("platform", {
   lobbyLoop: {
     src: `${base}audio/lobby-loop.ogg`,
     bus: "music",
-    loop: true,
+    // Sample-accurate loop points (CC-7.7), not `loop: true` over the whole file: the encoded
+    // file carries about 0.53s of inert audio past `endS`, so the lossy Vorbis encoder's real
+    // quantization artifacts at its own hard start/end land away from the audible seam. See
+    // apps/host/CREDITS.md for how startS/endS were measured and verified.
+    loop: { startS: 0.030204, endS: 22.178821 },
     visual: "The TV lobby, menu, motion check and results screens",
   },
 });

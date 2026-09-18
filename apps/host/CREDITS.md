@@ -39,17 +39,43 @@ is needed to build or run it).
   are its "first run", trimmed to 0-0.4 s. The crowd cut (`Short Crowd Cheer 2.flac` preview, trimmed
   to 1.5 s with a 20 ms fade-in and a 300 ms fade-out) starts at the third note's onset, 275 ms in, so
   it comes in "under the last note" as the shortlist describes, and the mix runs 1.77 s end to end.
-- **`lobby-loop.ogg` is the shortlist's primary, "Adventure Begins Loop"**, cut from its start to
-  22.154 s (12 bars at the shortlist's 130 BPM: `12 × 4 × 60 / 130`). This agent's own `aubio tempo`
-  read the downloaded file at 101.46 BPM, not 130 BPM — tempo detection is prone to
-  half/double/triplet octave errors and this agent could not resolve the discrepancy by ear. The
-  130 BPM figure is the owner-approved one from `docs/architecture/audio.md` (CC-7.1), so the cut
-  length follows it; either way the track is titled and described as "made to loop" and the cut
-  starts at 0 s, its own top. **Follow-up:** confirm the loop's tempo and seam by ear alongside the
-  manual check above, and re-cut if the seam isn't clean.
+- **`lobby-loop.ogg` is the shortlist's primary, "Adventure Begins Loop"**, re-cut in CC-7.7 after
+  the follow-up above turned out to matter: the original CC-7.3 cut (0 to 22.154 s, "12 bars at
+  130 BPM") wrapped from full-level audio into a near-silent gap at the seam (measured: a
+  4303-of-32768 sample jump and a music-bus RMS drop from 4839 to 1335 between the last and first
+  30 ms, i.e. the file's own end was loud and its own start was quiet). CC-7.7 re-downloaded the
+  original, uncut 58.986 s track from the same OpenGameArt zip and measured its real tempo with a
+  beat-grid fit (aubio's onset times against a 16th-note grid, searched jointly over tempo and
+  phase for the best autocorrelation-style score): **97.494 BPM**, not 130 — `docs/architecture/
+  audio.md`'s "Lobby loop" table (12 bars, 130 BPM measured) is now known wrong and is flagged to
+  the owner as a documentation follow-up, not corrected here (that doc is owner-approved). At
+  97.494 BPM a bar is 2.4617 s, so 9 bars is 22.155 s, close to the original cut's length by
+  coincidence of the wrong-BPM math, but not its seam. The exact loop points were then chosen with
+  a small (±6 ms) sample-accurate search around the 9-bar grid boundary, minimizing the jump
+  between the sample just before the loop end and the sample at the loop start (and their local
+  slopes): the chosen points (`startS: 0.030204s`, `endS: 22.178821s`, both in
+  `apps/host/src/audio/platform-sounds.ts`) scored 31.25 on that cost versus a median of about
+  7.85 million across 500 candidate points spread through the track (0th percentile — strictly
+  better than every one of them) and versus 19.0 million for the original cut. Re-encoding to lossy
+  Vorbis reintroduces some of that discontinuity (the encoder's own block boundaries don't line up
+  with a hard file start/end), so the shipped file is **not** a bare 22.15 s loop: it's the track
+  from 0 s through about 0.53 s past `endS` (about 22.68 s of audio, encoder unchanged from CC-7.3's
+  `ffmpeg`/`Lavc63.1.101 vorbis`, since this environment's `ffmpeg` has no `libvorbis`), with
+  `platform-sounds.ts` using `loop: { startS, endS }` (already supported by `@couchcade/audio`,
+  previously unused here) instead of `loop: true` over the whole buffer — Web Audio's own
+  `AudioBufferSourceNode.loopStart`/`loopEnd` then loop only the 0.030204 s to 22.178821 s span
+  sample-accurately, so the lossy encoder's real edge artifacts, now about half a second past
+  `endS`, are never heard. Measured after that re-encode, at the actual loop points: a
+  41-of-32768 jump (down from 1356 with a bare hard-edge encode of the same cut, and from 4303 in
+  the original file) — about 0.12% of full scale. Level: normalised to -2.9 dBFS peak, matching the
+  rest of the platform's -3 dBFS convention. This agent still has no ears; "verified" above means
+  measured with `ffprobe`/`ffmpeg volumedetect` and the sample-jump/RMS script described, not
+  listened to — the doc's own manual TV check is still the first real listen.
 - Every file above is OGG Vorbis (HOUSE_STYLE "Music", `docs/architecture/audio.md` "Loading, formats
-  and size" rule 1). `apps/host/public/audio/` totals **~303 KB** (`press.ogg` 7.2 KB, `ui.ogg` 4.6 KB,
-  `scene.ogg` 10.0 KB, `your-turn.ogg` 13.3 KB, `celebrate.ogg` 44.1 KB, `foul.ogg` 9.1 KB — 88.3 KB for
-  the six tokens together — and `lobby-loop.ogg` 214.2 KB), inside the 500 KB platform budget, the
+  and size" rule 1). `apps/host/public/audio/` totals **~340.5 KB** (`press.ogg` 7.2 KB, `ui.ogg` 4.6 KB,
+  `scene.ogg` 9.9 KB, `your-turn.ogg` 13.3 KB, `celebrate.ogg` 44.1 KB, `foul.ogg` 9.1 KB — 88.2 KB for
+  the six tokens together — and `lobby-loop.ogg` 252.3 KB), inside the 500 KB platform budget, the
   150 KB token budget and the 350 KB lobby-loop budget (`docs/architecture/audio.md`, "Size budget").
-- No playback wiring in this story — that's CC-7.4. `apps/host/src/` is untouched.
+- CC-7.3 had no playback wiring; CC-7.7 adds `press`/`scene`/`ui` wiring in `apps/host/src/` for the
+  moments `docs/architecture/audio.md`'s token table left unwired after CC-7.4 (see this repo's
+  `apps/host/src/audio/`, `MenuScreen.vue`, `App.vue`, `use-host-session.ts`).
