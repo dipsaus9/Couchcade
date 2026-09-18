@@ -4,7 +4,7 @@ title: Add E2E tests for the direct link and the relay fallback
 status: Done
 assignee: []
 created_date: '2026-09-17 17:51'
-updated_date: '2026-09-18 06:38'
+updated_date: '2026-09-18 06:41'
 labels:
   - story
 dependencies:
@@ -74,6 +74,15 @@ RTCPeerConnection support is unconfirmed until the PR's CI run, so the specs bra
 supportsRtc() at runtime rather than hard-coding an expectation per project -- whichever way CI's
 WebKit goes, the specs assert the right path (or skip the cut case with a clear reason) instead of
 failing.
+
+Reviewer (dipsaus-ai:story-reviewer, sonnet, round 1): pass. All 4 acceptance criteria met, no
+scope violations, no blocking findings. Reviewer independently agreed the five files touched
+outside the declared References (apps/controller/src/App.vue, runtime/link-test-hook.ts (new),
+runtime/link.ts, e2e/games/target-range.spec.ts, e2e/src/fixtures.ts) are a necessary, tightly
+scoped prerequisite -- the test hook has to live in the app bundle Playwright actually runs
+against, matching the existing window.__couchcadeMotion pattern (apps/controller/src/motion/adapter.ts),
+and the fixtures/target-range changes are backward-compatible additions needed to open the app
+with ?link=1 and reuse the existing bot-match flow.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
