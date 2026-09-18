@@ -15,10 +15,11 @@ export * from "./pip-head.ts";
  * screen": "TV game menu and scoreboard chips"), replacing the plain player-shape icon this chip
  * drew before CC-6.6: at 8 simultaneous chips plus the round counter, the safe area (1728px at
  * 1080p) has no room left for both a 56px Pip head and a separate 36px shape icon per chip (that
- * combination overflowed by several hundred px in testing). The chip's name still sits next to
- * the Pip, so colour is never this chip's only cue (docs/HOUSE_STYLE.md, "shapes wherever a
- * player colour appears"): the Pip's jersey colour still shows through the head crop even without
- * the shape mark on it (pips.md: the jersey starts above the crop's bottom edge).
+ * combination overflowed by several hundred px in testing). Colour is still never this chip's
+ * only cue (docs/HOUSE_STYLE.md, "shapes wherever a player colour appears"): the chip's name sits
+ * right next to the Pip, same as it always did. (The jersey colour peeks a few px through the
+ * bottom of the head crop too, but that sliver is too thin from couch distance to count as a real
+ * cue on its own.)
  */
 export const scoreboardMetrics = {
   /** Chip height. */
