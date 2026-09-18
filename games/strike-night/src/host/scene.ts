@@ -96,11 +96,18 @@ export default class StrikeNightScene extends StageScene<StrikeNightState> {
 
   private lookOf(id: string): WorldPipLook {
     const info = this.host.players.find((player) => player.id === id);
-    const seat = findPlayer(this.host.getState(), id)?.seat ?? 0;
     return {
       profile: info?.profile ?? { skin: 0, hair: 0, hairColour: 0 },
-      slot: info?.slot ?? seat,
+      slot: this.slotOf(id),
     };
+  }
+
+  /** The platform's own seat colour/shape index (`PlayerInfo.slot`), the same identity the World
+   * Pips and the stage scoreboard chips use -- not the game's own bowling-order `seat`, which can
+   * differ from it. Falls back to the game seat only if the host player record is somehow gone. */
+  private slotOf(id: string): number {
+    const info = this.host.players.find((player) => player.id === id);
+    return info?.slot ?? findPlayer(this.host.getState(), id)?.seat ?? 0;
   }
 
   private scores(state: StrikeNightState): Record<string, number> {
@@ -165,7 +172,12 @@ export default class StrikeNightScene extends StageScene<StrikeNightState> {
       .setRound({ current: view.frame.current, total: view.frame.total });
     this.panel.setText(view.panel).setClock(view.clock);
     this.pinMap.show(view.pinMap);
-    this.scorecard.show(view.scorecard);
+    // present.ts only knows the game's own seat order; the scorecard's shape mark needs the
+    // platform's seat colour/shape index instead, the same one the World Pips and the scoreboard
+    // chips use (`slotOf`), so a row never shows a different shape than that player's own Pip.
+    this.scorecard.show(
+      view.scorecard?.map((row) => ({ ...row, slot: this.slotOf(row.id) })) ?? null,
+    );
     this.paintCallout(view.callout);
   }
 

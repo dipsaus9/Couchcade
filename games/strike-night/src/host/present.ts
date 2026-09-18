@@ -85,7 +85,9 @@ export interface PinMapDot {
 export interface ScorecardRow {
   id: string;
   name: string;
-  /** In seat order (`@couchcade/stage`'s `players` token index), for the row's shape mark. */
+  /** `@couchcade/stage`'s `players` token index for the row's shape mark: this game's own seat,
+   * since `present` never sees the platform's `PlayerInfo.slot`. The scene remaps it to that
+   * before drawing, the same identity the World Pips and the scoreboard chips use. */
   slot: number;
   /** One cell per frame, straight from `FrameRecord`: the overlay derives "X", "7 /" or "7 2"
    * from `roll1`/`roll2` itself, the same numbers the spec's "Mark on the TV" column shows. */
