@@ -30,8 +30,6 @@ export interface PhoneOptions {
   sessionStorage?: Record<string, string>;
   /** Runs on the new page before it loads, for example to listen for its sockets. */
   beforeLoad?(page: Page): void;
-  /** Query string appended to the phone's URL, such as `?link=1` (src/link.ts, CC-3.22). */
-  search?: string;
 }
 
 /** Opens `count` phones, each in a fresh context at the phone app (`/`). */
@@ -44,19 +42,11 @@ export interface DeviceFixtures {
   phones: PhoneLauncher;
 }
 
-export interface DeviceOptions {
-  /** Query string appended to the TV's URL, such as `?link=1` (src/link.ts, CC-3.22). Set with
-   * `test.use({ hostSearch: "?link=1" })`. */
-  hostSearch: string;
-}
-
-export const test = base.extend<DeviceFixtures & DeviceOptions>({
-  hostSearch: ["", { option: true }],
-
-  host: async ({ browser, hostSearch }, use) => {
+export const test = base.extend<DeviceFixtures>({
+  host: async ({ browser }, use) => {
     const context = await browser.newContext(tvOptions);
     const page = await context.newPage();
-    await page.goto(`/host/${hostSearch}`);
+    await page.goto("/host/");
     await use(page);
     await context.close();
   },
@@ -79,7 +69,7 @@ export const test = base.extend<DeviceFixtures & DeviceOptions>({
         }
         const page = await context.newPage();
         options.beforeLoad?.(page);
-        await page.goto(`/${options.search ?? ""}`);
+        await page.goto("/");
         pages.push(page);
       }
       return pages;
