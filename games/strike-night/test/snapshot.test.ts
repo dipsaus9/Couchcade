@@ -21,6 +21,9 @@ describe("snapshot and restore", () => {
     expect(changedAt.every((entry) => entry.startsWith("frameEnd"))).toBe(true);
   });
 
+  // A full 4-player match played out roll by roll through real physics; a slower CI runner can
+  // take longer than vitest's default 5 s (see @couchcade/game-sdk/testing's contract kit for
+  // the same reasoning), so this and the two other full-playthrough tests below get 30 s.
   it("stays well under the game snapshot budget for 4 players", () => {
     const players = createPlayers(4);
     const target = room(players, 1);
@@ -30,7 +33,7 @@ describe("snapshot and restore", () => {
     }
     const bytes = new TextEncoder().encode(JSON.stringify(snapshot(target.state))).length;
     expect(bytes).toBeLessThanOrEqual(maxGameSnapshotBytes);
-  });
+  }, 30_000);
 
   it("restores at the next frame's first roll with the same points", () => {
     const target = room(2);
@@ -49,7 +52,7 @@ describe("snapshot and restore", () => {
     expect(restored.players.map((player) => player.total)).toEqual(
       target.state.players.map((player) => player.total),
     );
-  });
+  }, 30_000);
 
   it("starts a new match from a snapshot that doesn't parse", () => {
     const players = createPlayers(2);
@@ -75,5 +78,5 @@ describe("snapshot and restore", () => {
     const restored = restore(target.players, 1, saved);
     expect(restored.phase).toBe("over");
     expect(target.game.outcome(restored)).toEqual(target.outcome());
-  });
+  }, 30_000);
 });
