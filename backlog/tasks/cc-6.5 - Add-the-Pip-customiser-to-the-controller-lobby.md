@@ -4,7 +4,7 @@ title: Add the Pip customiser to the controller lobby
 status: Done
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-18 06:15'
+updated_date: '2026-09-18 06:18'
 labels:
   - story
 dependencies:
@@ -54,6 +54,8 @@ Reference amendment 2: tooling/budgets and .size-limit.json. docs/architecture/p
 Reviewer round 1 (block): (a) scope -- apps/controller/test/pips/ wasn't a declared Reference; added it (sibling stories CC-6.3/CC-6.4 declare their test/ paths separately, same convention). (b) advisory, addressed anyway: pips.md's 'Which story builds what' table assigns the join-body profile to CC-6.5 and 'When the Pip is sent' item 2 (room:welcome reconcile) is meant to run for every phone that enters a room, not only one that opens the customiser -- moved the reconcile out of use-pip-customiser.ts's constructor (which only ran if the lazy customiser panel was opened) into a new apps/controller/src/pips/reconcile.ts consumed eagerly by LobbyScreen.vue, and added the stored profile to session.ts's join() body. session/ added to References for the latter. (c) advisory, addressed: the Bald-disables-Colour hint was gated on activeTab==='colour', which selectTab() never allows while bald, so it never rendered -- moved it next to the disabled tab. (d) advisory, addressed: the lobby button copy used whether a record already existed instead of pips.md's actual rule ('Make your Pip' for players, 'Edit my Pip' for the VIP) -- switched to the vip prop.
 
 Reviewer round 1 fixes pushed (commit 8d0bcb5), merged origin/main (CC-11.9 target-range work, no conflicts), full verify green again. Re-running story-reviewer for round 2.
+
+Reviewer round 2 (dipsaus-ai:story-reviewer, model sonnet): PASS. Both acceptance criteria met in code, no scope violations across all References (original + amendments), no blocking or advisory findings. Reviewer independently ran the controller and budgets test suites, typecheck, and pnpm budgets, and confirmed the lazy customiser chunk (3.31/4KB) is measured separately from Controller initial JS (64.44/80KB). Traced the join()/reconcileOnEntry double-send question: no risk (join() only puts profile in the HTTP body, never sends player:profile; reconcileOnEntry is the only websocket sender and fires once per lobby mount).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
