@@ -130,6 +130,11 @@ export interface ControllerLink {
   createChannel<TInput extends GameInput>(
     streams?: Readonly<Record<string, { hz?: 30 | 60 }>>,
   ): InputChannel<TInput>;
+  /** Test hook only (docs/architecture/realtime-link.md, "Testing"; wired to
+   * `window.__couchcadeLink` by `runtime/link-test-hook.ts` in dev builds): closes the current
+   * connection as if it dropped, so the path falls back to relay until the link retries. A no-op
+   * with no open connection. Real controllers never call this. */
+  debugCut(): void;
   dispose(): void;
 }
 
@@ -575,6 +580,24 @@ export function createControllerLink(options: ControllerLinkOptions): Controller
         schedule,
         warn,
       });
+    },
+
+    debugCut() {
+      if (peerAttempt === null) return;
+      // Close the channels without clearing their handlers first, so the existing `onclose` wiring
+      // fires `machine.connectionClosed()` the same way a real drop does, and the state machine's
+      // own retry and backoff take over (Connection lifecycle).
+      const { streamChannel, eventsChannel } = peerAttempt;
+      try {
+        streamChannel.close();
+      } catch {
+        // Already closing: nothing to do.
+      }
+      try {
+        eventsChannel.close();
+      } catch {
+        // Already closing: nothing to do.
+      }
     },
 
     dispose() {
