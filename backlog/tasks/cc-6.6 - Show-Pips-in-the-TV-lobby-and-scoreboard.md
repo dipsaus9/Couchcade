@@ -4,7 +4,7 @@ title: Show Pips in the TV lobby and scoreboard
 status: Done
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-18 07:02'
+updated_date: '2026-09-18 07:12'
 labels:
   - story
 dependencies:
@@ -44,6 +44,8 @@ Branch: CC-6.6/pips-on-tv
 
 <!-- SECTION:NOTES:BEGIN -->
 Verify: pnpm check && pnpm test
+
+Reviewer round 1 (dipsaus-ai:story-reviewer, model sonnet): PASS. Both acceptance criteria met (AC1 judged against pips.md's corrected intent per 'Found while writing this spec' item 2, since the literal AC wording is a documented doc bug). No scope violations. Reviewer independently reran the full stage test suite (69/69, real headless Chromium) and independently reproduced the shape+Pip-head overflow claim in a disposable worktree (602px overflow of the 1728px safe area at the most aggressive compaction step), confirming the replace-not-add design call was forced, not stylistic. Advisory: reworded the accessibility justification to credit the player name (not the jersey sliver) as the real 'colour is never the only cue' fallback; ran pnpm budgets per pips.md's Budgets table -- Host platform JS 422.65/450 KB, all 10 budgets pass.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
