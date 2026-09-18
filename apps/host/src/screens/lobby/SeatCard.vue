@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { CcButton, CcPlayerShape } from "@couchcade/ui";
+import { CcButton, CcPip } from "@couchcade/ui";
 import { computed } from "vue";
 import type { Seat } from "./lobby-state.ts";
 import PlayerShape from "./PlayerShape.vue";
 
-// One of the 8 lobby cards. An empty seat previews the shape the next player gets. Hovering or
-// focusing a player's card shows the 64px Kick button in place of the status line
-// (docs/design/platform-screens.md, "Join and lobby").
+// One of the 8 lobby cards. An empty seat previews the shape the next player gets. A seated one
+// shows the player's Interface Pip, full crop, 140px (docs/architecture/pips.md "Pips on the TV";
+// CC-6.6). Hovering or focusing a player's card shows the 64px Kick button in place of the status
+// line (docs/design/platform-screens.md, "Join and lobby").
 const props = defineProps<{ seat: Seat; isVip: boolean; canKick: boolean }>();
 defineEmits<{ kick: [id: string] }>();
 
@@ -23,12 +24,13 @@ const status = computed(() => {
     class="seat"
     :class="{ empty: !seat.player, away: seat.player && !seat.player.connected }"
   >
-    <CcPlayerShape
+    <CcPip
       v-if="seat.player"
-      class="shape"
-      :player="seat.style.id"
-      :size="96"
-      screen="tv"
+      :profile="seat.player.profile"
+      :slot="seat.slot"
+      crop="full"
+      :size="140"
+      surface="tv"
     />
     <PlayerShape v-else class="shape" :shape="seat.style.shape" :size="72" />
     <p v-if="seat.player" class="name">{{ seat.player.name }}</p>
