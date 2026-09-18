@@ -88,6 +88,19 @@ export async function expectedLinkPath(
   return observeLinkPath(phone, timeoutMs);
 }
 
+/**
+ * Whether this page's browser engine exposes an `RTCPeerConnection` constructor at all --
+ * informational only (AC4's "the task notes record which"), never a gate: CI has shown that
+ * WebKit exposing the constructor and even reaching `direct` once doesn't mean a real connection
+ * reliably carries a whole real-time match (packets over an actual, imperfect WebRTC stack in a
+ * CI sandbox can behave very differently from the fake link the unit tests use), so a spec that
+ * plays a full match keeps WebKit off the real connection entirely rather than trusting it to
+ * sustain one, and uses this only to say what it found.
+ */
+export function hasRtcApi(phone: Page): Promise<boolean> {
+  return phone.evaluate(() => typeof RTCPeerConnection === "function");
+}
+
 export interface RelayFrame {
   t: string;
   d: Record<string, unknown>;
