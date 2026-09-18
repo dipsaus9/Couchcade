@@ -18,6 +18,7 @@
     "@couchcade/game-sdk": "workspace:*",
     "@couchcade/protocol": "workspace:*",
     "@couchcade/theme": "workspace:*",
+    "@couchcade/utils": "workspace:*",
     "phaser": "catalog:"
   },
   "devDependencies": {

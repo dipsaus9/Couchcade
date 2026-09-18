@@ -557,6 +557,9 @@ importers:
       '@couchcade/theme':
         specifier: workspace:*
         version: link:../theme
+      '@couchcade/utils':
+        specifier: workspace:*
+        version: link:../utils
       phaser:
         specifier: 'catalog:'
         version: 4.2.1
