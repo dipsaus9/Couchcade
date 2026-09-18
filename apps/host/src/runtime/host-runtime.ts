@@ -33,6 +33,8 @@ import { createFixedStepLoop } from "./fixed-step.ts";
 import type { FixedStepLoop } from "./fixed-step.ts";
 import { createGameRunner } from "./game-runner.ts";
 import type { GameRunner } from "./game-runner.ts";
+import { createHostLinks } from "./links.ts";
+import type { HostLinkPeer } from "./links.ts";
 import { createSnapshotSender, planRecovery } from "./recovery.ts";
 import type { RoomSnapshot, SnapshotResume, SnapshotSender } from "./recovery.ts";
 import type { GameStage } from "./stage.ts";
@@ -64,6 +66,12 @@ export interface HostRuntimeOptions {
    * `location.origin`.
    */
   origin?: string;
+  /** Builds the answer-side WebRTC peer connection for a phone's link (CC-3.20). Defaults to a
+   * real `RTCPeerConnection` with `iceServers: []`; tests inject a fake. */
+  createLinkPeer?: () => HostLinkPeer | null;
+  /** The link switch for this TV session (`runtime/link-switch.ts`). Defaults to
+   * `realtimeLinkEnabled`. */
+  linkEnabled?: () => boolean;
 }
 
 /** Reads and stores the calibrated TV lag (session-flow.md, "Storage and use"). */
@@ -200,6 +208,25 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
   let running:
     | (RunningGame & { loop: FixedStepLoop; touchPlayers: Set<string>; snapshots: SnapshotSender })
     | null = null;
+  // Answer-side WebRTC links (CC-3.20, docs/architecture/realtime-link.md). `isSeatedPlayer` and
+  // `onInput` read `lobby` and `running` above through closures, same as the rest of this runtime;
+  // `links` itself owns no timer, matching the doc's "the link code sets no host timers".
+  const links = createHostLinks({
+    sendMessage: options.send,
+    isSeatedPlayer: (id) =>
+      lobby !== null && seatedPlayers(lobby).some((player) => player.id === id),
+    onInput: (playerId, input) => {
+      if (running && !running.runner.queue(playerId, input)) {
+        warn(`dropped input ${JSON.stringify(input.type)} from ${playerId}`);
+      }
+    },
+    createPeer: options.createLinkPeer,
+    enabled: options.linkEnabled,
+    now,
+    roomOffsetMs: () => clock.offsetMs ?? 0,
+    schedule,
+    warn,
+  });
   let results: GameResults | null = null;
   let calibration: Calibration | null = null;
   let motionCheck: MotionCheck | null = null;
@@ -415,6 +442,7 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
         reducedMotion: reducedMotion(),
         roomCode: state.code,
         joinUrl: origin === undefined ? undefined : joinUrl(origin, state.code),
+        link: (playerId) => links.link(playerId),
       })
       .then(
         () => {
@@ -626,6 +654,9 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
         case "clock:pong":
           clock.receive(message.d);
           return;
+        case "rtc:offer":
+          links.receiveOffer(message.from, message.d);
+          return;
         case "input":
           if (running && !running.runner.queue(message.from, message.d)) {
             warn(`dropped input ${JSON.stringify(message.d.type)} from ${message.from}`);
@@ -665,8 +696,13 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
           break;
         }
         case "player:left":
-          // A short drop keeps the seat and the game isn't told. A freed seat ends that player's game.
-          if (message.d.reason !== "disconnected") running?.runner.leave(message.d.id);
+          // A short drop keeps the seat, the game isn't told and the link stays up (session-flow.md,
+          // "Deploys"). A freed seat ends that player's game and closes their link at once (AC4,
+          // "Kicks, leaving and expiry").
+          if (message.d.reason !== "disconnected") {
+            running?.runner.leave(message.d.id);
+            links.close(message.d.id);
+          }
           break;
         default:
           break;
@@ -699,6 +735,9 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
     },
 
     dispose() {
+      // Closes every link: the room ends here, whether the host sent `room:end` or the socket
+      // closed for another reason (AC4, "Kicks, leaving and expiry" and "on room:end").
+      links.closeAll();
       menu.dispose();
       calibration?.dispose();
       calibration = null;

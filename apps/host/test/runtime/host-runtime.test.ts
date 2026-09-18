@@ -1,11 +1,12 @@
 import { createRoomClock, type StoredDisplayLag } from "@couchcade/game-sdk/clock";
-import type { CouchcadeGame } from "@couchcade/game-sdk/contract";
+import type { CouchcadeGame, HostSceneData } from "@couchcade/game-sdk/contract";
 import { createRegistry } from "@couchcade/game-sdk/registry";
 import type { HostToRelayMessage, RelayToHostMessage } from "@couchcade/protocol";
 import { describe, expect, it } from "vitest";
 import { motionWaitMs } from "../../src/motion/motion-check.ts";
 import { countdownMs } from "../../src/screens/menu/menu.ts";
 import { createHostRuntime, type DisplayLagStore } from "../../src/runtime/host-runtime.ts";
+import type { HostLinkPeer } from "../../src/runtime/links.ts";
 import {
   beatMs,
   flashMs,
@@ -30,6 +31,7 @@ function setup({
   games = [echoGame()] as CouchcadeGame[],
   sceneFails = false,
   storedLag = null as StoredDisplayLag | null,
+  createLinkPeer = undefined as (() => HostLinkPeer | null) | undefined,
 } = {}) {
   const time = createVirtualTime(1_000_000);
   const sent: HostToRelayMessage[] = [];
@@ -37,6 +39,7 @@ function setup({
   const stageLog: string[] = [];
   const sceneLag: number[] = [];
   const sceneRooms: Array<{ roomCode?: string; joinUrl?: string }> = [];
+  const sceneLinks: Array<HostSceneData<unknown>["link"]> = [];
   let stored = storedLag;
   const displayLag: DisplayLagStore = {
     ms: () => stored?.ms ?? 0,
@@ -51,6 +54,7 @@ function setup({
       stageLog.push(`start ${game.id} ${data.players.length}`);
       sceneLag.push(data.displayLagMs);
       sceneRooms.push({ roomCode: data.roomCode, joinUrl: data.joinUrl });
+      sceneLinks.push(data.link);
       return sceneFails ? Promise.reject(new Error("no scene")) : Promise.resolve();
     },
     stop: (game) => stageLog.push(`stop ${game.id}`),
@@ -71,6 +75,8 @@ function setup({
     onChange: () => (changes += 1),
     displayLag,
     origin: "https://couchcade.workers.dev",
+    createLinkPeer,
+    linkEnabled: () => true,
   });
   const lobby = lobbyWith(3);
   const [vip, second] = lobby.players.map((player) => player.id) as [string, string];
@@ -90,6 +96,7 @@ function setup({
     stageLog,
     sceneLag,
     sceneRooms,
+    sceneLinks,
     stored: () => stored,
     runtime,
     lobby,
@@ -876,5 +883,136 @@ describe("motion step", () => {
     time.advance(motionWaitMs);
     expect(runtime.running).toBeNull();
     expect(time.pending).toBe(0);
+  });
+});
+
+// CC-3.20: the host answers link offers, closes links on leave/kick/expiry and on dispose (which
+// covers `room:end`, see `runtime/host-runtime.ts`'s `dispose()`), and passes `HostSceneData.link`
+// to the running game's scene. `links.ts`'s own test (`links.test.ts`) covers the TV-side limits,
+// the 5 s/60 s ignore rules and the frame validation in full; this only checks the wiring.
+function fakeLinkSdp(ufrag: string): string {
+  return [
+    "v=0",
+    "o=- 0 0 IN IP4 127.0.0.1",
+    "s=-",
+    "t=0 0",
+    "m=application 9 UDP/DTLS/SCTP webrtc-datachannel",
+    "c=IN IP4 0.0.0.0",
+    "a=candidate:1 1 udp 2122260223 203.0.113.5 54321 typ host generation 0",
+    `a=ice-ufrag:${ufrag}`,
+    "a=ice-pwd:abcdefghijklmnopqrstuvwxyz012345",
+    `a=fingerprint:sha-256 ${Array.from({ length: 32 }, () => "AA").join(":")}`,
+    "a=mid:0",
+    "",
+  ].join("\r\n");
+}
+
+class FakeHostPeer implements HostLinkPeer {
+  connectionState = "new";
+  iceGatheringState = "complete";
+  localDescription: { sdp: string } | null = null;
+  onconnectionstatechange: (() => void) | null = null;
+  onicegatheringstatechange: (() => void) | null = null;
+  closed = false;
+
+  createDataChannel() {
+    return {
+      readyState: "connecting" as const,
+      bufferedAmount: 0,
+      send() {},
+      close() {},
+      onopen: null,
+      onclose: null,
+      onmessage: null,
+    };
+  }
+
+  async setRemoteDescription(): Promise<void> {}
+
+  async createAnswer(): Promise<{ sdp?: string }> {
+    return { sdp: fakeLinkSdp("ufrag1") };
+  }
+
+  async setLocalDescription(description: { sdp: string }): Promise<void> {
+    this.localDescription = { sdp: description.sdp };
+  }
+
+  close(): void {
+    this.closed = true;
+  }
+}
+
+/** Flushes the resolved-promise chain `receiveOffer` runs (setRemoteDescription -> createAnswer
+ * -> setLocalDescription -> sendMessage), enough microtask ticks for it to settle. */
+async function flushLink(): Promise<void> {
+  for (let i = 0; i < 8; i++) await Promise.resolve();
+}
+
+function rtcOffer(from: string, s = 1): RelayToHostMessage {
+  return {
+    t: "rtc:offer",
+    from,
+    d: { s, desc: { u: "u1", p: "pppppppppppppppppppppppppppppp", f: "A".repeat(43), c: [] } },
+  };
+}
+
+describe("CC-3.20: WebRTC links", () => {
+  it("answers rtc:offer from a seated player with rtc:answer", async () => {
+    const { handle, ofType, vip } = setup({ createLinkPeer: () => new FakeHostPeer() });
+    handle(rtcOffer(vip, 7));
+    await flushLink();
+    expect(ofType("rtc:answer")).toEqual([
+      { t: "rtc:answer", d: { to: vip, s: 7, desc: expect.any(Object) } },
+    ]);
+  });
+
+  it("never answers a player who isn't seated in this room", async () => {
+    const { handle, ofType } = setup({ createLinkPeer: () => new FakeHostPeer() });
+    handle(rtcOffer("NOTINGAM"));
+    await flushLink();
+    expect(ofType("rtc:answer")).toHaveLength(0);
+  });
+
+  it("closes the link when the player is kicked, and keeps it on a short drop", async () => {
+    const peers: FakeHostPeer[] = [];
+    const { handle, vip } = setup({
+      createLinkPeer: () => {
+        const peer = new FakeHostPeer();
+        peers.push(peer);
+        return peer;
+      },
+    });
+    handle(rtcOffer(vip));
+    await flushLink();
+
+    handle({ t: "player:left", d: { id: vip, reason: "disconnected" } });
+    expect(peers[0]?.closed).toBe(false);
+
+    handle({ t: "player:left", d: { id: vip, reason: "kicked" } });
+    expect(peers[0]?.closed).toBe(true);
+  });
+
+  it("closes every link on dispose", async () => {
+    const peers: FakeHostPeer[] = [];
+    const { handle, runtime, vip, second } = setup({
+      createLinkPeer: () => {
+        const peer = new FakeHostPeer();
+        peers.push(peer);
+        return peer;
+      },
+    });
+    handle(rtcOffer(vip, 1));
+    handle(rtcOffer(second, 2));
+    await flushLink();
+
+    runtime.dispose();
+    expect(peers.every((peer) => peer.closed)).toBe(true);
+  });
+
+  it("gives the running game's scene a link() accessor with the relay defaults by default", async () => {
+    const { play, sceneLinks } = setup();
+    play();
+    const link = sceneLinks.at(-1);
+    expect(link?.("PLAYER99")).toEqual({ path: "relay", rttMs: null, playbackDelayMs: 180 });
   });
 });
