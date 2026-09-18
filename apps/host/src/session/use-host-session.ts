@@ -26,6 +26,7 @@ import {
   type LobbyState,
 } from "../screens/lobby/lobby-state.ts";
 import { createTurnstile } from "../security/turnstile.ts";
+import { settings } from "../settings/store.ts";
 import { clearSession, loadSession, saveSession, type StoredSession } from "./storage.ts";
 
 /**
@@ -93,7 +94,9 @@ export function useHostSession() {
       stage: phaserStage,
       send: (message) => relay?.send(message),
       onChange: () => show(),
-      reducedMotion: () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+      // CC-7.6: the laptop's stored reduced-motion setting, defaulting to prefers-reduced-motion
+      // (docs/architecture/audio.md "Host settings").
+      reducedMotion: () => settings.value.reducedMotion,
     });
     runtime = roomRuntime;
     const show = () => {

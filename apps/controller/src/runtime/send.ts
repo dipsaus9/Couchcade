@@ -26,6 +26,20 @@ export interface InputSenderOptions {
 export type InputSender = (input: GameInput, eventTimeStamp?: number) => number | null;
 
 /**
+ * Converts a local timestamp (`clock`'s own clock, such as `performance.now()`) to room time.
+ * Shared with the real-time input channel's browser wiring (`./link.ts`, CC-3.19), so `send` and
+ * `input.stream`/`input.fire` stamp `at` the same way (docs/architecture/realtime-link.md, "The
+ * phone decides its own shot", rule 5: "Timing still comes from `at`").
+ */
+export function localToRoomTime(
+  localMs: number,
+  toHostTime: (localTimestamp: number) => number = roomToHostTime,
+  clock: LocalClock = globalThis.performance,
+): number {
+  return toHostTime(clock.timeOrigin + localMs);
+}
+
+/**
  * The one send helper every game controller uses (docs/architecture/platform.md, "How the phone
  * shows a controller"). It stamps `at` with the room time the player acted, encodes and sends.
  *
@@ -48,7 +62,7 @@ export function createInputSender({
       eventTimeStamp !== undefined && Number.isFinite(eventTimeStamp) && eventTimeStamp <= now
         ? eventTimeStamp
         : now;
-    const at = toHostTime(clock.timeOrigin + actedAt);
+    const at = localToRoomTime(actedAt, toHostTime, clock);
     const d =
       input.payload === undefined
         ? { type: input.type, at }

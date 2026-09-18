@@ -161,7 +161,8 @@ function onMessage(state: PhoneState, message: RelayToPhoneMessage): PhoneState 
       // Clock sync arrives with CC-1.14.
       return state;
     case "rtc:answer":
-      // The WebRTC link's own runtime handles it directly (CC-3.19); it doesn't touch phone state.
+      // session.ts's onMessage hands this to the link runtime directly, the same way it does
+      // clock:pong; it never reaches here. Kept for RelayToPhoneMessage's exhaustive switch.
       return state;
   }
 }

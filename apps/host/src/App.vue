@@ -17,6 +17,7 @@ import MenuScreen from "./screens/menu/MenuScreen.vue";
 import PasscodeScreen from "./screens/passcode/PasscodeScreen.vue";
 import ResultsScreen from "./screens/results/ResultsScreen.vue";
 import { useHostSession } from "./session/use-host-session.ts";
+import { watchMuteHotkey } from "./settings/mute-hotkey.ts";
 
 const { screen, openRoom, endRoom, calibration, moderate } = useHostSession();
 const origin = window.location.origin;
@@ -46,6 +47,11 @@ onBeforeUnmount(stopWatchingForUnlock);
 // `press` on every laptop button click (CC-7.7, audio.md's token table).
 const stopWatchingButtonPresses = watchButtonPresses();
 onBeforeUnmount(stopWatchingButtonPresses);
+
+// The `M` key (CC-7.6, audio.md "Host settings" rule 3): toggles mute on any TV screen, except
+// while a text field has focus.
+const stopWatchingMuteHotkey = watchMuteHotkey();
+onBeforeUnmount(stopWatchingMuteHotkey);
 
 // The music for the phase the TV is showing. `screen.name` already models `playing` (the frame
 // stays empty then), so this covers every phase without reading the runtime's `HostPhase` too.

@@ -5,6 +5,7 @@ import { requestJoin, type FetchFn } from "../join/api.ts";
 import { normaliseName, roomCodeFromSearch, type JoinDraft } from "../join/form.ts";
 import { noTurnstile, type TurnstileProvider } from "../join/turnstile.ts";
 import { keepScreenAwake, lockPortrait, type ScreenWakeLock } from "../device/screen.ts";
+import { createControllerLink, type ControllerLink } from "../runtime/link.ts";
 import { watchReconnect, type ReconnectWatch } from "../runtime/reconnect.ts";
 import { openRoomSocket, type RoomSocket } from "./socket.ts";
 import { initialState, reduce, type PhoneEvent, type PhoneState } from "./state.ts";
@@ -24,10 +25,14 @@ export interface PhoneSessionOptions {
   turnstile?: TurnstileProvider;
   /** The room clock inputs are stamped with. Defaults to the shared `roomClock`. */
   clock?: Pick<RoomClock, "connect" | "disconnect" | "receive">;
+  /** The phone's WebRTC link runtime. Defaults to a fresh `createControllerLink`. */
+  link?: ControllerLink;
 }
 
 export interface PhoneSession {
   state: Readonly<ShallowRef<PhoneState>>;
+  /** The phone's WebRTC link to the host, shared by every running game (docs/architecture/realtime-link.md). */
+  link: ControllerLink;
   join(draft: JoinDraft): Promise<void>;
   /** Sends a message to the room. Dropped while the phone has no socket. */
   send(message: PhoneToRelayMessage): void;
@@ -51,14 +56,18 @@ export function createPhoneSession({
   fetchFn,
   turnstile = noTurnstile,
   clock = roomClock,
+  link: linkOption,
 }: PhoneSessionOptions = {}): PhoneSession {
   const state = shallowRef(initialState(roomCodeFromSearch(search), loadSession(storage)));
   let socket: RoomSocket | null = null;
   let reconnect: ReconnectWatch | null = null;
   let wakeLock: ScreenWakeLock | null = null;
 
+  const link = linkOption ?? createControllerLink({ sendMessage: (message) => send(message) });
+
   const dispatch = (event: PhoneEvent): void => {
     state.value = reduce(state.value, event);
+    link.follow(state.value);
   };
 
   function enterRoom(session: StoredSession, ticket?: string): void {
@@ -77,6 +86,8 @@ export function createPhoneSession({
       fetchFn,
       onMessage: (message) => {
         if (message.t === "clock:pong") return clock.receive(message.d);
+        // The link's own runtime handles its answer directly; it never touches phone state.
+        if (message.t === "rtc:answer") return link.receiveAnswer(message.d);
         dispatch({ type: "message", message });
         // Every (re)connect syncs the room clock again: 5 samples, then 1 every 30 s (CC-1.14).
         if (message.t === "room:welcome") clock.connect((d) => send({ t: "clock:ping", d }));
@@ -153,6 +164,7 @@ export function createPhoneSession({
 
   return {
     state,
+    link,
     join,
     send,
     dismissNotice: () => dispatch({ type: "notice-dismissed" }),
@@ -164,6 +176,7 @@ export function createPhoneSession({
       socket = null;
       wakeLock?.release();
       wakeLock = null;
+      link.dispose();
     },
   };
 }
