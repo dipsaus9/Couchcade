@@ -206,10 +206,16 @@ async function simpleBowl(phone: Page, mode: "touch" | "motion", resting?: Resti
   // let go (grip-up). `resting.pauseFor` keeps the background "still" trace (used so the phone
   // never looks like it stopped sending samples between turns) off the same fake adapter while
   // the real swing plays, so the two traces' samples can't interleave into one detector.
+  //
+  // `swingTrace`'s ramp and decay finish by 200ms (the peak sits at ~100ms); playing past that
+  // only delays this releasing the grip, and `emitOn: "release"` needs the release within
+  // SWING_RELEASE_WINDOW_MS (300ms) of the peak. 200ms keeps a comfortable margin instead of
+  // spending most of that window on a flat tail the detector doesn't need (grip-up itself ends
+  // the swing candidate; it doesn't need the trace's own quiet period to do that).
   const doSwing = async (): Promise<void> => {
     await phone.mouse.move(x, y);
     await phone.mouse.down();
-    await playMotionTrace(phone, swingTrace(300));
+    await playMotionTrace(phone, swingTrace(200));
     await phone.mouse.up();
     await phone.waitForTimeout(100);
   };
