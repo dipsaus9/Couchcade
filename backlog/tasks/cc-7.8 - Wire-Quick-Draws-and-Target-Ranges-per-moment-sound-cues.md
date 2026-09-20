@@ -4,7 +4,7 @@ title: Wire Quick Draw's and Target Range's per-moment sound cues
 status: In Progress
 assignee: []
 created_date: '2026-09-19 08:23'
-updated_date: '2026-09-20 10:18'
+updated_date: '2026-09-20 10:21'
 labels:
   - story
 dependencies: []
@@ -102,4 +102,26 @@ cues (draws, shots/taps, hits/misses, round transitions) still need an ears-on c
 Verify green in the worktree: pnpm check, check:style, check:deps, test (317 game tests + full repo
 suite), build. games/*/package.json gained "@couchcade/audio": "workspace:*" (needed to import it;
 not literally under src/host/, flagging as implied-necessary the same way pnpm-lock.yaml is).
+
+Reviewer (dipsaus-ai:story-reviewer, model sonnet, round 1): verdict BLOCK. No scope violations
+found (the reviewer explicitly agreed games/*/package.json's new "@couchcade/audio": "workspace:*"
+dependency and the pnpm-lock.yaml bookkeeping are implied-necessary, not a scope violation).
+
+AC1: met:false -- confirmed both games' wiring is otherwise complete and correct against
+docs/architecture/audio.md's table (all 9 Target Range cue types; 7 of 8 Quick Draw cue types), but
+the Quick Draw `round`/`result` background-music gap (see notes above) means "every cue" isn't
+literally true yet. One blocking finding, in games/quick-draw/src/host/sounds.ts: the missing
+audio.music(loop) wiring, whose only real fix is the follow-up story recommended above (source/trim
+a verified loop, needs an audible check this environment can't do) or a scope amendment. Advisory
+finding: test coverage/pattern in games/quick-draw/test/host/sounds.test.ts called out as thorough,
+no changes needed.
+
+This is not something another review round can resolve without either (a) fabricating an unverified
+audio-quality judgement, or (b) expanding this story's References -- both of which the orchestrator's
+brief says to stop and report on rather than guess. Stopping here after round 1 rather than spending
+the remaining 2 rounds on a finding that can't change without one of those two decisions. Escalating
+to the orchestrator with the choice and a recommendation (see final summary / handback).
+
+Not pushed. Branch stays at CC-7.8/wire-game-sound-cues, worktree .worktrees/CC-7.8, for whichever
+path the orchestrator picks.
 <!-- SECTION:NOTES:END -->
