@@ -2,7 +2,7 @@ import { assert, integer, property, record } from "fast-check";
 import { describe, expect, it } from "vitest";
 import { pipParts, randomPip } from "@couchcade/utils/pips";
 import { utf8ByteLength } from "../src/codec/index.ts";
-import { pipPartCounts, pipProfileSchema } from "../src/shared/index.ts";
+import { controllerViewSchema, pipPartCounts, pipProfileSchema } from "../src/shared/index.ts";
 
 describe("pipPartCounts", () => {
   it("is derived from @couchcade/utils's pipParts, not its own copy", () => {
@@ -113,5 +113,26 @@ describe("pipProfileSchema", () => {
         expect(utf8ByteLength(JSON.stringify(profile))).toBeLessThan(100);
       }),
     );
+  });
+});
+
+describe("controllerViewSchema", () => {
+  it("accepts a view without vip, same as before CC-3.28", () => {
+    const result = controllerViewSchema.safeParse({ screen: "echo", data: { text: "" } });
+    expect(result.success).toBe(true);
+    expect(result.success && result.data.vip).toBeUndefined();
+  });
+
+  it("accepts vip true and false, a running game's platform-owned VIP signal (CC-3.28)", () => {
+    for (const vip of [true, false]) {
+      const result = controllerViewSchema.safeParse({ screen: "echo", data: { text: "" }, vip });
+      expect(result.success).toBe(true);
+      expect(result.success && result.data.vip).toBe(vip);
+    }
+  });
+
+  it("rejects a non-boolean vip", () => {
+    const result = controllerViewSchema.safeParse({ screen: "echo", data: null, vip: "yes" });
+    expect(result.success).toBe(false);
   });
 });

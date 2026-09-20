@@ -175,6 +175,43 @@ describe("createViewSync", () => {
     expect(sent).toHaveLength(1);
     expect(time.pending).toBe(0);
   });
+  it("treats vip as part of the view (CC-3.28): it isn't merged across phones and its own change resends", () => {
+    const { time, sent, sync } = setup();
+    const asVip = (text: string, isVip: boolean): ControllerView => ({
+      ...view(text),
+      vip: isVip,
+    });
+    sync.show("echo", viewsOf([sam, asVip("hi", true)], [noor, asVip("hi", false)]));
+    expect(sent).toEqual([
+      {
+        t: "controller:state",
+        d: {
+          gameId: "echo",
+          // Same screen and data, different vip: two entries, never merged into one.
+          views: [
+            { to: [sam], view: asVip("hi", true) },
+            { to: [noor], view: asVip("hi", false) },
+          ],
+        },
+      },
+    ]);
+    expect(hostToRelaySchema.safeParse(sent[0]).success).toBe(true);
+
+    // The VIP passes to noor: only the two views that actually flipped resend.
+    time.advance(1000);
+    sync.show("echo", viewsOf([sam, asVip("hi", false)], [noor, asVip("hi", true)]));
+    expect(sent[1]).toEqual({
+      t: "controller:state",
+      d: {
+        gameId: "echo",
+        views: [
+          { to: [sam], view: asVip("hi", false) },
+          { to: [noor], view: asVip("hi", true) },
+        ],
+      },
+    });
+  });
+
   it("sends a forgotten phone its unchanged view on the next show, inside the send cap", () => {
     const { time, sent, sync } = setup();
     sync.show("echo", viewsOf([sam, view("a")], [noor, view("b")]));
