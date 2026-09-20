@@ -415,6 +415,58 @@ describe("AC6: the dev readout never carries an address", () => {
   });
 });
 
+describe("CC-3.26: link:ping piggybacks the phone's own rttMs and jitter", () => {
+  type PingPayload = { id: number; t0: number; rttMs: number | null; jitterMs: number };
+
+  function collectPings(peer: FakePeer): PingPayload[] {
+    const pings: PingPayload[] = [];
+    peer.hostSide(0).onMessage((data) => {
+      if (typeof data !== "string") return;
+      const { t, d } = JSON.parse(data) as { t: string; d: PingPayload };
+      if (t === "link:ping") pings.push(d);
+    });
+    return pings;
+  }
+
+  it("sends null rttMs and 0 jitterMs on the very first ping, before any pong", async () => {
+    const rig = createRig();
+    rig.link.follow(seatedWelcomed);
+    await rig.virtual.advance(0);
+    const peer = rig.currentPeer();
+    if (peer === null) throw new Error("no peer attempt started");
+
+    const pings = collectPings(peer);
+    peer.channels[0]?.open();
+    peer.channels[1]?.open(); // both open -> channelsOpen() sends the first ping right away
+    await rig.virtual.advance(0); // delivers the fake channel's scheduled (0 ms) send
+
+    expect(pings.length).toBeGreaterThan(0);
+    expect(pings[0]).toMatchObject({ rttMs: null, jitterMs: 0 });
+  });
+
+  it("piggybacks the same rttMs/jitterMs the dev readout exposes, once pongs have arrived", async () => {
+    const rig = createRig();
+    rig.link.follow(seatedWelcomed);
+    await goDirect(rig); // 3 pongs answered, promoted to direct
+    expect(rig.link.state).toBe("direct");
+    const peer = rig.currentPeer();
+    if (peer === null) throw new Error("no peer");
+
+    // No further pongs are sent after goDirect, so rttSamples (and thus rttMs/jitterMs) stay put
+    // for every ping sent from here on -- the payload should match the dev-readout getters.
+    const pings = collectPings(peer);
+    await rig.virtual.advance(1_500); // several idle-cadence pings (1,000 ms) go out unanswered
+
+    expect(pings.length).toBeGreaterThan(0);
+    for (const ping of pings) {
+      expect(ping.rttMs).toBe(rig.link.rttMs);
+      expect(ping.jitterMs).toBe(rig.link.jitterMs);
+    }
+    expect(typeof rig.link.rttMs).toBe("number");
+    expect(rig.link.jitterMs).toBeGreaterThanOrEqual(0);
+  });
+});
+
 describe("retrying on the relay path", () => {
   it("does not retry on every follow() call, only on a real trigger or the backoff timer", async () => {
     const rig = createRig();

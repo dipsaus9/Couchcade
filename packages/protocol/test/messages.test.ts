@@ -260,7 +260,7 @@ describe("WebRTC signalling and link schemas", () => {
   });
 
   it("exports link:ping and link:pong schemas, never routed through the relay directions", () => {
-    const ping = { t: "link:ping" as const, d: { id: 1, t0: 100.5 } };
+    const ping = { t: "link:ping" as const, d: { id: 1, t0: 100.5, rttMs: 42, jitterMs: 3.5 } };
     const pong = { t: "link:pong" as const, d: { id: 1, t0: 100.5, t1: 205, t2: 206, r: 12.3 } };
     expect(z.safeParse(linkPing, ping).success).toBe(true);
     expect(z.safeParse(linkPong, pong).success).toBe(true);
