@@ -100,7 +100,7 @@ Research on controls and code:
    | 4 | Far and gusty | 24 px | 2 to 4 | 14 px |
 
    Radii and drops are world pixels on the 480×270 TV world. Wind is a whole number, left or right.
-3. **Target.** Each round the seeded RNG places the target centre at `x` 160 to 320 and `y` 110 to 160, in steps of 2 px. It stays there for the round's 3 arrows, so players can correct from their last arrow.
+3. **Target.** Each round the seeded RNG places the target centre at `x` 160 to 320, in steps of 2 px. `y` always reaches as far as 110 (the horizon), but how close to the couch it may land is capped by the round's radius, so the target's on-screen depth tracks the round's physics distance instead of rolling independently of it (CC-11.11): 110 to 160 for round 1 (radius 36), 110 to 152 for round 2 (radius 30), 110 to 144 for rounds 3 and 4 (radius 24). It stays there for the round's 3 arrows, so players can correct from their last arrow.
 4. **Wind.** Before each arrow the seeded RNG picks the wind strength inside the round's range and a direction, left or right. A strength of 0 has no direction.
 5. **Volley.** Each arrow is one volley. Every player may shoot one arrow while the volley is open: from the moment it opens until 10,000 ms later, or until every player has shot. See [Round flow](#round-flow-and-timings).
 6. **Arrow score.** Where the arrow lands comes from [Arrow flight](#arrow-flight). With `d` the distance from the target centre and `R` the round's radius:
