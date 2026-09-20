@@ -41,20 +41,24 @@ import type { TargetRangeInput } from "../shared/input.ts";
 /** The motion step's result, as the controller runtime passes it. */
 export type TargetRangeMotion = ControllerMotion<MotionAdapter, Calibration>;
 
-/** What the shot needs from the controller's one `InputChannel`. */
+/** What the shot needs from the controller's one `InputChannel`. `path` is optional so a minimal
+ * fallback channel (a no-op stub, a test double) doesn't have to supply it: `shownDelayMs` treats
+ * a missing `path` the same as `"relay"`, the larger (safer) of the two known delays. */
 export type ShotChannel = Pick<
   InputChannel<TargetRangeInput>,
-  "stream" | "fire" | "clear" | "last" | "path"
->;
+  "stream" | "fire" | "clear" | "last"
+> & {
+  path?: InputChannel<TargetRangeInput>["path"];
+};
 
 /** `../controller/index.ts`'s declared `streams.aim.hz`. */
 const AIM_STREAM_HZ = 30;
 
 /**
  * How far behind the TV plays this player's crosshair right now (CC-11.10), mirroring
- * `apps/host/src/runtime/links.ts`'s `relayPlaybackDelayMs` (180, also used off the link, which
- * runs input through the relay too) and `directPlaybackDelayMs` (`1000 / hz` clamped to 25-120,
- * jitter assumed 0 until it's measured -- same assumption the host makes).
+ * `apps/host/src/runtime/links.ts`'s `relayPlaybackDelayMs` (180, also used off the link, and
+ * when `path` is unknown) and `directPlaybackDelayMs` (`1000 / hz` clamped to 25-120, jitter
+ * assumed 0 until it's measured -- same assumption the host makes).
  */
 export function shownDelayMs(path: ShotChannel["path"]): number {
   if (path === "direct") return Math.min(120, Math.max(25, 1000 / AIM_STREAM_HZ));

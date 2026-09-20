@@ -37,7 +37,6 @@ const noopChannel: ShotChannel = {
   fire: () => {},
   last: () => null,
   clear: () => {},
-  path: "off",
 };
 
 const synced = useClockSynced();
