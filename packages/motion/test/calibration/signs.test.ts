@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   applySigns,
   calibrateRest,
+  createSignTracker,
   detectSigns,
   normaliseSample,
 } from "@couchcade/motion/calibration";
@@ -32,6 +33,54 @@ describe("detectSigns", () => {
       inverted: false,
       measured: false,
     });
+  });
+});
+
+describe("createSignTracker (CC-5.14): the first clear sample sets it, a later one can correct it", () => {
+  it("keeps the default while every sample is unclear, without ever measuring", () => {
+    const tracker = createSignTracker();
+    const side = { x: G, y: 1, z: 1 };
+    expect(tracker.push(side)).toEqual({ inverted: false, measured: false });
+    expect(tracker.push(side)).toEqual({ inverted: false, measured: false });
+    expect(tracker.current()).toEqual({ inverted: false, measured: false });
+  });
+
+  it("sets the decision from the first sample outside the unclear band, no dedicated window needed", () => {
+    const tracker = createSignTracker();
+    const unclear = { x: G, y: 1, z: 1 };
+    const clearInverted = { x: 0, y: -5, z: -5 };
+
+    // Two unclear samples first: still the W3C default, not yet measured.
+    expect(tracker.push(unclear).measured).toBe(false);
+    expect(tracker.push(unclear).measured).toBe(false);
+    // The third sample is the first clear one, and it sets the decision immediately.
+    expect(tracker.push(clearInverted)).toEqual({ inverted: true, measured: true });
+    expect(tracker.current()).toEqual({ inverted: true, measured: true });
+  });
+
+  it("lets a later clear sample correct an earlier one", () => {
+    const tracker = createSignTracker();
+    expect(tracker.push({ x: 0, y: -5, z: -5 })).toEqual({ inverted: true, measured: true });
+    // An unclear sample in between keeps the running decision, not the original default.
+    expect(tracker.push({ x: G, y: 1, z: 1 })).toEqual({ inverted: true, measured: false });
+    // A later, disagreeing clear sample corrects it.
+    expect(tracker.push({ x: 0, y: 5, z: 5 })).toEqual({ inverted: false, measured: true });
+    expect(tracker.current()).toEqual({ inverted: false, measured: true });
+  });
+
+  it("starts an unclear pose from the previous page-session decision, exactly like detectSigns", () => {
+    const unclear = { x: G, y: 0.5, z: 0.5 };
+    expect(createSignTracker(true).push(unclear)).toEqual({ inverted: true, measured: false });
+    expect(createSignTracker(false).push(unclear)).toEqual({ inverted: false, measured: false });
+    expect(createSignTracker().push(unclear)).toEqual({ inverted: false, measured: false });
+  });
+
+  it("reset() starts over at the original previous decision, not whatever it last corrected to", () => {
+    const tracker = createSignTracker(false);
+    tracker.push({ x: 0, y: -5, z: -5 }); // corrects to inverted: true
+    expect(tracker.current().inverted).toBe(true);
+    tracker.reset();
+    expect(tracker.current()).toEqual({ inverted: false, measured: false });
   });
 });
 

@@ -25,20 +25,27 @@ import { parseMotionPermissionView } from "./view.ts";
 // 1. asks: "Tap to enable motion" calls the adapter's `request()` synchronously inside the tap,
 //    renews the screen wake lock and, on Android, enters fullscreen with portrait locked.
 //    "Use touch instead" answers `denied` without asking the browser.
-// 2. after `granted`, waits up to 1 s for real sensor data, then runs the one second of holding
-//    still (rest calibration, CC-5.3) with a progress ring.
-// 3. sends one `motion:status`: `granted` once calibrated, `denied` when the player or the browser
-//    said no, `unsupported` for no sensors, no gyroscope, or sensors that stopped.
+// 2. after `granted`, a continuous still detector (rest calibration, CC-5.3, made continuous by
+//    CC-5.14 per motion.md "Where aim's zero comes from (CC-5.12)") starts watching for stillness
+//    in parallel with the up-to-1-s wait for real sensor data. Most players are already holding
+//    the phone still at this point, so a still stretch has often already completed by the time the
+//    data check resolves, and the game starts with no screen at all. "Hold your phone still" with a
+//    progress ring only shows as a fallback, when no still stretch has happened yet.
+// 3. sends one `motion:status`: `granted` once calibrated (never with a zero/unmeasured bias -- the
+//    best estimate so far is used even before a still stretch completes), `denied` when the player
+//    or the browser said no, `unsupported` for no sensors, no gyroscope, or sensors that stopped.
 // 4. during the game: when the page comes back from hidden, "Tap to resume" asks again and
 //    restarts the sensors, keeping the calibration (rule 6). When no sample arrives for 2 s while
-//    the page is visible, the player switches to touch for the rest of the game (rule 7).
+//    the page is visible, the player switches to touch for the rest of the game (rule 7). The still
+//    detector keeps running and re-measuring the whole time, so a bad early estimate stops
+//    mattering within a few seconds instead of ruining the session.
 // 5. a full page reload (CC-5.13) loses this module's state entirely, but not the browser's own
 //    permission decision. If the reload lands mid-game, past the `motion-permission` screen this
 //    module never sees again, `grant.ts`'s record of the last game that reached "ready" tells
 //    `follow` to rebuild the game as paused with no calibration, instead of leaving it unset and
 //    silently landing on touch. "Tap to resume" then re-asks the browser (still inside a real tap,
-//    so browsers that need a fresh gesture work too) and, once granted, redoes the one second of
-//    holding still, because the calibration itself didn't survive the reload.
+//    so browsers that need a fresh gesture work too) and, once granted, restarts the still
+//    detector, because the calibration itself didn't survive the reload.
 
 /** Where the phone is in the motion step. */
 export type MotionFlow =
@@ -238,32 +245,19 @@ export function createMotionSession(options: MotionSessionOptions): MotionSessio
     stopWork.push(stopListening, () => cancelCheck?.());
   }
 
-  /** After `request()` answers `granted`: checks real sensor data, then calibrates or gives up. */
+  /**
+   * After `request()` answers `granted`: a continuous still detector (CC-5.14) starts watching
+   * for stillness right away, in parallel with the up-to-1-s wait for real sensor data below. Once
+   * that wait resolves, "the game wants to start" -- the host is waiting on this phone's
+   * `motion:status` -- so the hold-still screen is shown only as a fallback, when no still stretch
+   * has completed yet (motion.md, "Where aim's zero comes from (CC-5.12)", recommendation point 5).
+   */
   async function afterGranted(current: number): Promise<void> {
     const adapter = options.adapter();
-    const capability = await waitForData(adapter);
-    if (current !== generation) return;
-    update({ capability });
-    const usable = options.needsGyroscope ? capability === "full" : capability !== "none";
-    if (usable) calibrate(current);
-    else toTouch("unsupported");
-  }
-
-  function calibrate(current: number): void {
-    const adapter = options.adapter();
     const rest = createRestCalibration();
-    update({ flow: { kind: "still", progress: 0 } });
-    const stopListening = adapter.start((sample) => {
-      if (current !== generation) return;
-      const calibration = rest.push(sample);
-      if (calibration === null) {
-        const progress = Math.min(1, Math.floor((rest.progress().stillMs / stillMs) * 10) / 10);
-        const flow = state.value?.flow;
-        if (flow?.kind === "still" && flow.progress !== progress) {
-          update({ flow: { kind: "still", progress } });
-        }
-        return;
-      }
+    let latest: Calibration | null = null;
+
+    const finish = (calibration: Calibration): void => {
       stopAll();
       update({ flow: { kind: "ready" }, calibration, paused: false });
       sendStatus("granted");
@@ -273,11 +267,42 @@ export function createMotionSession(options: MotionSessionOptions): MotionSessio
         saveMotionGrant(grantStorage, { gameId: game.gameId, title: game.title, step: game.step });
       }
       watchForStall();
+    };
+
+    const stopListening = adapter.start((sample) => {
+      if (current !== generation) return;
+      latest = rest.push(sample) ?? latest;
+      const flow = state.value?.flow;
+      if (flow?.kind !== "still") return;
+      if (latest) {
+        finish(latest);
+        return;
+      }
+      const progress = Math.min(1, Math.floor((rest.progress().stillMs / stillMs) * 10) / 10);
+      if (flow.progress !== progress) update({ flow: { kind: "still", progress } });
     });
+    stopWork.push(stopListening);
+
+    const capability = await waitForData(adapter);
+    if (current !== generation) return;
+    update({ capability });
+    const usable = options.needsGyroscope ? capability === "full" : capability !== "none";
+    if (!usable) {
+      toTouch("unsupported");
+      return;
+    }
+
+    // The common case: the phone was already still while waiting for real sensor data, so a still
+    // stretch -- or at least a usable estimate -- already exists. No screen needed at all.
+    if (latest) {
+      finish(latest);
+      return;
+    }
+    update({ flow: { kind: "still", progress: 0 } });
     const cancelGiveUp = schedule(() => {
       if (current === generation) toTouch("unsupported");
     }, stillGiveUpMs);
-    stopWork.push(stopListening, cancelGiveUp);
+    stopWork.push(cancelGiveUp);
   }
 
   return {

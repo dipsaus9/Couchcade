@@ -16,10 +16,11 @@ export interface SignDecision {
 }
 
 /**
- * Decides the gravity sign from the still mean of `gravityAcceleration`, as delivered. The player is
- * reading the screen, so with W3C signs a portrait phone between flat and upright reads `y + z > 0`.
- * A mean with `y + z < −2` is inverted. With `|y + z| <= 2` (the phone is on its side) the previous
- * decision from this page session is kept, or W3C signs when there is none.
+ * Decides the gravity sign from one `gravityAcceleration` reading, as delivered (a still mean or a
+ * single sample; both are just a vector to this function). The player is reading the screen, so
+ * with W3C signs a portrait phone between flat and upright reads `y + z > 0`. A reading with
+ * `y + z < −2` is inverted. With `|y + z| <= 2` (the phone is on its side) the previous decision
+ * from this page session is kept, or W3C signs when there is none.
  */
 export function detectSigns(
   meanGravity: Vec3,
@@ -30,6 +31,41 @@ export function detectSigns(
   if (facing < -band) return { inverted: true, measured: true };
   if (facing > band) return { inverted: false, measured: true };
   return { inverted: previous ?? false, measured: false };
+}
+
+export interface SignTracker {
+  /** Feeds one `gravityAcceleration` reading and returns the decision after it. */
+  push(gravity: Vec3): SignDecision;
+  /** The decision as of the last `push`, without feeding a new reading. */
+  current(): SignDecision;
+  /** Starts over at the original `previous` decision. */
+  reset(): void;
+}
+
+/**
+ * Tracks the gravity sign for the whole session (motion.md, "Where aim's zero comes from
+ * (CC-5.12)", recommendation point 4): the first sample outside the unclear band sets the
+ * decision, and any later clear sample can correct it. No dedicated still window is needed --
+ * `push` takes whatever reading calibration sees next, still or moving.
+ */
+export function createSignTracker(
+  previous?: boolean,
+  band: number = SIGN_UNCLEAR_BAND,
+): SignTracker {
+  const initial: SignDecision = { inverted: previous ?? false, measured: false };
+  let decision = initial;
+  return {
+    push(gravity) {
+      decision = detectSigns(gravity, decision.inverted, band);
+      return decision;
+    },
+    current() {
+      return decision;
+    },
+    reset() {
+      decision = initial;
+    },
+  };
 }
 
 /**

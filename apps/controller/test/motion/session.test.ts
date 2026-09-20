@@ -1,5 +1,5 @@
 import { createFakeAdapter, type MotionCapability } from "@couchcade/motion/sensors";
-import type { MotionSample } from "@couchcade/motion/sensors";
+import type { MotionAdapter, MotionSample } from "@couchcade/motion/sensors";
 import type { ControllerView, PlayerInfo, PhoneToRelayMessage } from "@couchcade/protocol";
 import { describe, expect, it } from "vitest";
 import { motionGrantKey, type MotionGrantStorageLike } from "../../src/motion/grant.ts";
@@ -108,6 +108,13 @@ function setup({
   capability = "full" as MotionCapability,
   needsGyroscope = true,
   grantStorage = fakeGrantStorage(),
+  waitForData,
+}: {
+  capability?: MotionCapability;
+  needsGyroscope?: boolean;
+  grantStorage?: MotionGrantStorageLike;
+  /** Overrides the default immediate-resolve stub, e.g. to stream samples while it's pending. */
+  waitForData?: (adapter: MotionAdapter) => Promise<MotionCapability>;
 } = {}) {
   const time = virtualTime();
   const adapter = createFakeAdapter({ now: time.now });
@@ -124,7 +131,7 @@ function setup({
     document: doc,
     schedule: time.schedule,
     now: time.now,
-    waitForData: () => Promise.resolve(capability),
+    waitForData: waitForData ?? (() => Promise.resolve(capability)),
     grantStorage,
   });
   /** Pushes still samples, one every 16 ms, for `ms`. */
@@ -200,6 +207,71 @@ describe("createMotionSession", () => {
     // A second tap does nothing.
     motion.enable();
     expect(requested).toBe(1);
+  });
+
+  describe("the hold-still screen is conditional (CC-5.14): only a fallback, never guaranteed", () => {
+    it("skips the screen entirely when a still stretch already completed while waiting for real data", async () => {
+      // Most players: the phone is already still while the browser resolves the permission tap
+      // and the up-to-1-s real-data check, so a still stretch has often already landed by the
+      // time the game wants to start.
+      const { motion, statuses } = setup({
+        waitForData: (adapter) => {
+          const fake = adapter as MotionAdapter & { push(sample: MotionSample): void };
+          for (let t = 0; t <= 1100; t += 16) fake.push(still(t));
+          return Promise.resolve("full");
+        },
+      });
+      motion.follow(step());
+      motion.enable();
+      await flush();
+
+      // Straight to "ready": the "starting"/"still" screens never showed at all.
+      expect(motion.state.value?.flow).toEqual({ kind: "ready" });
+      expect(motion.state.value?.calibration).not.toBeNull();
+      expect(motion.state.value?.calibration?.bias).not.toEqual({ alpha: 0, beta: 0, gamma: 0 });
+      expect(statuses()).toEqual(["granted"]);
+    });
+
+    it("shows the screen only as a fallback when nothing usable exists yet, then proceeds once it does", async () => {
+      // Nobody was holding the phone still during the wait (data arrives only after it resolves).
+      const { motion, holdStill, statuses } = setup();
+      motion.follow(step());
+      motion.enable();
+      await flush();
+      expect(motion.state.value?.flow).toEqual({ kind: "still", progress: 0 });
+      expect(statuses()).toEqual([]);
+
+      holdStill(1100);
+      expect(motion.state.value?.flow).toEqual({ kind: "ready" });
+      expect(statuses()).toEqual(["granted"]);
+    });
+
+    it("never hands the game a zero/unmeasured bias, even from the fallback screen's own timeout", async () => {
+      const { motion, adapter, time, statuses } = setup();
+      motion.follow(step());
+      motion.enable();
+      await flush();
+      expect(motion.state.value?.flow).toEqual({ kind: "still", progress: 0 });
+
+      // A shaky hand: turning too fast to ever complete a still stretch, for the whole 5 s that
+      // rest.ts's own internal timeout allows before it falls back to the best noisy estimate.
+      let t = 0;
+      for (; t <= 5100; t += 20) {
+        time.advance(t === 0 ? 0 : 20);
+        adapter.push({
+          t,
+          interval: 20,
+          acceleration: { x: 0, y: 0, z: 0 },
+          gravityAcceleration: { x: 0, y: 6.9, z: 6.9 },
+          rotationRate: { alpha: Math.round(t / 20) % 2 ? 25 : 3, beta: 0, gamma: 0 },
+        });
+      }
+
+      // The fallback fired well before the wall-clock give-up-to-touch timer (stillGiveUpMs).
+      expect(motion.state.value?.flow).toEqual({ kind: "ready" });
+      expect(motion.state.value?.calibration?.bias).not.toEqual({ alpha: 0, beta: 0, gamma: 0 });
+      expect(statuses()).toEqual(["granted"]);
+    });
   });
 
   it("a browser that says no, or has no sensors, switches to touch and tells the host", async () => {
