@@ -71,3 +71,12 @@ export function createInputSender({
     return at;
   };
 }
+
+/**
+ * The `ui:action` the in-game "End game" control sends (CC-3.27). Host-side, only the current
+ * VIP's tap ends the game early (apps/host/src/runtime/host-runtime.ts); anyone else's is a
+ * no-op, the same as a non-VIP's results or menu actions.
+ */
+export function endGameAction(): PhoneToRelayMessage {
+  return { t: "ui:action", d: { action: "end-game" } };
+}

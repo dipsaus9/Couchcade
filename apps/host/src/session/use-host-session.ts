@@ -193,6 +193,15 @@ export function useHostSession() {
     relay?.send({ t: "room:end", d: {} });
   }
 
+  /**
+   * "End game" on the TV (CC-3.27): stops the running game and reopens the menu, without closing
+   * the room the way `endRoom` does. The host's own tap always may; a phone's `ui:action` is
+   * gated to the VIP inside `host-runtime.ts`.
+   */
+  function endGameEarly(): void {
+    runtime?.endGameEarly();
+  }
+
   const stored = loadSession();
   if (stored) enterRoom(stored, null);
 
@@ -201,7 +210,7 @@ export function useHostSession() {
     relay?.close();
   });
 
-  return { screen, openRoom, endRoom, calibration, moderate };
+  return { screen, openRoom, endRoom, calibration, moderate, endGameEarly };
 }
 
 interface Moderation {

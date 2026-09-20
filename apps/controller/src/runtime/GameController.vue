@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { GameInput } from "@couchcade/game-sdk/contract";
 import type { PhoneToRelayMessage } from "@couchcade/protocol";
+import { CcButton } from "@couchcade/ui";
 import { computed, onBeforeUnmount, onMounted, watch } from "vue";
 import { motionAdapter } from "../motion/adapter.ts";
 import type { MotionGame } from "../motion/session.ts";
@@ -14,7 +15,7 @@ import {
 } from "./controller.ts";
 import { controllers } from "./games.ts";
 import type { ControllerLink } from "./link.ts";
-import { createInputSender } from "./send.ts";
+import { createInputSender, endGameAction } from "./send.ts";
 
 // The running game's controller (docs/architecture/platform.md, "How the phone shows a
 // controller"): its phone entry loads by game id and gets the latest view as props, plus the motion
@@ -33,6 +34,16 @@ const send = createInputSender({
   sendMessage: (message) => props.sendMessage(message),
   canSend: () => props.state.role === "player" && props.state.online,
 });
+
+/**
+ * "End game" (CC-3.27): every seated player in the running game sees the control, because the
+ * host is the only one who knows who the current VIP is (docs/architecture/session-flow.md,
+ * "the VIP's phone" screens all work the same way); the host silently ignores anyone else's tap
+ * (apps/host/src/runtime/host-runtime.ts).
+ */
+function endGame(): void {
+  props.sendMessage(endGameAction());
+}
 
 const status = useGameController(() => props.state.gameId, controllers);
 
@@ -66,12 +77,22 @@ const devReadout = new URLSearchParams(globalThis.location?.search ?? "").get("d
   <component :is="status.component" v-if="status.kind === 'ready'" v-bind="bound" />
   <WaitingScreen v-else-if="status.kind === 'missing'" v-bind="missingGameCopy" />
   <WaitingScreen v-else v-bind="loadingControllerCopy" />
+  <CcButton class="end-game" variant="stop" :disabled="!props.state.online" @press="endGame">
+    End game
+  </CcButton>
   <p v-if="devReadout" class="link-dev-readout">
     {{ link.path }} · {{ link.rttMs === null ? "–" : `${Math.round(link.rttMs)} ms` }}
   </p>
 </template>
 
 <style scoped>
+.end-game {
+  position: fixed;
+  top: var(--cc-space-4);
+  right: var(--cc-space-4);
+  z-index: 999;
+}
+
 .link-dev-readout {
   position: fixed;
   bottom: var(--cc-space-4);

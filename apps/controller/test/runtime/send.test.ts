@@ -1,7 +1,7 @@
 import { roomClock } from "@couchcade/game-sdk/clock";
 import { decode, encode, phoneToRelaySchema, type PhoneToRelayMessage } from "@couchcade/protocol";
 import { describe, expect, it, vi } from "vitest";
-import { createInputSender, type LocalClock } from "../../src/runtime/send.ts";
+import { createInputSender, endGameAction, type LocalClock } from "../../src/runtime/send.ts";
 
 const timeOrigin = 1_789_000_000_000.25;
 const clock: LocalClock = { timeOrigin, now: () => 5_000.5 };
@@ -65,5 +65,15 @@ describe("createInputSender", () => {
     const { send, sent } = sender({ canSend: false });
     expect(send({ type: "tap" }, 4_000)).toBeNull();
     expect(sent).toEqual([]);
+  });
+});
+
+describe("endGameAction", () => {
+  it("builds a valid end-game ui:action frame (CC-3.27)", () => {
+    const message = endGameAction();
+
+    expect(message).toEqual({ t: "ui:action", d: { action: "end-game" } });
+    const frame = encode(message);
+    expect(decode(phoneToRelaySchema, frame)).toEqual({ ok: true, message });
   });
 });

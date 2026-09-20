@@ -164,6 +164,14 @@ export interface HostRuntime {
   /** "Try again" on the TV after nobody got enough taps in. */
   retryCalibration(): void;
   /**
+   * "End game" (CC-3.27): stops the running game and reopens the menu for the VIP, the same way
+   * "Back to menu" already does after a natural finish. There's nothing to show for a game that
+   * didn't finish, so this skips the results screen. Does nothing outside a running game. The
+   * TV's own button calls this directly and always may; a phone's `ui:action` is gated to the
+   * current VIP in `handle()`.
+   */
+  endGameEarly(): void;
+  /**
    * Called on every animation frame of the calibration screen with that frame's room time.
    * Returns what to draw, and records the frame that first draws each flash.
    */
@@ -514,6 +522,27 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
   }
 
   /**
+   * "End game" (CC-3.27): stops the running game without a results screen and reopens the menu
+   * for the VIP, mirroring `begin()`'s dropped-chunk recovery and `finishRecovery()`'s "menu"
+   * case above.
+   */
+  function endGameEarly(): void {
+    if (running === null) return;
+    const { game, loop, snapshots } = running;
+    loop.stop();
+    snapshots.stop();
+    options.stage.stop(game);
+    running = null;
+    results = null;
+    menuNotice = null;
+    const leaderId = lobby === null ? undefined : vip(lobby)?.id;
+    if (leaderId !== undefined) menu.action(leaderId, { action: "start" });
+    setPhase(menu.open ? "menu" : "lobby");
+    showPlatformViews();
+    options.onChange?.();
+  }
+
+  /**
    * A new TV tab got its first `room:welcome` with a phase other than the lobby: it was refreshed
    * or reopened after a deploy. The relay follows the welcome with `player:joined` for every known
    * player and the stored `room:snapshot`. Those all arrive before the first `clock:pong`, and the
@@ -645,6 +674,8 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
 
     skipCalibration: endCalibration,
 
+    endGameEarly,
+
     retryCalibration() {
       calibration?.retry();
     },
@@ -711,6 +742,13 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
           }
           return;
         case "ui:action":
+          // "End game" (CC-3.27): only while a game runs, and only the current VIP's tap counts
+          // -- the same moderation shape as kick (apps/server/src/room/moderation.ts), applied
+          // here because only the host runtime knows who the VIP is.
+          if (message.d.action === "end-game") {
+            if (running !== null && message.from === vip(state)?.id) endGameEarly();
+            return;
+          }
           // The motion step takes no platform actions: the game is already picked. A recovering TV
           // takes none until it knows where the room was.
           if (running !== null || motionCheck !== null || recovery !== null) return;
