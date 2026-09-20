@@ -4,7 +4,7 @@ title: Wire Quick Draw's and Target Range's per-moment sound cues
 status: Done
 assignee: []
 created_date: '2026-09-19 08:23'
-updated_date: '2026-09-20 10:27'
+updated_date: '2026-09-20 10:59'
 labels:
   - story
 dependencies: []
@@ -140,6 +140,17 @@ AC #1 stays unchecked, as instructed: this environment cannot confirm sound is a
 Re-running the review gate against the amended AC before push.
 
 Reviewer round 2 (dipsaus-ai:story-reviewer, model sonnet), against the amended AC: verdict PASS. AC2 (wiring, amended to except Quick Draw's music loop) met:true; AC1 (playtest) met:false, correctly left unchecked -- no scope violations, no findings. Proceeding to push and open the draft PR.
+
+Pushed CC-7.8/wire-game-sound-cues, opened draft PR https://github.com/dipsaus9/Couchcade/pull/155.
+CI (PR checks): budgets, build, check, check:deps, check:style, test all passed on the first run.
+e2e failed once on platform/host-recovery.spec.ts:118 ("a TV reloaded on the game menu comes back
+to the menu", chromium only, both attempts) -- unrelated to this story: that test covers the TV
+reload flow on the game-menu screen, before any game scene starts, so games/*/src/host/scene.ts's
+new audio.load() calls in create() never execute on that path. The same test passed cleanly on
+chromium and webkit in CC-3.27's E2E run ~10 minutes earlier on essentially the same base. Re-ran
+the e2e job (gh run rerun --failed): all 30 tests (29 passed, 1 intentionally skipped) passed clean
+on the second run, confirming a transient CI flake, not a regression from this story's changes.
+PR is green and ready for merge review.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
