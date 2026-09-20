@@ -3,9 +3,9 @@ import type { FakeKind, QuickDrawState, TapResult } from "../shared/index.ts";
 
 /**
  * Moments the TV marks with a sound. The scene emits each one on its event emitter under
- * `quickDrawCueEvent`, the frame it first shows it. Sound arrives with CC-10.5 and
- * `@couchcade/audio` (CC-7.2), which subscribe here; until then nothing listens. Every cue
- * already has its visual in the scene, so the game works with the sound off.
+ * `quickDrawCueEvent`, the frame it first shows it. `./sounds.ts`'s `playCueSound` subscribes to
+ * it (CC-7.8) and turns each cue into an `@couchcade/audio` call. Every cue already has its
+ * visual in the scene, so the game works with the sound off.
  */
 export type QuickDrawCue =
   /** `intro` starts: the music loop plays, the tumbleweed rolls. */

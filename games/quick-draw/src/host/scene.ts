@@ -1,8 +1,9 @@
+import { audio } from "@couchcade/audio";
 import { motion } from "@couchcade/theme";
 import type { HostSceneData } from "@couchcade/game-sdk/contract";
 import { StageScene, shakeIntensity, worldToOverlay } from "@couchcade/stage";
 import type { Callout, Scoreboard } from "@couchcade/stage";
-import { Math as PhaserMath } from "phaser";
+import { Math as PhaserMath, Scenes } from "phaser";
 import type { GameObjects, Tweens } from "phaser";
 import type { QuickDrawState } from "../shared/index.ts";
 import { cuesBetween, quickDrawCueEvent } from "./cues.ts";
@@ -13,6 +14,7 @@ import { calloutAt } from "./layout.ts";
 import { InstructionPanel, PipTag, bangText } from "./overlays.ts";
 import { present } from "./present.ts";
 import type { Presentation } from "./present.ts";
+import { playCueSound, quickDrawSounds } from "./sounds.ts";
 import { loadSprites } from "./sprites.ts";
 import { PipActor, Props, buildBackdrop } from "./world.ts";
 import { worldPipLook } from "./world-pip.ts";
@@ -75,6 +77,13 @@ export default class QuickDrawScene extends StageScene<QuickDrawState> {
   }
 
   create(): void {
+    void audio.load(quickDrawSounds);
+    this.events.on(quickDrawCueEvent, playCueSound);
+    this.events.once(Scenes.Events.SHUTDOWN, () => {
+      this.events.off(quickDrawCueEvent, playCueSound);
+      audio.unload(quickDrawSounds);
+    });
+
     const state = this.host.getState();
     const view = present(state, { reducedMotion: this.reducedMotion });
     this.cameras.main.setRoundPixels(true);

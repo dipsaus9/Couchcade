@@ -10,6 +10,7 @@
     "test": "playwright install chromium-headless-shell && vitest run"
   },
   "dependencies": {
+    "@couchcade/audio": "workspace:*",
     "@couchcade/game-sdk": "workspace:*",
     "@couchcade/motion": "workspace:*",
     "@couchcade/protocol": "workspace:*",
