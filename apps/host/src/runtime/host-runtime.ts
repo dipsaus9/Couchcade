@@ -313,6 +313,20 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
     views.show(gameId, all);
   }
 
+  /**
+   * Merges the current VIP's id into every per-player running-game view (CC-3.28): a platform-owned
+   * sibling of the game's own `data`, so the game never sees or sets it (`controllerProps` in
+   * apps/controller/src/runtime/controller.ts only forwards `screen` and `data`). Recomputed from
+   * `lobby` on every call, so it follows the VIP if they disconnect mid-game (lobby-state.ts's
+   * `vip()` already picks the next connected seated player).
+   */
+  function withVip(gameViews: ReadonlyMap<string, ControllerView>): Map<string, ControllerView> {
+    const leaderId = lobby === null ? undefined : vip(lobby)?.id;
+    return new Map(
+      [...gameViews].map(([id, view]) => [id, { ...view, vip: id === leaderId }] as const),
+    );
+  }
+
   function setPhase(next: HostPhase): void {
     if (phase === next) return;
     phase = next;
@@ -440,7 +454,7 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
           return;
         }
         snapshots.tick();
-        show(game.id, runner.views(), runner.players);
+        show(game.id, withVip(runner.views()), runner.players);
       },
     });
     setPhase("playing");
@@ -458,7 +472,7 @@ export function createHostRuntime(options: HostRuntimeOptions): HostRuntime {
     const current = { game, runner, loop, touchPlayers, snapshots };
     running = current;
 
-    show(game.id, runner.views(), runner.players);
+    show(game.id, withVip(runner.views()), runner.players);
     options.onChange?.();
 
     const beginTicking = (): void => {

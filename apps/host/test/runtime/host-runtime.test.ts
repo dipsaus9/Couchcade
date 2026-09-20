@@ -512,6 +512,46 @@ describe("createHostRuntime", () => {
     });
   });
 
+  describe("VIP signal during play (CC-3.28)", () => {
+    /** The running game's view sent to `id` in the latest `controller:state` batch, or undefined. */
+    function viewOf(ofType: ReturnType<typeof setup>["ofType"], id: string) {
+      const last = ofType("controller:state").at(-1);
+      return last?.d.views.find((entry) => entry.to.includes(id))?.view;
+    }
+
+    it("marks only the current VIP's view, alongside the game's own data, not inside it", async () => {
+      const { play, vip, second, lobby, ofType } = setup();
+      const third = lobby.players[2]!.id;
+      play();
+      await settle();
+
+      expect(viewOf(ofType, vip)).toEqual({ screen: "echo", data: { text: "" }, vip: true });
+      expect(viewOf(ofType, second)).toEqual({ screen: "echo", data: { text: "" }, vip: false });
+      expect(viewOf(ofType, third)).toEqual({ screen: "echo", data: { text: "" }, vip: false });
+    });
+
+    it("passes the flag to the next connected player when the current VIP disconnects mid-game", async () => {
+      const { handle, play, vip, second, lobby, ofType, time } = setup();
+      play();
+      await settle();
+      // Clear the 667 ms send window opened by the game's first view, same as the reconnect test
+      // above, so the next tick's view flushes at once instead of queuing behind it.
+      time.advance(1000);
+
+      const dropped = {
+        ...lobby,
+        players: lobby.players.map((p) => (p.id === vip ? { ...p, connected: false } : p)),
+      };
+      handle({ t: "player:left", d: { id: vip, reason: "disconnected" } }, dropped);
+      // A running game only resends on its next tick (its views come from the game loop, not
+      // straight off the presence change), same as a mid-game input.
+      time.advance(1000 / 60);
+
+      expect(viewOf(ofType, second)).toEqual({ screen: "echo", data: { text: "" }, vip: true });
+      expect(viewOf(ofType, vip)).toEqual({ screen: "echo", data: { text: "" }, vip: false });
+    });
+  });
+
   it("recomputes canPlayAgain when the seated count changes during results", async () => {
     const { runtime, handle, play, second, lobby, time } = setup({
       games: [echoGame({ min: 3, max: 3 })],
@@ -607,7 +647,7 @@ describe("createHostRuntime", () => {
     const views = latest();
     expect(views.get(late.id)).toEqual(["echo", { screen: "next-game", data: null }]);
     expect(views.get(second.id)).toEqual(["echo", line(2)]);
-    expect(views.get(vip)).toEqual(["echo", { screen: "echo", data: { text: "" } }]);
+    expect(views.get(vip)).toEqual(["echo", { screen: "echo", data: { text: "" }, vip: true }]);
   });
 
   it("re-sends a reconnected phone its lobby view, even though it didn't change", () => {
@@ -643,7 +683,7 @@ describe("createHostRuntime", () => {
     expect(ofType("controller:state")).toHaveLength(before + 1);
     expect(ofType("controller:state").at(-1)?.d).toEqual({
       gameId: "echo",
-      views: [{ to: [second], view: { screen: "echo", data: { text: "" } } }],
+      views: [{ to: [second], view: { screen: "echo", data: { text: "" }, vip: false } }],
     });
     time.advance(1000);
     expect(ofType("controller:state")).toHaveLength(before + 1);

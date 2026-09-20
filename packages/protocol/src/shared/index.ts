@@ -93,6 +93,17 @@ export const controllerViewSchema = z.object({
   /** Whatever that screen needs. */
   data: jsonValueSchema,
   cue: z.optional(cueTokenSchema),
+  /**
+   * True on the current VIP's phone during a running game, false for every other seated player in
+   * it, absent outside a running game (CC-3.28). A platform-owned sibling of `data`, set by
+   * apps/host/src/runtime/host-runtime.ts and never by a game's own `view()` -- the lobby, menu,
+   * calibration and results screens already carry their own `vip` inside `data`, because they are
+   * platform screens that own their `data` outright, but a running game's `data` belongs to the
+   * game, so this field gives the controller a VIP signal without a game ever seeing or
+   * colliding with it (apps/controller/src/runtime/controller.ts's `controllerProps` only forwards
+   * `screen` and `data` to the game component, so `vip` never reaches it).
+   */
+  vip: z.optional(z.boolean()),
 });
 export type ControllerView = z.infer<typeof controllerViewSchema>;
 
