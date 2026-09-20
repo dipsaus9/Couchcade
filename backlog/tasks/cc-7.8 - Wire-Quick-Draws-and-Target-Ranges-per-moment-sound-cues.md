@@ -4,7 +4,7 @@ title: Wire Quick Draw's and Target Range's per-moment sound cues
 status: In Progress
 assignee: []
 created_date: '2026-09-19 08:23'
-updated_date: '2026-09-20 10:22'
+updated_date: '2026-09-20 10:24'
 labels:
   - story
 dependencies: []
@@ -31,7 +31,7 @@ games/target-range/src/host/cues.ts and games/quick-draw's equivalent already de
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 A playtest note confirms sounds are heard for draws, shots/taps, hits/misses and round transitions, not only music and UI clicks
-- [ ] #2 Every cue in games/target-range/src/host/cues.ts and its Quick Draw equivalent plays the matching @couchcade/audio token when it fires, except Quick Draw's still-missing background music loop (no verified-clean CC0 loop asset exists yet; tracked separately by a follow-up story)
+- [x] #2 Every cue in games/target-range/src/host/cues.ts and its Quick Draw equivalent plays the matching @couchcade/audio token when it fires, except Quick Draw's still-missing background music loop (no verified-clean CC0 loop asset exists yet; tracked separately by a follow-up story)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -124,4 +124,18 @@ to the orchestrator with the choice and a recommendation (see final summary / ha
 
 Not pushed. Branch stays at CC-7.8/wire-game-sound-cues, worktree .worktrees/CC-7.8, for whichever
 path the orchestrator picks.
+
+Merged origin/main (83408c9, the orchestrator's AC amendment + CC-7.9 follow-up), resolving one
+trivial timestamp conflict in this task file. Re-ran the full verify baseline on the merged tree:
+pnpm check, check:style, check:deps, test (all 2296 repo tests including games/quick-draw and
+games/target-range), build -- all green.
+
+The amended AC set reordered the criteria: #1 is now the playtest note (unchanged wording), #2 is
+now the wiring criterion, amended to explicitly except Quick Draw's still-missing background music
+loop (now tracked by CC-7.9). Checked AC #2: the existing implementation already fully satisfies the
+amended wording as-is (no code changes needed) -- every cue in both games plays the matching
+@couchcade/audio call, except that one already-documented, now-separately-tracked exception.
+AC #1 stays unchecked, as instructed: this environment cannot confirm sound is audible.
+
+Re-running the review gate against the amended AC before push.
 <!-- SECTION:NOTES:END -->
