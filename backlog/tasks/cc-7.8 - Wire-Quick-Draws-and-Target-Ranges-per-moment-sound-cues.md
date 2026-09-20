@@ -1,10 +1,10 @@
 ---
 id: CC-7.8
 title: Wire Quick Draw's and Target Range's per-moment sound cues
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-19 08:23'
-updated_date: '2026-09-20 10:24'
+updated_date: '2026-09-20 10:27'
 labels:
   - story
 dependencies: []
@@ -138,4 +138,22 @@ amended wording as-is (no code changes needed) -- every cue in both games plays 
 AC #1 stays unchecked, as instructed: this environment cannot confirm sound is audible.
 
 Re-running the review gate against the amended AC before push.
+
+Reviewer round 2 (dipsaus-ai:story-reviewer, model sonnet), against the amended AC: verdict PASS. AC2 (wiring, amended to except Quick Draw's music loop) met:true; AC1 (playtest) met:false, correctly left unchecked -- no scope violations, no findings. Proceeding to push and open the draft PR.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Wired every Target Range cue (round, open, draw, shoot, land, tick, reveal, roundEnd, over) and
+every Quick Draw cue except its still-missing background music loop to @couchcade/audio, via new
+games/{quick-draw,target-range}/src/host/sounds.ts sound banks and playCueSound(cue) functions,
+following the existing platform pattern (apps/host/src/audio/*) and docs/architecture/audio.md's
+"Wiring the existing games" table exactly. Both scenes now subscribe on create() and unload on
+Phaser's SHUTDOWN event. New unit tests spy on the real @couchcade/audio singleton to verify the
+right call happens for every cue (317 game tests, all passing). AC2 (amended to except Quick Draw's
+loop, now tracked by CC-7.9) is met and checked; AC1 (playtest confirmation) stays unchecked -- this
+delivery pipeline cannot hear audio, so it's flagged for the owner's next playtest session alongside
+CC-11's playtest gap. Independent review (dipsaus-ai:story-reviewer) passed on round 2, after the
+owner amended AC2's wording and filed CC-7.9 for the excepted gap.
+<!-- SECTION:FINAL_SUMMARY:END -->
