@@ -3,10 +3,10 @@ id: CC-5.14
 title: >-
   Continuously re-estimate motion calibration instead of a one-shot hold-still
   step
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-20 11:40'
-updated_date: '2026-09-20 12:40'
+updated_date: '2026-09-20 12:52'
 labels:
   - story
 dependencies:
@@ -192,6 +192,23 @@ tooling/budgets/src/budgets.ts (force `mode: "production"` in buildApp()'s `buil
 and restore `process.env.NODE_ENV` around it) merged first, after which this branch's next
 merge-and-verify should pass cleanly, or (b) explicit permission to include that one-file fix in
 this story's own commit as a justified exception to its declared References.
+
+Review round 3 (sonnet): PASS. Reviewed the reapplied maxGapMs fix (identical code to the earlier
+attempt, previously reverted only due to the now-fixed tooling/budgets NODE_ENV bug). Confirmed it
+addresses round 2's advisory finding without regressing the round-1 mid-game re-estimation fix or
+false-triggering on ordinary 60Hz sample spacing. All 4 ACs re-verified fresh, no scope violations.
+One new advisory (non-blocking, explicitly not required for this story): createSignTracker's
+`measured` field is derived per-sample rather than sticky, so it can read false again after a
+genuinely-measured sign is followed by an unclear sample -- doesn't affect `inverted` (AC2) and
+`signMeasured` isn't consumed outside rest.ts/types.ts today. Noted for a future story if that
+field is ever surfaced to UI/telemetry.
+
+tooling/budgets was fixed on main in the meantime (commits d54105b, c19512d): buildApp() now forces
+both Vite's `mode: "production"` and an explicit process.env.NODE_ENV save/restore around the
+build() call, since Vue's plugin chain reads the ambient NODE_ENV directly and mode alone wasn't
+enough (found and reported during this delivery; the orchestrator applied both fixes). Verified
+clean on the merged tree: pnpm check/check:style/check:deps/test/build all green, Controller
+initial JS at 64.85 KB / 80.00 KB (healthy real headroom, not the earlier phantom 80.12 KB).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
@@ -201,37 +218,42 @@ Replaced the one-shot rest calibration with a continuous still detector, per mot
 owner-approved "Where aim's zero comes from (CC-5.12)" recommendation (points 1-5, 7; point 6
 recentre cadence untouched). packages/motion/src/calibration/rest.ts keeps its public API
 (push/progress/reset) but now runs for the whole session, re-measuring the gyroscope bias and
-gravity direction on every fresh still stretch, and never falls back to a zero bias (the old 5s
-timeout did; it now uses the real, possibly noisy, recent-window average instead, and accelerometer
--only phones still correctly report zero since there's nothing to measure). signs.ts adds
-createSignTracker, detecting the gravity sign from the first sample outside the unclear band and
-letting any later clear sample correct it, instead of averaging one dedicated still window.
-apps/controller/src/motion/session.ts starts the still detector as soon as permission is granted,
-concurrently with the existing up-to-1s real-sensor-data wait, and keeps it running (via a
-session-scoped motionRest fed through watchForStall) for the whole game -- a fresh still stretch
+gravity direction on every fresh still stretch, never falls back to a zero bias (the old 5s timeout
+did; it now uses the real, possibly noisy, recent-window average instead), and breaks the still
+stretch on a wall-clock gap between samples (e.g. a page-visibility pause) the same way turning or
+a magnitude jump already do, so a stale partial window can't be "completed" by one post-resume
+sample. signs.ts adds createSignTracker, detecting the gravity sign from the first sample outside
+the unclear band and letting any later clear sample correct it, instead of averaging one dedicated
+still window. apps/controller/src/motion/session.ts starts the still detector as soon as permission
+is granted, concurrently with the existing up-to-1s real-sensor-data wait, and keeps it running (via
+a session-scoped motionRest fed through watchForStall) for the whole game -- a fresh still stretch
 between shots keeps updating the calibration mid-game, not just once at the start. The hold-still
 screen is now conditional: it only shows when no still stretch has completed by the time the game
-wants to start (right after the data check resolves), which most players never see since they're
-naturally still while the browser resolves the permission prompt.
+wants to start, which most players never see since they're naturally still while the browser
+resolves the permission prompt.
 
-Reviewed twice (dipsaus-ai:story-reviewer, sonnet): round 1 blocked on AC#1 (the still detector's
-listener was torn down the moment calibration first completed, so bias was frozen for the rest of
-a normal game -- fixed by keeping it alive through watchForStall/pause/resume); round 2 passed all
-four criteria, with one advisory finding (a wall-clock gap across a page-visibility pause could in
-principle let a stale partial still window complete from a single post-resume sample). A fix for
-that advisory finding was implemented and tested, but reverted before commit: it tripped
-tooling/budgets/test/budgets.test.ts (an unrelated, pre-existing bug where that test's Vite build
-inherits vitest's NODE_ENV=test and measures a non-production bundle -- confirmed reproducible on
-origin/main itself, at 79.93/80.00 KB, just 70 bytes of headroom, before this story touched
-anything; the real CI check, `pnpm budgets`, passes comfortably at 64.76/80 KB on this branch).
-tooling/budgets is outside this story's References, so the underlying tooling bug is left as a
-documented follow-up rather than fixed here, and the advisory gap-detection improvement was
-dropped rather than fought past it, since it was optional.
+Reviewed three times (dipsaus-ai:story-reviewer, sonnet). Round 1 blocked on AC#1 (the still
+detector was torn down the instant calibration first completed, freezing the bias for the rest of a
+normal game -- fixed by keeping it alive through watchForStall/pause/resume). Round 2 passed all
+four criteria with one advisory finding (a wall-clock gap across a pause could let a stale partial
+still window complete from a single post-resume sample). Round 3 verified the fix for that finding
+(maxGapMs) and re-checked all four ACs fresh: pass, with one new non-blocking advisory (signs.ts's
+`measured` field isn't sticky -- doesn't affect correctness, `signMeasured` isn't consumed outside
+rest.ts today). No scope violations in any round.
 
-Full verify (check, check:style, check:deps, test, build) green. 240 packages/motion tests (17
-files) and 204 apps/controller tests (23 files), all new/rewritten for this story's four acceptance
-criteria: continuous re-estimation across multiple still stretches in a simulated session, the
-never-zero-bias guarantee (including the fixed timeout path), sign correction from a later sample,
-mid-game re-estimation after entering "ready", and the conditional hold-still screen (skips when
-already still during the data wait, shows and proceeds as a fallback otherwise).
+Also surfaced and helped resolve an unrelated, pre-existing bug in tooling/budgets/src/budgets.ts
+during delivery: its Vite build measurement inherited vitest's process.env.NODE_ENV=test, inflating
+the controller bundle measurement by ~15 KB versus the real, deployed build -- proven reproducible
+on origin/main itself (79.93-79.97 KB / 80 KB, ~30-70 bytes of headroom) before this story added
+anything. The orchestrator applied a two-part fix on main (commits d54105b, c19512d: Vite's
+mode:"production" plus an explicit process.env.NODE_ENV save/restore, since Vue's plugin chain
+reads the ambient env directly). Confirmed fixed: Controller initial JS now measures 64.85 KB /
+80.00 KB on this branch, real headroom restored.
+
+Full verify (check, check:style, check:deps, test, build) green on the branch merged with the
+latest main. 242 packages/motion tests (17 files) and 210 apps/controller tests (23 files), all
+new/rewritten for this story's four acceptance criteria: continuous re-estimation across multiple
+still stretches in a simulated session, the never-zero-bias guarantee (including the fixed timeout
+path and the wall-clock-gap guard), sign correction from a later sample, mid-game re-estimation
+after entering "ready", and the conditional hold-still screen.
 <!-- SECTION:FINAL_SUMMARY:END -->
