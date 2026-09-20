@@ -1,10 +1,10 @@
 ---
 id: CC-3.27
 title: Let the VIP or host end a running game early
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-19 08:25'
-updated_date: '2026-09-20 10:06'
+updated_date: '2026-09-20 10:11'
 labels:
   - story
 dependencies: []
@@ -109,6 +109,8 @@ CC-3.27's References to include apps/host/src/session/use-host-session.ts, or ac
 TV control to stay strictly in scope) that a delivery agent isn't authorised to make unilaterally.
 Escalating to the orchestrator per the "stop and report, don't guess" instruction. All commits are
 on branch CC-3.27/end-game-early in .worktrees/CC-3.27, ready to push once resolved.
+
+Review gate round 2 (dipsaus-ai:story-reviewer, sonnet): verdict pass. References widened by the orchestrator to include apps/host/src/session/use-host-session.ts resolved round 1's sole blocking finding; no code changed. All 3 acceptance criteria re-confirmed met, no scope violations remain. One advisory (non-blocking) finding carried over: the phone's End Game button is visible to every seated player, not just the VIP (client has no VIP signal during play); enforcement is host-side and AC3 is met regardless. Filed as a fast-follow story after this one closes.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
@@ -119,12 +121,14 @@ ui:action value (\"end-game\") flows through the existing relay forwarding uncha
 new endGameEarly() stops the loop, snapshots and stage, skips the results screen (there's nothing
 to show for an unfinished game) and reopens the menu for the VIP through the same code path
 begin()'s dropped-chunk recovery and finishRecovery() already use, so every phone and the TV land
-back on the menu/lobby with no stuck state. Two triggers: a TV button (apps/host/src/App.vue) that
-calls the runtime directly (host is authoritative, no guard needed), and a VIP's phone tap
-(apps/controller/src/runtime/GameController.vue) that host-runtime.ts gates to the current VIP,
-the same guard shape as kick. The phone control is shown to every seated player (the client can't
-learn who's VIP during play without touching files outside this story's scope); the host-side
-guard is what actually enforces AC3. Verify: pnpm check, pnpm test (full monorepo, all green) and
-pnpm build all pass; 5 new host-runtime tests and 1 new send.ts test cover the VIP path, the
-non-VIP no-op, the outside-a-game no-op and the TV's direct call.
+back on the menu/lobby with no stuck state. Two triggers: a TV button (apps/host/src/App.vue,
+wired through apps/host/src/session/use-host-session.ts) that calls the runtime directly (host is
+authoritative, no guard needed), and a VIP's phone tap (apps/controller/src/runtime/
+GameController.vue) that host-runtime.ts gates to the current VIP, the same guard shape as kick.
+The phone control is shown to every seated player (the client can't learn who's VIP during play
+without touching files outside this story's scope, flagged as a fast-follow); the host-side guard
+is what actually enforces AC3. Verify: pnpm check, pnpm test (full monorepo) and pnpm build all
+green; 5 new host-runtime tests and 1 new send.ts test cover the VIP path, the non-VIP no-op, the
+outside-a-game no-op and the TV's direct call. Independent review passed on round 2 (round 1
+blocked only on References not yet covering use-host-session.ts, since fixed by the orchestrator).
 <!-- SECTION:FINAL_SUMMARY:END -->
