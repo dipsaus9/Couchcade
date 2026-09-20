@@ -88,6 +88,10 @@ async function buildApp(rootDir: string, app: BudgetCheckConfig["app"]): Promise
   const result = await build({
     root,
     configFile: join(root, "vite.config.ts"),
+    // Forced explicitly: this file is also called from inside Vitest (NODE_ENV=test), which
+    // otherwise makes Vite build a larger, unminified-equivalent bundle and inflates every
+    // measurement here well past what actually ships.
+    mode: "production",
     build: { write: false },
     logLevel: "warn",
   });
