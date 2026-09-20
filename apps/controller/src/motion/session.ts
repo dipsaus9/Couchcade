@@ -9,6 +9,13 @@ import type {
 import type { PhoneToRelayMessage } from "@couchcade/protocol";
 import { shallowRef, type ShallowRef } from "vue";
 import type { PhoneState } from "../session/state.ts";
+import {
+  browserMotionGrantStorage,
+  clearMotionGrant,
+  loadMotionGrant,
+  saveMotionGrant,
+  type MotionGrantStorageLike,
+} from "./grant.ts";
 import { parseMotionPermissionView } from "./view.ts";
 
 // The phone side of the motion step (docs/architecture/motion.md, "Permission, calibration and
@@ -25,6 +32,13 @@ import { parseMotionPermissionView } from "./view.ts";
 // 4. during the game: when the page comes back from hidden, "Tap to resume" asks again and
 //    restarts the sensors, keeping the calibration (rule 6). When no sample arrives for 2 s while
 //    the page is visible, the player switches to touch for the rest of the game (rule 7).
+// 5. a full page reload (CC-5.13) loses this module's state entirely, but not the browser's own
+//    permission decision. If the reload lands mid-game, past the `motion-permission` screen this
+//    module never sees again, `grant.ts`'s record of the last game that reached "ready" tells
+//    `follow` to rebuild the game as paused with no calibration, instead of leaving it unset and
+//    silently landing on touch. "Tap to resume" then re-asks the browser (still inside a real tap,
+//    so browsers that need a fresh gesture work too) and, once granted, redoes the one second of
+//    holding still, because the calibration itself didn't survive the reload.
 
 /** Where the phone is in the motion step. */
 export type MotionFlow =
@@ -97,6 +111,11 @@ export interface MotionSessionOptions {
   now?: () => number;
   /** The real-data check after `granted`. Defaults to `waitForCapability`. */
   waitForData?: (adapter: MotionAdapter) => Promise<MotionCapability>;
+  /**
+   * Where the last granted game is remembered across a reload (CC-5.13). Defaults to
+   * `sessionStorage`, which reads as empty where it's blocked (private mode, sandboxed frames).
+   */
+  grantStorage?: MotionGrantStorageLike;
 }
 
 export interface MotionSession {
@@ -125,6 +144,7 @@ export function createMotionSession(options: MotionSessionOptions): MotionSessio
   const schedule = options.schedule ?? defaultSchedule;
   const now = options.now ?? (() => performance.now());
   const waitForData = options.waitForData ?? ((adapter) => waitForCapability(adapter));
+  const grantStorage = options.grantStorage ?? browserMotionGrantStorage();
   const state = shallowRef<MotionGame | null>(null);
 
   /** Bumped whenever pending work belongs to an older flow and must be ignored. */
@@ -158,6 +178,8 @@ export function createMotionSession(options: MotionSessionOptions): MotionSessio
       calibration: null,
       paused: false,
     });
+    // Touch is the answer now, so a later reload has nothing granted to recover.
+    clearMotionGrant(grantStorage);
     if (tell) sendStatus(reason);
   }
 
@@ -189,6 +211,8 @@ export function createMotionSession(options: MotionSessionOptions): MotionSessio
     listening = false;
     options.exitFullscreen();
     state.value = null;
+    // Whatever this local game recorded, it's done: nothing left here for a reload to recover.
+    clearMotionGrant(grantStorage);
   }
 
   /** Motion rule 7: no sample for 2 s while the game runs and the page is visible means touch. */
@@ -214,6 +238,17 @@ export function createMotionSession(options: MotionSessionOptions): MotionSessio
     stopWork.push(stopListening, () => cancelCheck?.());
   }
 
+  /** After `request()` answers `granted`: checks real sensor data, then calibrates or gives up. */
+  async function afterGranted(current: number): Promise<void> {
+    const adapter = options.adapter();
+    const capability = await waitForData(adapter);
+    if (current !== generation) return;
+    update({ capability });
+    const usable = options.needsGyroscope ? capability === "full" : capability !== "none";
+    if (usable) calibrate(current);
+    else toTouch("unsupported");
+  }
+
   function calibrate(current: number): void {
     const adapter = options.adapter();
     const rest = createRestCalibration();
@@ -230,8 +265,13 @@ export function createMotionSession(options: MotionSessionOptions): MotionSessio
         return;
       }
       stopAll();
-      update({ flow: { kind: "ready" }, calibration });
+      update({ flow: { kind: "ready" }, calibration, paused: false });
       sendStatus("granted");
+      // Remembered so a reload mid-game can recover motion instead of landing on touch (CC-5.13).
+      const game = state.value;
+      if (game !== null) {
+        saveMotionGrant(grantStorage, { gameId: game.gameId, title: game.title, step: game.step });
+      }
       watchForStall();
     });
     const cancelGiveUp = schedule(() => {
@@ -268,7 +308,28 @@ export function createMotionSession(options: MotionSessionOptions): MotionSessio
         listen();
         return;
       }
-      if (game === null) return;
+      if (game === null) {
+        // Reconnecting straight into a running game (CC-5.13): the `motion-permission` screen
+        // already passed and this module has nothing local for it, most likely a reload mid-game.
+        // A remembered grant for this exact game says the browser answered granted before the
+        // reload, so rebuild it paused with no calibration, instead of leaving it unset and
+        // landing on touch. "Tap to resume" (`resume()`) re-asks the browser and recalibrates.
+        // A late joiner or promoted audience member sent "next-game" isn't in this run of it yet
+        // (showsGameController excludes the same screen), so it never recovers a motion step.
+        if (gameId === null || view.screen === "next-game") return;
+        const grant = loadMotionGrant(grantStorage);
+        if (grant === null || grant.gameId !== gameId) return;
+        state.value = {
+          ...grant,
+          flow: { kind: "ready" },
+          calibration: null,
+          capability: "none",
+          playing: true,
+          paused: true,
+        };
+        listen();
+        return;
+      }
       if (gameId === game.gameId) {
         if (game.playing) return;
         update({ playing: true });
@@ -301,12 +362,7 @@ export function createMotionSession(options: MotionSessionOptions): MotionSessio
             toTouch(permission);
             return;
           }
-          const capability = await waitForData(adapter);
-          if (current !== generation) return;
-          update({ capability });
-          const usable = options.needsGyroscope ? capability === "full" : capability !== "none";
-          if (usable) calibrate(current);
-          else toTouch("unsupported");
+          await afterGranted(current);
         })
         .catch(() => {
           if (current === generation) toTouch("unsupported");
@@ -327,6 +383,10 @@ export function createMotionSession(options: MotionSessionOptions): MotionSessio
     resume() {
       const game = state.value;
       if (game === null || !game.paused) return;
+      // No calibration to keep means this is a reload's recovered game (CC-5.13, `follow`), not a
+      // sleeping one: the sensors need real re-checking and calibration needs redoing, same as a
+      // first-time grant.
+      const recovering = game.calibration === null;
       const adapter = options.adapter();
       // No await before this call: some browsers want a fresh gesture to restart the sensors.
       const answer = adapter.request();
@@ -335,10 +395,14 @@ export function createMotionSession(options: MotionSessionOptions): MotionSessio
       generation += 1;
       const current = generation;
       void answer
-        .then((permission) => {
+        .then(async (permission) => {
           if (current !== generation) return;
           if (permission !== "granted") {
             toTouch(permission);
+            return;
+          }
+          if (recovering) {
+            await afterGranted(current);
             return;
           }
           update({ paused: false });

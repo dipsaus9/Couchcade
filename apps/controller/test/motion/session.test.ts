@@ -2,6 +2,7 @@ import { createFakeAdapter, type MotionCapability } from "@couchcade/motion/sens
 import type { MotionSample } from "@couchcade/motion/sensors";
 import type { ControllerView, PlayerInfo, PhoneToRelayMessage } from "@couchcade/protocol";
 import { describe, expect, it } from "vitest";
+import { motionGrantKey, type MotionGrantStorageLike } from "../../src/motion/grant.ts";
 import {
   createMotionSession,
   motionStallMs,
@@ -93,7 +94,21 @@ const still = (t: number): MotionSample => ({
   rotationRate: { alpha: 0.5, beta: 0, gamma: 0 },
 });
 
-function setup({ capability = "full" as MotionCapability, needsGyroscope = true } = {}) {
+/** A plain-object stand-in for `sessionStorage`, so a test can share it across a simulated reload. */
+function fakeGrantStorage(initial: Record<string, string> = {}): MotionGrantStorageLike {
+  const map = new Map(Object.entries(initial));
+  return {
+    getItem: (key) => map.get(key) ?? null,
+    setItem: (key, value) => void map.set(key, value),
+    removeItem: (key) => void map.delete(key),
+  };
+}
+
+function setup({
+  capability = "full" as MotionCapability,
+  needsGyroscope = true,
+  grantStorage = fakeGrantStorage(),
+} = {}) {
   const time = virtualTime();
   const adapter = createFakeAdapter({ now: time.now });
   const sent: PhoneToRelayMessage[] = [];
@@ -110,6 +125,7 @@ function setup({ capability = "full" as MotionCapability, needsGyroscope = true 
     schedule: time.schedule,
     now: time.now,
     waitForData: () => Promise.resolve(capability),
+    grantStorage,
   });
   /** Pushes still samples, one every 16 ms, for `ms`. */
   const holdStill = (ms: number) => {
@@ -121,7 +137,18 @@ function setup({ capability = "full" as MotionCapability, needsGyroscope = true 
   };
   const statuses = () =>
     sent.flatMap((message) => (message.t === "motion:status" ? [message.d.status] : []));
-  return { time, adapter, sent, log, motion, holdStill, statuses, setVisibility: set, listeners };
+  return {
+    time,
+    adapter,
+    sent,
+    log,
+    motion,
+    holdStill,
+    statuses,
+    setVisibility: set,
+    listeners,
+    grantStorage,
+  };
 }
 
 describe("createMotionSession", () => {
@@ -251,8 +278,8 @@ describe("createMotionSession", () => {
   });
 
   /** A phone with motion on, in the running game. */
-  async function inGame() {
-    const context = setup();
+  async function inGame(options: Parameters<typeof setup>[0] = {}) {
+    const context = setup(options);
     context.motion.follow(step());
     context.motion.enable();
     await flush();
@@ -332,5 +359,92 @@ describe("createMotionSession", () => {
       notice: null,
     });
     expect(motion.state.value).toBeNull();
+  });
+
+  describe("reload recovery (CC-5.13)", () => {
+    it("a game granted before a reload resumes on motion, not touch, after one resume tap", async () => {
+      const storage = fakeGrantStorage();
+      // Before the reload: a normal grant and calibration, same as `inGame()`.
+      await inGame({ grantStorage: storage });
+
+      // The reload: a fresh session sharing only the browser's storage. The host resends the
+      // running game's own view, never `motion-permission` again, so this is the only message it
+      // gets before the phone is settled.
+      const after = setup({ grantStorage: storage });
+      after.motion.follow(playing);
+      // Rebuilt paused with no calibration, not left unset: `showsGameController`'s motion prop
+      // is never silently undefined here, so the game never lands on touch without a chance to
+      // recover motion first.
+      expect(after.motion.state.value).toMatchObject({
+        gameId: "swing",
+        flow: { kind: "ready" },
+        calibration: null,
+        paused: true,
+        playing: true,
+      });
+      expect(after.motion.state.value?.flow.kind).not.toBe("touch");
+
+      after.log.length = 0;
+      after.motion.resume();
+      // The browser is asked again inside the tap, same as any other resume.
+      expect(after.log).toEqual(["wake lock", "fullscreen"]);
+      await flush();
+      // Recalibrating, not resuming straight to "ready": the reload didn't keep the calibration.
+      expect(after.motion.state.value?.flow.kind).toBe("still");
+      expect(after.motion.state.value?.paused).toBe(true);
+      after.holdStill(1100);
+      expect(after.motion.state.value?.flow).toEqual({ kind: "ready" });
+      expect(after.motion.state.value?.calibration).not.toBeNull();
+      expect(after.motion.state.value?.paused).toBe(false);
+      expect(after.statuses()).toEqual(["granted"]);
+    });
+
+    it("without a remembered grant, a reload mid-game still plays with touch", () => {
+      const after = setup();
+      after.motion.follow(playing);
+      expect(after.motion.state.value).toBeNull();
+    });
+
+    it("a grant for a different game never recovers this one", () => {
+      const storage = fakeGrantStorage({
+        [motionGrantKey]: JSON.stringify({ gameId: "other-game", title: "Other", step: 1 }),
+      });
+      const after = setup({ grantStorage: storage });
+      after.motion.follow(playing);
+      expect(after.motion.state.value).toBeNull();
+    });
+
+    it("a resume tap the browser refuses after a reload switches to touch, same as a sleep resume", async () => {
+      const storage = fakeGrantStorage();
+      await inGame({ grantStorage: storage });
+
+      const after = setup({ grantStorage: storage });
+      after.adapter.setPermission("denied");
+      after.motion.follow(playing);
+      after.motion.resume();
+      await flush();
+      expect(after.motion.state.value).toMatchObject({ paused: false, flow: { kind: "touch" } });
+      expect(after.statuses()).toEqual(["denied"]);
+    });
+
+    it("Use touch instead clears an earlier grant, so a later reload can't wrongly recover it", () => {
+      const storage = fakeGrantStorage({
+        [motionGrantKey]: JSON.stringify({ gameId: "swing", title: "Swing", step: 1 }),
+      });
+      const { motion, statuses } = setup({ grantStorage: storage });
+      // "Play again" starts a new step for the same game; this time the player declines.
+      motion.follow(step(2));
+      motion.useTouch();
+      expect(statuses()).toEqual(["denied"]);
+      expect(storage.getItem(motionGrantKey)).toBeNull();
+    });
+
+    it("the game ending clears the remembered grant", async () => {
+      const storage = fakeGrantStorage();
+      const { motion } = await inGame({ grantStorage: storage });
+      expect(storage.getItem(motionGrantKey)).not.toBeNull();
+      motion.follow(results);
+      expect(storage.getItem(motionGrantKey)).toBeNull();
+    });
   });
 });

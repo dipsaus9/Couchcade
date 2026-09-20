@@ -37,6 +37,8 @@ export const motionCopy = {
   resume: {
     title: (name: string) => `Welcome back, ${name}`,
     body: "Your screen went to sleep. Tap to switch motion back on.",
+    /** CC-5.13: after a reload, not a sleep, so the sleep copy would be wrong. */
+    reloadBody: "That reload switched motion off. Tap to switch it back on.",
     action: "Tap to resume",
     hint: "Your turn is safe. Nobody skipped you.",
   },
