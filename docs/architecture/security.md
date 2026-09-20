@@ -6,7 +6,7 @@ This is the threat model for Couchcade and the defences the CC-2 stories build. 
 
 **For agents.** Everything after the owner sections is binding, like [platform.md](platform.md). This doc adds security detail to platform.md and doesn't repeat it. Where a rule here isn't named in a story's acceptance criteria, the story that owns the file builds it and adds the test anyway. The [threat table](#threats-defences-and-tests) marks those rules with "added by this doc". Where this doc, platform.md and a story disagree, stop and flag it.
 
-Status: approved by the owner on 16 September 2026 (CC-2.1), with the decisions in rows 15 to 18.
+Status: approved by the owner on 16 September 2026 (CC-2.1), with the decisions in rows 15 to 18. Amended by CC-3.14 for the real-time link (docs/architecture/realtime-link.md, approved by the owner on 17 September 2026): the [threat table](#threats-defences-and-tests) and [Privacy and logs](#privacy-and-logs).
 
 ---
 
@@ -121,6 +121,20 @@ These are the parts no story can do for you.
 | **Supply chain** | pnpm `minimumReleaseAge`, blocked install scripts except `esbuild` and `workerd`, frozen lockfile, Renovate, actions pinned to SHAs, read-only workflow permissions, CodeQL, `pnpm audit`, Dependabot alerts. | `pnpm install --frozen-lockfile` in CI (CC-1.5, CC-1.6). SHA pins (CC-1.6). CodeQL, `pnpm audit` and alerts have no story yet. See [Follow-ups](#follow-ups). |
 | **Leaked deploy credentials or account takeover** | Two-factor sign-in on GitHub and Cloudflare. Deploy token as a GitHub secret, used only by `deploy.yml` on `main`, with Workers permissions on this account only. Fork PRs get no secrets. Branch protection on `main`. | Deploy runs only after CI on `main` (CC-1.18). Branch protection and token scope have no story yet. See [Follow-ups](#follow-ups). |
 | **Secrets in the repo or logs** | `.dev.vars` and `.env*` gitignored. Production secrets only through `wrangler secret put`. No tokens, passcodes, names or IPs in log lines. Automatic invocation logs off. | `.gitignore` covers `apps/server/.dev.vars` (CC-1.5). `.dev.vars.example` holds only test values (CC-1.10). `wrangler.jsonc` turns invocation logs off (CC-1.9, added by this doc). |
+
+### Real-time link threats (added by CC-3.14, see docs/architecture/realtime-link.md)
+
+These extend the table above for the direct WebRTC link between a seated phone and the host.
+
+| Threat | Defences | Test (story) |
+|---|---|---|
+| **A stranger opens a link to the TV** | A link only starts from an offer the room forwarded from a ticketed, seated player socket. The host answers only offers whose `from` is an in-game or seated player of this room. The DTLS certificate fingerprint travels inside that authenticated offer, so the connection that finishes the handshake is the one the player offered. There is no other way in: the host never listens for offers from anywhere else. | Relay drops `rtc:offer` from audience and host sockets. Host ignores an offer from an unknown id (CC-3.15, CC-3.19). |
+| **A player pretends to be another player on the link** | The host takes the sender from which link a frame arrived on. A frame with `from` is dropped. | Unit test in the link core (CC-3.16). |
+| **Two tabs or an old attempt** | A new offer for the same player closes the older link, like 4009 on the socket. Answers carry the attempt id `s`. | Unit test (CC-3.16). |
+| **Kicked, expired or leaving player keeps a link** | On `player:left` with `kicked`, `expired` or `left`, the host closes that link at once. On `disconnected` it keeps it for the 2-minute window, so a Cloudflare deploy doesn't stop play. | Host runtime test (CC-3.20). |
+| **Flooding the TV over the link** | Per-phone token buckets and a frame-size cap, built in `@couchcade/game-sdk/link` and applied by the host runtime. More than 100 dropped frames in 10 seconds closes that phone's link for 60 seconds; the phone falls back to the relay path, under the room's own flood rules. | Unit test feeds 1,000 frames and asserts drops and the cut-off (CC-3.16, CC-3.20). |
+| **Eavesdropping or tampering on the link** | Every data channel is encrypted with DTLS. Signalling runs over the existing HTTPS WebSocket. | Browser built-in. |
+| **Oversized or malformed signalling or link frames** | The same 1 KB cap and schemas as every other message, checked before and after the relay for signalling, and by the host for link frames. | Protocol fixtures (CC-3.15, CC-3.16). |
 
 ---
 
@@ -334,7 +348,7 @@ The headers are the README's, unchanged. `apps/server/src/security/headers.ts` i
 The README's privacy promises hold: no cookies, no analytics, IPs only in memory, room data deleted on close.
 
 1. **Automatic invocation logs off.** Cloudflare's per-request logs record the full URL, which for `/ws` contains the ticket. Set `observability.logs.invocation_logs` to `false` in `wrangler.jsonc` (CC-1.9) and check the key against the wrangler docs when adding it.
-2. **Our own log lines** keep the sampling from platform.md and contain no IPs, tickets, rejoin tokens, passcodes or player names. Log the error code and the room code, nothing else.
+2. **Our own log lines** keep the sampling from platform.md and contain no IPs, tickets, rejoin tokens, passcodes or player names. Log the error code and the room code, nothing else. **ICE candidates, session descriptions and link statistics from the real-time link are never stored or logged** (added by CC-3.14, docs/architecture/realtime-link.md): the relay never parses `desc` beyond its schema, and a log line about the link carries only the state and an error code, never an address.
 3. **Turnstile.** Siteverify gets the token and secret only. We don't send `remoteip`.
 4. **Rooms** delete all storage when they close (platform.md).
 

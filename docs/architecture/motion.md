@@ -6,7 +6,7 @@ This is the design for using phones as motion controllers: which sensors we read
 
 **For agents.** Everything after the owner sections is binding for CC-5.2 to CC-5.10 and for every game controller that uses `@couchcade/motion`. [platform.md](platform.md), [security.md](security.md), [session-flow.md](session-flow.md), [platform-screens.md](../design/platform-screens.md), README.md, [TECH_STACK.md](../TECH_STACK.md) and [HOUSE_STYLE.md](../HOUSE_STYLE.md) still apply, and this doc doesn't repeat them. Where this doc, platform.md and a story disagree, stop and flag it. [Conflicts found while writing this doc](#conflicts-with-stories-and-other-docs) lists the ones already known.
 
-Status: approved by the owner on 16 September 2026 (CC-5.1), with the decisions in rows 15 to 19. One later section, [Where aim's zero comes from](#where-aims-zero-comes-from-cc-512) (CC-5.12), is a recommendation awaiting the owner and is not binding yet.
+Status: approved by the owner on 16 September 2026 (CC-5.1), with the decisions in rows 15 to 19. One later section, [Where aim's zero comes from](#where-aims-zero-comes-from-cc-512) (CC-5.12), is a recommendation awaiting the owner and is not binding yet. Amended by CC-3.14 for the real-time link (docs/architecture/realtime-link.md, approved by the owner on 17 September 2026): decisions 12 and 16, the [Aim](#aim-cc-55) sending rules, and [Fitting the input budget](#fitting-the-input-budget) rules 1 and 4 now describe the relay path; the direct link streams at different rates.
 
 ---
 
@@ -48,11 +48,11 @@ Approving this doc approves these. Rows 15 to 19 were open choices that the owne
 | 9 | Swings only count while the grip is held | A swing is read only while the thumb holds the on-screen grip. Letting go of the grip is the bowling release. Nothing ever asks a player to let go of the phone. |
 | 10 | Timing comes from the phone's clock | Every gesture carries the room-clock time of its peak, so a home run doesn't depend on Wi-Fi speed. |
 | 11 | Shots use the aim on the phone | When a player shoots or throws, the input carries where the phone pointed at that moment. The TV's crosshair may trail the hand a little, but the hit is judged on the real aim. |
-| 12 | Aim and tilt stream at most 4 messages a second | The phone samples aim 15 times a second and packs up to 4 samples into each message. Tilt is sent only when it changes. |
+| 12 | Aim and tilt stream through the input channel (amended by CC-3.14) | On the relay path, at most 4 messages a second: the phone packs up to 8 samples since the previous message into each one. Over the direct WebRTC link (docs/architecture/realtime-link.md), aim streams at 30 or 60 samples a second, one sample per message. Tilt is sent only when it changes, on either path. |
 | 13 | Tests replay recorded motion | `pnpm trace:record` records real swings on real phones as JSON. Detectors are pure code that unit tests feed with those traces, because Playwright can't fake sensors. |
 | 14 | Screens stay awake | The phone holds the screen wake lock that session-flow.md already keeps on during the menu and every game. If the screen still locks, "Tap to resume" switches the sensors back on. |
 | 15 | Target Range is the first gyroscope game (owner, 2026-09-16) | Then Strike Night as the first swing game. |
-| 16 | The TV crosshair may trail by about 250 ms (owner, 2026-09-16) | Aim stays at 4 messages a second, smoothed on the TV. Hits use the phone's own aim. |
+| 16 | The TV crosshair trails by a playback delay, smoothed on the TV (owner, 2026-09-16; amended by CC-3.14) | On the relay path that's about 180 ms; on the direct link it's about 40 to 50 ms, from the link's own measured jitter (docs/architecture/realtime-link.md). Hits use the phone's own aim on either path. |
 | 17 | Full power at a firm swing (owner, 2026-09-16) | About 900 degrees a second. Swinging harder adds nothing. |
 | 18 | Keep the page in portrait (owner, 2026-09-16) | Android goes fullscreen and locks portrait. iPhones get a one-line hint to turn on Portrait Orientation Lock. |
 | 19 | No gyroscope, touch for swing, aim and flick (owner, 2026-09-16) | Those phones keep motion for tilt and shake. |
@@ -492,13 +492,13 @@ For Target Range, Double Top and Duck Season.
 4. Range: ±25° of yaw and ±15° of pitch map to ±1, clamped (game may tune). About what a TV fills from the couch.
 5. Rolling the wrist doesn't move the aim, because yaw and pitch are measured around world axes, not the phone's.
 
-**Sending**
+**Sending** (amended by CC-3.14: direct rates, and packing moves into the channel — docs/architecture/realtime-link.md)
 
-- The phone takes one aim sample every 66 ms (15 per second).
-- It sends through the CC-3.6 input stream (`set`, see session-flow.md), which allows at most 4 messages per second. The value is the rolling window of the latest samples, as `aim: [[dtMs, yaw, pitch], …]`, at most 4 of them, newest last. `dtMs` is each sample's offset from the input's `at`, so it is 0 for the newest and negative for older ones. The stream's latest-wins rule means each message carries the samples taken since the last one. Four samples are about 60 bytes.
+- The phone sends one sample straight to `input.stream()` (the game SDK's `InputChannel`) as it reads it, instead of downsampling and packing itself. Packing for the relay path is the channel's job, not the gesture sender's.
+- Direct link: each sample goes out at once, at the stream's rate — 30 a second by default, 60 when the game's controller asks. Relay path: the channel batches at most 4 messages a second, packing up to 8 samples taken since the previous message into each one, as `[dtMs, yaw, pitch]` tuples, newest last. `dtMs` is each sample's offset from the input's `at`, so it is 0 for the newest and negative for older ones.
 - A sample that moved less than 0.01 from the last one sent is skipped. A phone held still sends nothing.
 - Only the player whose turn it is streams aim in turn-based games (Double Top). Simultaneous games (Target Range, Duck Season) stream for every player who is aiming.
-- The TV plays the samples back about 250 ms behind, so the crosshair moves smoothly rather than in 4 jumps a second. See [owner decision 2](#owner-decisions-2026-09-16) and [conflicts](#conflicts-with-stories-and-other-docs).
+- The TV plays the samples back a playback delay behind, so the crosshair moves smoothly instead of jumping: about 180 ms on the relay path, about 40 to 50 ms on the direct link, from its measured jitter. See [owner decision 2](#owner-decisions-2026-09-16), [conflicts](#conflicts-with-stories-and-other-docs), and docs/architecture/realtime-link.md ("Smoothing on the relay path", "Smoothing on the direct path").
 
 **Touch fallback: drag** (`fallbacks/aim.ts`)
 
@@ -592,23 +592,23 @@ A dash is a dash. Strength isn't part of it, so the button fallback is never wea
 
 ## Fitting the input budget
 
-Platform.md caps each phone at 4 input messages per second, at least 250 ms apart, and says every incoming message costs one Durable Object request. Motion adds nothing on top of that cap.
+Platform.md caps each phone at 4 input messages per second on the relay path, at least 250 ms apart, and says every incoming message costs one Durable Object request. Over the direct link (docs/architecture/realtime-link.md), streams go at 30 or 60 per second and events at once, and none of it costs a request. Motion adds nothing on top of either cap.
 
 | Gesture | Kind | Messages it causes |
 |---|---|---|
 | Swing | Event | 1 per swing. A bowling frame is 1 or 2, a baseball at-bat a handful. |
 | Flick | Event | 1 per dart |
 | Shake | Event | At most 1 per 700 ms, fewer after the game's cooldown |
-| Aim | Stream | At most 4 per second while moving, 0 while still. 15 samples per second packed inside. |
-| Tilt | Stream | At most 4 per second while changing, 0 while held steady |
+| Aim | Stream | Relay: at most 4 per second while moving, 0 while still, up to 8 samples packed per message. Direct: 30 or 60 per second while moving, one sample per message. |
+| Tilt | Stream | At most 4 per second while changing on the relay path, 0 while held steady. The same cadence, unpacked, over the direct link. |
 | `motion:status` | Once | 1 per phone per motion game |
 
 Rules:
 
-1. **All of a phone's input shares one input stream.** A game never runs two CC-3.6 streams side by side, so a phone can't exceed 4 per second by combining gestures.
+1. **All of a phone's input shares one input channel.** A game never runs two `InputChannel` streams side by side for the same input type, so a phone can't exceed the relay cap by combining gestures on the relay path; the channel applies the direct or relay cap for whichever path is up.
 2. **Streams use `set`, events use `fire`.** Aim and tilt are continuous values sent with `set` (latest wins per input type). Swing, flick and shake are discrete events sent with `fire`, which session-flow.md sends before any pending `set` value. The event's sample time goes in as `eventTimeStamp`, so the input's `at` is when the player acted, however long it waited for a slot. For Bumper Sumo that means `set({ type: "tilt", payload: { x, y } })` and `fire({ type: "dash", payload: { at } })`.
 3. **Fire payloads carry the aim.** A throw or shot puts the aim sample at the moment of firing in its own payload, as session-flow.md rule 6 asks, for example Double Top's `fire({ type: "throw", payload: { flick, aim: { yaw, pitch } } })`. The TV never looks the aim up from the stream.
-4. **No raw data.** Samples, filter state and traces never go over the socket. A game input carrying more than 4 aim samples, or any sample array, fails review.
+4. **No raw data.** Samples, filter state and traces never go over the socket. A game input carrying more than 8 packed aim samples, or any sample array, fails review.
 5. **Worst case is the cap.** An 8-player real-time motion game at 4 per second is exactly what platform.md already budgets for real-time play. Turn-based motion games (Strike Night, Putt Club, Double Top) sit far below it.
 6. **Size.** The largest motion input, 4 aim samples, or a flick with its aim, is under 150 bytes, well inside the 1 KB cap.
 

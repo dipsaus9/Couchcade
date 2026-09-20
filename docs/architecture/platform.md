@@ -6,7 +6,7 @@ This is the design every platform and game story builds on. It covers how the TV
 
 **For agents.** The sections after the decisions table are binding. Where this doc and a story disagree, stop and flag it. README.md, [TECH_STACK.md](../TECH_STACK.md) and [HOUSE_STYLE.md](../HOUSE_STYLE.md) still apply. This doc adds detail and doesn't repeat them.
 
-Status: approved by the owner on 16 September 2026 (CC-1.1). The free-tier budget section was updated with the CC-1.4 results the same day, as agreed at approval.
+Status: approved by the owner on 16 September 2026 (CC-1.1). The free-tier budget section was updated with the CC-1.4 results the same day, as agreed at approval. Amended by CC-3.14 for the real-time link (docs/architecture/realtime-link.md, approved by the owner on 17 September 2026): [How traffic flows](#how-traffic-flows), the protocol catalogue, and the free-tier budget rules.
 
 ---
 
@@ -47,7 +47,7 @@ These are settled by the README, TECH_STACK, the CC-1.3 spike, the owner or this
 | 11 | Layered packages, checked in CI | Code only imports "downwards" (apps, then games, then shared packages, then `utils`). A CI check fails the build otherwise. |
 | 12 | Local dev uses the Cloudflare Vite plugin | Decided by spike CC-1.3: the real Worker and room run inside the Vite dev server. No second server process. |
 | 13 | Deploy from GitHub Actions on merge | Every merge to `main` builds, deploys to `workers.dev` and runs a smoke test that creates a room. |
-| 14 | Plan for the worst case on the free tier | CC-1.4 measured 1 request per connect, per incoming message and per close, from phones and the host alike. The cheaper 20:1 count is unconfirmed, so we plan on 1:1. Phones send at most 4 messages per second and the host at most 1.5, so one 2-hour night with 8 players fits in a day. |
+| 14 | Plan for the worst case on the free tier | CC-1.4 measured 1 request per connect, per incoming message and per close, from phones and the host alike. The cheaper 20:1 count is unconfirmed, so we plan on 1:1. Phones send at most 4 messages per second **on the relay path** and the host at most 1.5, so one 2-hour night with 8 players fits in a day. Real-time input over the direct link (docs/architecture/realtime-link.md) costs nothing, so the plan stays sized for a night where every link fails. |
 | 15 | One shared room clock (owner, 2026-09-16) | The room on Cloudflare answers clock pings with its own time, and the TV and every phone sync to it. That costs 1 request per sample instead of 2 through the TV, and one network hop is more accurate. Games only see game time. |
 | 16 | Mid-game joiners play from the next game (owner, 2026-09-16) | Someone who joins while a game is running gets a seat, colour and Pip straight away and waits on a "Next game soon" screen. The running game is untouched. |
 | 17 | Every merge deploys right away (owner, 2026-09-16) | There is no deploy freeze. A deploy disconnects every socket. Phones and the TV reconnect and the room restores from the last round snapshot, but a round in progress can be lost. The owner accepts that. |
@@ -75,7 +75,7 @@ These are settled by the README, TECH_STACK, the CC-1.3 spike, the owner or this
 
 ## How traffic flows
 
-Both the TV and the phones connect outwards to Cloudflare. Nothing connects to the laptop or to a phone, so any network works, including a phone on 4G.
+Both the TV and the phones connect outwards to Cloudflare, for signalling, presence and the relay path. On top of that, a seated player's phone also opens a direct WebRTC link straight to the laptop when the network lets the two find each other (docs/architecture/realtime-link.md): once that link is up, real-time input for that phone travels phone-to-laptop instead of through Cloudflare, and the room's only job for it is having forwarded the offer and answer that opened it. Audience phones never get a link, and any seated phone the link can't reach keeps using the relay path only, so every network still works — a direct phone is just faster.
 
 ```mermaid
 flowchart TB
@@ -92,6 +92,7 @@ flowchart TB
   worker -->|"3. WebSocket, valid tickets only"| room
   room <-->|"phone input to the TV, one controller:state batch from the TV"| tv
   room <-->|"each phone gets only its own view, sends input"| phones
+  phones <-->|"WebRTC link, when it connects: real-time input, never through Cloudflare"| tv
 ```
 
 One tap, end to end:
@@ -108,7 +109,7 @@ sequenceDiagram
   R->>P: this phone's view (free, outgoing)
 ```
 
-What costs budget is a message arriving at the room. What leaves the room is free. That asymmetry shapes most of the [budget rules](#free-tier-budget-rules).
+What costs budget is a message arriving at the room. What leaves the room is free, and so is every message on the direct link once it connects (docs/architecture/realtime-link.md). That asymmetry shapes most of the [budget rules](#free-tier-budget-rules).
 
 ---
 
@@ -379,6 +380,19 @@ For `controller:state` from the host, the relay picks one view per phone. An ent
 
 The README's `ping` and `pong` for the dev overlay are these clock samples. The overlay reads round-trip time from them and sends nothing extra.
 
+**Real-time link signalling** (added by CC-3.14, see [docs/architecture/realtime-link.md](realtime-link.md))
+
+A seated phone's direct WebRTC link to the host is set up through two relay messages, then carries its own traffic (`input`, `link:ping`, `link:pong`) straight between the phone and the host, never through the relay.
+
+| Type | From → to | Payload `d` | Costs a request | Story |
+|---|---|---|---|---|
+| `rtc:offer` | seated player → relay → host | `{ s: number, desc: LinkDescription }`. The relay adds `from`. | Yes | CC-3.15 |
+| `rtc:answer` | host → relay → that phone | `{ to: PlayerId, s: number, desc: LinkDescription }` from the host (costs a request); `{ s: number, desc: LinkDescription }` on to the phone (free) | Yes (host → relay only) | CC-3.15 |
+| `link:ping` | phone → host, over the link's `cc-stream` channel | `{ id, t0 }`, phone local time | No, never reaches the relay | CC-3.16 |
+| `link:pong` | host → phone, over the link's `cc-stream` channel | `{ id, t0, t1, t2, r }`: host receive and send times, and the host's own room clock offset | No, never reaches the relay | CC-3.16 |
+
+`desc` is a compact, template-rebuilt session description, capped like every other frame at 1 KB. The relay never parses it beyond the schema, never stores it and never logs it (security.md).
+
 ### Close codes
 
 | Code | Meaning | Client reconnects? |
@@ -482,7 +496,7 @@ Phones and the host use partysocket with `basePath: "ws/CODE"` and an async `que
 
 - **Phone locks or loses the network.** The socket closes. The room marks the player disconnected and sends `player:left { reason: "disconnected" }`. The seat, colour and score stay reserved for 2 minutes. When the phone comes back, the room sends `player:reconnected` and the host re-sends that phone's current view. After 2 minutes the room sends `player:left { reason: "expired" }` and frees the seat. A later rejoin closes with 4011.
 - **Two tabs for one player.** The newest connection wins. The older one closes with 4009.
-- **TV refresh or deploy.** The host rejoins with its rejoin token. After `room:welcome` the relay sends a `player:joined` for every known player and the last `room:snapshot`. The host runtime restores the game at the start of the next round (CC-3.5).
+- **TV refresh or deploy.** The host rejoins with its rejoin token. After `room:welcome` the relay sends a `player:joined` for every known player and the last `room:snapshot`. The host runtime restores the game at the start of the next round (CC-3.5). A deploy closes every socket but not a direct phone's link, which never touches Cloudflare: direct phones keep sending real-time input to the host while the sockets reconnect (docs/architecture/realtime-link.md).
 - **Kicked or flooding.** The room marks the player id kicked or revoked, so the rejoin token stops working.
 
 ---
@@ -686,7 +700,7 @@ Phones judge timing locally ("tap the moment DRAW appears") and the host decides
 2. It sends `clock:ping { id, t0 }`. The room replies `clock:pong { id, t0, t1 }`, where `t1` is the room's `Date.now()` on receipt. The device notes the arrival time `t3`.
 3. For each sample, round trip `rtt = t3 - t0` and offset `offset = t1 - (t0 + t3) / 2`.
 4. On connect and on every reconnect, the device takes 5 samples 200 ms apart. It discards samples with `rtt` above median + 1 standard deviation and uses the median offset of the rest.
-5. After that, it takes 1 sample every 30 seconds into a rolling window of the last 8 samples and applies the same filter.
+5. After that, it takes 1 sample every 30 seconds into a rolling window of the last 8 samples and applies the same filter. A phone on the direct link skips this periodic sample instead, and refines its clock from the link's own `link:ping`/`link:pong` round trips (docs/architecture/realtime-link.md); the 5 samples on connect still run first, so a phone has room time before its link comes up.
 6. `toHostTime(localTimestamp)` returns `localTimestamp + offset`, which is room time. The name stays `toHostTime` because the host uses the same clock. Target error: under 15 ms with asymmetric latency, proven by a unit test.
 
 ### From room time to game time
@@ -803,9 +817,12 @@ Both caps live as constants in `@couchcade/game-sdk/input`, which the batching h
 | Keep-alive `ping`, every 25 s per device | 144 per device per hour |
 | Clock sync: 5 samples on connect, then 1 every 30 s | 5 per connect + 120 per device per hour |
 | Turn-based input, about 1 action every 5 s per phone | about 720 per phone per hour |
-| Real-time input at the phone cap | 14,400 per phone per hour |
+| Real-time input at the phone cap, on the relay path | 14,400 per phone per hour |
+| Real-time input over the direct link | 0, whatever the rate (docs/architecture/realtime-link.md) |
 | Host `controller:state`, only on change | about 1,800 per hour in turn-based games, at most 5,400 per hour at the host cap |
 | Profile edits, kick, lock, phase, snapshot | a handful per game |
+| Link signalling | 2 per connection attempt, at most 20 per phone per hour |
+| Clock sync while direct | 5 per connect, no periodic samples (see [Clock sync](#clock-sync)) |
 
 ### How long the daily budget lasts
 
@@ -826,9 +843,9 @@ One design night per day fits. A second long real-time night on the same day doe
 1. Accept sockets with the Hibernation API (partyserver `hibernate: true`). No `setTimeout` or `setInterval` in the room. Use alarms.
 2. Reject bad requests in the Worker (origin, ticket, rate limit, Turnstile, name) before any room is called.
 3. Address rooms with `env.Room.get(idFromName(code), { locationHint: "weur" })` and `stub.fetch()`. Never `getServerByName` on a hot path, because it adds a request.
-4. Phones send input only when it changes, through the batching helper: at most 4 messages per second, at least 250 ms apart. A release or fire event goes out at once if 250 ms have passed since the last send, otherwise at the 250 ms mark.
+4. Phones send input **on the relay path** only when it changes, through the batching helper: at most 4 messages per second, at least 250 ms apart. A release or fire event goes out at once if 250 ms have passed since the last send, otherwise at the 250 ms mark. **Over the direct link, streams go at 30 or 60 per second and events at once** (docs/architecture/realtime-link.md).
 5. The host sends `controller:state` only when a view changed, at most 1.5 times per second, at least 667 ms apart. The first change after a quiet period goes out on the next tick. Changes inside the 667 ms window are merged into one message with the latest view per phone. Views never carry per-frame data.
-6. Answer keep-alive with `setWebSocketAutoResponse()`. Clock samples double as the dev overlay's round-trip time, so the overlay adds no messages.
+6. Answer keep-alive with `setWebSocketAutoResponse()`. Clock samples double as the dev overlay's round-trip time, so the overlay adds no messages. A phone on the direct link skips its periodic relay clock sample and reads round-trip time from `link:ping`/`link:pong` instead, which never reach the relay (docs/architecture/realtime-link.md).
 7. No storage write per message. Snapshot once per round, never per frame.
 8. Phones send `player:profile` once when the player closes the customiser, not on every change.
 9. Static files never run the Worker (`run_worker_first` only for `/api/*` and `/ws/*`).
@@ -836,6 +853,8 @@ One design night per day fits. A second long real-time night on the same day doe
 11. Keep Workers Logs sampled (`head_sampling_rate` below 1) and never log per message.
 12. When the limit is hit anyway, the apps show the "quota reached" screen from CC-9.4. We don't count requests ourselves. That would cost requests.
 13. Use the Rate Limiting binding only to slow abuse down (CC-2.3). It counts loosely on Free, so never rely on it for an exact quota.
+14. Nothing may depend on the direct link being up. The caps above are sized for a night where every phone uses the relay path (docs/architecture/realtime-link.md).
+15. Link signalling is one `rtc:offer` and one `rtc:answer` per attempt, gathered in one go, never trickled. At most 10 attempts per phone per hour (docs/architecture/realtime-link.md).
 
 ---
 
