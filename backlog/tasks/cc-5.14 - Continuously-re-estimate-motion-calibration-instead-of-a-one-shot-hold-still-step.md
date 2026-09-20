@@ -3,10 +3,10 @@ id: CC-5.14
 title: >-
   Continuously re-estimate motion calibration instead of a one-shot hold-still
   step
-status: Done
+status: In Progress
 assignee: []
 created_date: '2026-09-20 11:40'
-updated_date: '2026-09-20 12:38'
+updated_date: '2026-09-20 12:40'
 labels:
   - story
 dependencies:
@@ -166,6 +166,32 @@ advisory (not required by any AC) and reverting it costs nothing but that one de
 delivered without it: the branch is back to the round-2-reviewed, fully green state (pnpm
 check/check:style/check:deps/test/build all pass, including tooling/budgets, at commit c17c279).
 The gap-across-pause scenario stays a known, documented, non-blocking risk for a future story.
+
+BLOCKED at Step 6 (push): after merging origin/main (bca4451: CC-3.26, CC-3.28) into this branch
+and re-running the full verify per the git contract, tooling/budgets/test/budgets.test.ts now fails
+("Controller initial JS 80.12 KB / 80.00 KB"). Confirmed via a throwaway worktree that this is NOT
+caused by CC-3.26/CC-3.28 (origin/main alone still measures 79.93/80.00 KB under this same
+condition, unchanged from before those merged) -- it's this story's own, already-verified-green
+commits that push it from 79.93 to 80.12 once merged with the latest base. Root cause (recorded in
+an earlier note): tooling/budgets/src/budgets.ts's buildApp() doesn't force production mode on its
+programmatic Vite build, so when invoked from inside vitest (NODE_ENV=test), it measures a
+non-production Vue bundle, ~15 KB larger than the real, deployed one. The real CI-facing check
+(`pnpm budgets`, i.e. `node src/cli.ts` outside vitest) passes comfortably on this branch merged
+with the latest base (would need re-measuring exactly, but was 64.76/80 KB before this merge, and
+main's own real measurement is unchanged by the merge at 64.71/80 KB). tooling/budgets is outside
+this story's References (packages/motion/src/calibration/rest.ts, signs.ts,
+apps/controller/src/motion/session.ts, packages/motion/test/calibration/,
+apps/controller/test/motion/), so the real fix isn't made here, per the story's own instruction to
+stop and report rather than guess when the fix needs an out-of-reference file.
+
+Status reverted to In Progress: the branch is fully implemented, reviewed (2 rounds, round 2 pass),
+and committed (4 commits on CC-5.14/continuous-calibration, merged with origin/main), but not
+pushed, because `pnpm test` is not green on the merged tree and the git contract requires that
+before every push. Recommend either (a) a quick, low-risk follow-up fix to
+tooling/budgets/src/budgets.ts (force `mode: "production"` in buildApp()'s `build()` call, or save
+and restore `process.env.NODE_ENV` around it) merged first, after which this branch's next
+merge-and-verify should pass cleanly, or (b) explicit permission to include that one-file fix in
+this story's own commit as a justified exception to its declared References.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
