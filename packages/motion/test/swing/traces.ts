@@ -76,7 +76,11 @@ export const GRIP_DOWN_MS = 1700;
 export const PEAK_MS = 180 * INTERVAL_MS;
 /** How long the arm rests at the top of the backswing before swinging forward. */
 const BACKSWING_PAUSE_MS = 150;
-/** The forward swing sweeps this arc, half before the bottom and half after. */
+/**
+ * The forward swing sweeps this arc by default, half before the bottom and half after. This was
+ * tuned as a small, fast, forearm/wrist-only motion (closer to a flick than a bowler's full arm) -
+ * see `armArcDeg` below for a wider, more realistic full-arm sweep.
+ */
 const ARC_DEG = 120;
 
 export interface SwingTraceSpec {
@@ -90,6 +94,14 @@ export interface SwingTraceSpec {
   turn?: number;
   /** Shoulder to phone, metres. */
   armM?: number;
+  /**
+   * The forward swing's total arc, degrees, half before the bottom and half after. Defaults to
+   * `ARC_DEG` (120°), a small, fast forearm/wrist motion. A real full-arm bowling swing - from
+   * behind the body, through the bottom, to a forward follow-through - sweeps far more: CC-12.8
+   * uses 150-165° for its realistic fixtures (`realistic.test.ts`), reasoned from a shoulder-driven
+   * swing rather than a wrist flick.
+   */
+  armArcDeg?: number;
   /** When the thumb lets go of the grip, ms. Defaults to 500 ms after the peak. */
   gripUpMs?: number;
   /** Extra rotation rate on every sample while gripped, deg/s, like sensor noise or a shaky hand. */
@@ -111,12 +123,12 @@ function armAngle(spec: SwingTraceSpec): {
   aim: (t: number) => number;
   startMs: number;
 } {
-  const { peak } = spec;
+  const { peak, armArcDeg = ARC_DEG } = spec;
   if (peak <= 0) return { theta: () => 0, aim: () => 0, startMs: PEAK_MS };
-  const durationMs = (Math.PI * ARC_DEG * 1000) / (2 * peak);
+  const durationMs = (Math.PI * armArcDeg * 1000) / (2 * peak);
   const startMs = PEAK_MS - durationMs / 2;
   // The backswing starts just after grip-down and is slow: under the start rate for firm swings.
-  const back = smooth(0, -ARC_DEG / 2, GRIP_DOWN_MS + 50, startMs - BACKSWING_PAUSE_MS);
+  const back = smooth(0, -armArcDeg / 2, GRIP_DOWN_MS + 50, startMs - BACKSWING_PAUSE_MS);
   // Meanwhile the hand turns towards the swing direction, so the phone stays in the swing plane.
   const aim = smooth(0, spec.angle ?? 0, GRIP_DOWN_MS + 50, startMs - BACKSWING_PAUSE_MS);
   const theta = (t: number) => {
@@ -124,17 +136,17 @@ function armAngle(spec: SwingTraceSpec): {
     if (phase <= 0) return back(t);
     const swept =
       ((peak * durationMs) / (Math.PI * 1000)) * (1 - Math.cos(Math.PI * Math.min(phase, 1)));
-    return -ARC_DEG / 2 + swept;
+    return -armArcDeg / 2 + swept;
   };
   return { theta, aim, startMs };
 }
 
 /** A swing trace in the version 1 format, with grip marks. */
 export function swingTrace(spec: SwingTraceSpec): Trace {
-  const { twist = 0, turn = 0, armM = 0.6, rawSigns = "w3c", jitter } = spec;
+  const { twist = 0, turn = 0, armM = 0.6, armArcDeg = ARC_DEG, rawSigns = "w3c", jitter } = spec;
   const gripUpMs = spec.gripUpMs ?? PEAK_MS + 500;
   const { theta, aim, startMs } = armAngle(spec);
-  const durationMs = (Math.PI * ARC_DEG * 1000) / (2 * Math.max(spec.peak, 1));
+  const durationMs = (Math.PI * armArcDeg * 1000) / (2 * Math.max(spec.peak, 1));
   const heading = smooth(0, turn, TURN_START, TURN_END);
   // The wrist twists with the same half-sine pulse as the arm.
   const roll = (t: number) => {

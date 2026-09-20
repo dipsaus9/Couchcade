@@ -5,6 +5,7 @@ import {
   SWING_FULL_PEAK,
   SWING_FULL_SPIN_RATE,
   SWING_MIN_PEAK,
+  SWING_RELEASE_WINDOW_MS,
   type Swing,
   type SwingDetectorOptions,
 } from "@couchcade/motion/gestures";
@@ -168,11 +169,11 @@ describe("createSwingDetector", () => {
   });
 
   describe('emitOn "release"', () => {
-    it("emits at grip-up the swing that peaked in the 300 ms before it", () => {
+    it("emits at grip-up the swing that peaked in the release window before it", () => {
       const swings: Swing[] = [];
       const detector = createSwingDetector({ emitOn: "release", toRoomTime: localTime });
       detector.on((swing) => swings.push(swing));
-      const trace = swingTrace({ peak: 700, gripUpMs: PEAK_MS + 250 });
+      const trace = swingTrace({ peak: 700, gripUpMs: PEAK_MS + SWING_RELEASE_WINDOW_MS - 50 });
       const emitted = replay(trace, detector);
       expect(emitted).toEqual([
         { swing: { speed: 0.7, angle: 0, spin: 0, peakAt: PEAK_MS }, t: PEAK_MS },
@@ -181,7 +182,17 @@ describe("createSwingDetector", () => {
     });
 
     it("emits nothing when the grip is held longer, so a player can let go and grip again", () => {
-      expect(detect({ peak: 700, gripUpMs: PEAK_MS + 350 }, { emitOn: "release" })).toEqual([]);
+      const gripUpMs = PEAK_MS + SWING_RELEASE_WINDOW_MS + 50;
+      expect(detect({ peak: 700, gripUpMs }, { emitOn: "release" })).toEqual([]);
+    });
+
+    it("still emits for a real full-arm swing's natural release delay (CC-12.8)", () => {
+      // The trace generator's own default release timing (`gripUpMs`, undocumented override:
+      // 500 ms after the peak) models a player naturally letting go once the swing feels done,
+      // not an instant button release. That must fit inside the release window with margin, or
+      // every default-timed swing in "release" mode is silently dropped, as CC-12.8's playtest
+      // found.
+      expect(detect({ peak: 700 }, { emitOn: "release" })).toHaveLength(1);
     });
   });
 

@@ -57,8 +57,24 @@ export const SWING_ANGLE_WINDOW_MS = 200;
 export const SWING_SPIN_WINDOW_MS = 120;
 /** A mean twist rate around the phone's long axis of this, in deg/s, is full spin. */
 export const SWING_FULL_SPIN_RATE = 540;
-/** `emitOn: "release"`: a grip-up emits the last swing that peaked this long before it, in ms. */
-export const SWING_RELEASE_WINDOW_MS = 300;
+/**
+ * `emitOn: "release"`: a grip-up emits the last swing that peaked this long before it, in ms.
+ *
+ * CC-12.8: was 300, tuned only against short, fast synthetic traces (a wrist-flick-sized swing
+ * covering a small arc in well under 300 ms end to end). A real full-arm bowling swing sweeps a
+ * much bigger arc — from behind the body, through the bottom, to a forward follow-through — so it
+ * keeps decelerating for longer after its peak before the arm "feels done": for a firm real swing
+ * (~150° arc, ~450 deg/s peak) that tail alone is already ~260 ms, and a slower, wider, more
+ * cautious swing (~165° arc, near the 240 deg/s floor) stretches to ~540 ms. On top of that, a
+ * player still has to consciously let go of the on-screen grip, which — unlike a physical Wii
+ * Remote button released mid-throw — adds a further ~150-250 ms of human reaction time for a
+ * first attempt at this gesture. 300 ms covered neither: it silently dropped a real swing that
+ * peaked correctly but released naturally, which is exactly what CC-12.8's playtest reported
+ * ("the motion is not letting go of the ball"). 700 ms comfortably covers the slowest realistic
+ * full swing's deceleration tail plus reaction time, while still requiring release soon after the
+ * swing rather than an unrelated later grip-up.
+ */
+export const SWING_RELEASE_WINDOW_MS = 700;
 /**
  * `emitOn: "peak"`: a swing that starts less than this after the last emitted one ended is ignored, in ms,
  * so the arm bouncing back after a follow-through isn't a second swing.
@@ -228,7 +244,7 @@ const MIN_VELOCITY = 1e-3;
  * 5. `angle = atan2(v.X, v.Y)`, with `v` the linear acceleration in the grip-down heading frame
  *    summed over the 200 ms up to the peak.
  * 6. `spin` is the mean `rotationRate.beta` (device `y`) over the 120 ms up to the peak, / 540.
- * 7. `"release"` emits at grip-up the last swing that peaked in the 300 ms before it. `"peak"` emits
+ * 7. `"release"` emits at grip-up the last swing that peaked in the 700 ms before it. `"peak"` emits
  *    each swing as it ends, and ignores a swing starting within 400 ms of the end of the last one emitted.
  *    A grip-up ends a swing in progress, so in `"peak"` mode that swing still emits.
  */
