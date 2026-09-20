@@ -93,10 +93,13 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       # Builds the host and controller, then assembles them into apps/server/dist/public. Both apps
-      # read the public Turnstile site key at build time.
+      # read the public Turnstile site key at build time. The real-time link defaults on (CC-3.24,
+      # docs/architecture/realtime-link.md, Rollout step 10, owner approval 2026-09-19); ?link=0
+      # stays as the per-visit escape hatch.
       - run: pnpm build
         env:
           VITE_TURNSTILE_SITE_KEY: ${{ vars.TURNSTILE_SITE_KEY }}
+          VITE_REALTIME_LINK: "true"
 
       # Lists the Worker's secret names (never values), so a deploy never goes out before the
       # Turnstile secret and the smoke token are set on the Worker.
