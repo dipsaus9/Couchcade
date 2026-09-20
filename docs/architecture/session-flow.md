@@ -6,7 +6,7 @@ This is the design for everything around a game: the menu, results, late joiners
 
 **For agents.** Everything after the owner sections is binding for CC-3.2 to CC-3.11, like [platform.md](platform.md) and [security.md](security.md). This doc doesn't repeat them. It adds what they leave open. Where this doc, platform.md, security.md and a story disagree, stop and flag it. [Conflicts found while writing this doc](#conflicts-found-while-writing-this-doc) lists the ones already known.
 
-Status: approved by the owner on 16 September 2026 (CC-3.1), with the decisions in rows 2, 8, 13 and 16.
+Status: approved by the owner on 16 September 2026 (CC-3.1), with the decisions in rows 2, 8, 13 and 16. Amended by CC-3.14 for the real-time link (docs/architecture/realtime-link.md, approved by the owner on 17 September 2026): [Real-time input batching](#real-time-input-batching) now describes the relay path.
 
 ---
 
@@ -334,7 +334,7 @@ Rules:
 
 ## Real-time input batching
 
-Built by CC-3.6 in `packages/game-sdk/src/input/`.
+Built by CC-3.6 in `packages/game-sdk/src/input/`. **This section describes the relay path.** A seated phone whose direct WebRTC link is up sends real-time input over the link instead, at the higher rates and rules in docs/architecture/realtime-link.md. Games never see the difference: the `InputChannel` (CC-3.18) wraps this relay-path stream on one side and the link on the other, so the rules and rates below still apply exactly as written whenever a phone is on the relay path, including every phone on a night the link can't connect at all.
 
 ### Rates
 
