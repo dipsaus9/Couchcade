@@ -4,6 +4,7 @@ title: Give the controller a VIP signal during a running game
 status: To Do
 assignee: []
 created_date: '2026-09-20 10:28'
+updated_date: '2026-09-20 11:46'
 labels:
   - story
 dependencies: []
@@ -12,8 +13,10 @@ references:
   - apps/host/src/runtime/view-sync.ts
   - apps/controller/src/runtime/GameController.vue
   - apps/host/src/runtime/host-runtime.ts
+  - packages/protocol/src/shared/index.ts
   - apps/controller/test/state.test.ts
   - apps/host/test/runtime/view-sync.test.ts
+  - packages/protocol/test/shared.test.ts
 parent_task_id: CC-3
 type: feature
 ordinal: 236000
