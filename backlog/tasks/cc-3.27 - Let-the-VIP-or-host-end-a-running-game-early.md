@@ -1,10 +1,10 @@
 ---
 id: CC-3.27
 title: Let the VIP or host end a running game early
-status: Done
+status: In Progress
 assignee: []
 created_date: '2026-09-19 08:25'
-updated_date: '2026-09-20 10:00'
+updated_date: '2026-09-20 10:05'
 labels:
   - story
 dependencies: []
@@ -90,6 +90,24 @@ silent no-op), the same way the relay-level guard is what actually enforces kick
 A non-VIP tapping "End game" today just does nothing. Worth a small fast-follow story if the
 owner wants the button VIP-only-visible: broadcast a lightweight vip flag alongside the running
 game's view.
+
+Review gate round 1 (dipsaus-ai:story-reviewer, sonnet): verdict block. All 3 acceptance criteria
+individually verified met (with reasoning per-criterion); pnpm check/test/build all green. Sole
+blocking finding: scopeViolations: ["apps/host/src/session/use-host-session.ts"] -- a required
+11-line wrapper (endGameEarly() -> runtime?.endGameEarly(), returned alongside the file's existing
+calibration/moderate wrappers) so apps/host/src/App.vue (in scope) can reach the runtime for the
+TV's own "End game" button. use-host-session.ts is not a declared Reference. Reviewer's own
+assessment: "this reads as a References-list omission in the story rather than an implementer
+overreach" and recommends adding it to References on redelivery, rather than treating it as a
+defect. Advisory (non-blocking) finding also raised: the phone's End Game button is visible to
+every seated player, not just the VIP (see design note above) -- flagged as a fast-follow
+candidate, not a blocker.
+
+Status reverted to In Progress: not pushed, no PR opened. This needs a scope decision (amend
+CC-3.27's References to include apps/host/src/session/use-host-session.ts, or accept dropping the
+TV control to stay strictly in scope) that a delivery agent isn't authorised to make unilaterally.
+Escalating to the orchestrator per the "stop and report, don't guess" instruction. All commits are
+on branch CC-3.27/end-game-early in .worktrees/CC-3.27, ready to push once resolved.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
