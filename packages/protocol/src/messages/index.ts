@@ -192,10 +192,18 @@ export const rtcAnswerToPhonePayloadSchema = z.object({
   desc: linkDescriptionSchema,
 });
 
-/** `t0` is the sender's local clock. Sent on `cc-stream`, never through the relay. */
+/**
+ * `t0` is the sender's local clock. Sent on `cc-stream`, never through the relay. `rttMs` and
+ * `jitterMs` piggyback the phone's own measured link quality -- a running median of its last 20
+ * pongs (null before the first one) and the p90 minus p50 of that same window (0 before enough
+ * samples) -- so the host can compute a real direct-path `playbackDelayMs` instead of assuming
+ * zero jitter (Clock and latency measurement, CC-3.26).
+ */
 export const linkPingPayloadSchema = z.object({
   id: z.int().check(z.gte(0)),
   t0: z.number(),
+  rttMs: z.nullable(z.number()),
+  jitterMs: z.number(),
 });
 
 /** `t1` and `t2` are the host's local receive and send times, `r` its current room clock offset. */

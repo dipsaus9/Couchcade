@@ -118,6 +118,9 @@ export interface ControllerLink {
   readonly path: InputChannelPath;
   /** The link's round trip, a running median of the last pongs, or null before the first one. */
   readonly rttMs: number | null;
+  /** The link's jitter, p90 minus p50 of the same round-trip window, 0 before enough samples --
+   * the same number piggybacked on the next `link:ping` (CC-3.26). */
+  readonly jitterMs: number;
   onChange(listener: (state: LinkState) => void): () => void;
   /** Called with every `PhoneState`; starts, keeps or stops the link to match it. */
   follow(state: PhoneState): void;
@@ -209,6 +212,21 @@ function median(samples: readonly number[]): number | null {
     : (sorted[mid] as number);
 }
 
+/** Nearest-rank percentile of an already-sorted ascending array, `p` in `[0, 100]`. */
+function percentileOf(sorted: readonly number[], p: number): number {
+  const rank = Math.min(sorted.length - 1, Math.max(0, Math.ceil((p / 100) * sorted.length) - 1));
+  return sorted[rank] as number;
+}
+
+/** The running jitter piggybacked on `link:ping` (CC-3.26): p90 minus p50 of the round-trip
+ * window. 0 with no samples yet, and naturally 0 with just one (both percentiles land on it),
+ * covering "0 before enough samples" (Clock and latency measurement). */
+function jitterOf(samples: readonly number[]): number {
+  if (samples.length === 0) return 0;
+  const sorted = samples.toSorted((a, b) => a - b);
+  return percentileOf(sorted, 90) - percentileOf(sorted, 50);
+}
+
 /** Waits for ICE gathering to finish, at most `iceGatherTimeoutMs`, then returns the local SDP
  * (Signalling, "gather local candidates, at most 1,000 ms; not trickled"). */
 async function gatherAndOffer(pc: LinkPeer, schedule: LinkScheduler): Promise<string> {
@@ -283,7 +301,13 @@ export function createControllerLink(options: ControllerLinkOptions): Controller
   function sendPingNow(): void {
     if (peerAttempt !== null && peerAttempt.streamChannel.readyState === "open") {
       const t0 = clock.now();
-      peerAttempt.streamChannel.send(JSON.stringify({ t: "link:ping", d: { id: pingSeq, t0 } }));
+      // Piggyback the phone's own last-known rttMs/jitterMs (CC-3.26) instead of a new message
+      // type: link traffic never touches Cloudflare, so this costs nothing extra.
+      const rttMs = median(rttSamples);
+      const jitterMs = jitterOf(rttSamples);
+      peerAttempt.streamChannel.send(
+        JSON.stringify({ t: "link:ping", d: { id: pingSeq, t0, rttMs, jitterMs } }),
+      );
       pingSeq += 1;
     }
     const interval = machine.state === "connecting" ? connectingPingIntervalMs : pingIntervalMs;
@@ -530,6 +554,9 @@ export function createControllerLink(options: ControllerLinkOptions): Controller
     },
     get rttMs() {
       return median(rttSamples);
+    },
+    get jitterMs() {
+      return jitterOf(rttSamples);
     },
 
     onChange: machine.onChange,
