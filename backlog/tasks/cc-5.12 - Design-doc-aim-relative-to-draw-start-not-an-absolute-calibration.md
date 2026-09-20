@@ -1,10 +1,10 @@
 ---
 id: CC-5.12
 title: 'Design doc: aim relative to draw start, not an absolute calibration'
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-19 08:24'
-updated_date: '2026-09-20 10:09'
+updated_date: '2026-09-20 11:39'
 labels:
   - story
   - owner-gate
@@ -30,7 +30,7 @@ Owner suggestion during the CC-3.24 replay (2026-09-19): "Movement should always
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 docs/architecture/motion.md records a decision: keep absolute calibration, switch to relative-to-draw-start aiming, or a hybrid, with the reasoning and what changes for existing games
-- [ ] #2 Owner approval recorded on the doc
+- [x] #2 Owner approval recorded on the doc
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -42,15 +42,5 @@ Owner suggestion during the CC-3.24 replay (2026-09-19): "Movement should always
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
-Delivered as docs-only. New section 'Where aim's zero comes from (CC-5.12)' in docs/architecture/motion.md.
-
-Key finding while reading the code: aim is ALREADY relative to the draw. games/target-range/src/controller/aim.ts calls source.recentre(t) in startDraw, and has since CC-11.3, the version played on 2026-09-19. The swing detector does the same at grip-down. So the origin was never the problem. Of the four things Calibration holds, frame.forward/right is a pure yaw offset that recentring cancels, frame.up self-repairs through the pose tracker's 2%-per-sample gravity correction, and the two that neither cancel nor repair are the gyroscope bias and the gravity sign. The bias is the culprit: 3 deg/s residual slides Target Range's crosshair 18 world px a second (33.3 deg maps to full scale at 6 px/deg), so a 1.5 s draw ends a far target's width off, every shot, in the same direction. Rest calibration's 5 s timeout carries on with a ZERO bias, which is the worst case and hits exactly the players who cannot hold still.
-
-Options written up: A keep absolute, B relative only with no calibration, C hybrid (keep the Calibration object, replace the one-shot still second with a continuous still detector that re-estimates bias and sign all session, so the hold-still screen disappears for most players). Recommendation: C. Also answered the three questions the story implies: relative-only does cost absolute shot-to-shot aiming (Target Range already pays it; Double Top and Duck Season must not), CC-5.11 stays complementary but shrinks to a manual shortcut and should be built after the estimator, and Strike Night's swing needs no origin change because it already zeroes at grip-down and its thresholds are rate magnitudes that a few deg/s of bias cannot move (it does still need the sign).
-
-Verify: pnpm check, check:style, check:deps, test and build all green on the branch.
-
-Reviewer (dipsaus-ai:story-reviewer, haiku per the docs-only token rule), round 1: verdict pass. AC#1 met, AC#2 not met by design (owner-gate). No scope violations, no findings.
-
-AC#2 is left unchecked and the status left In Progress on purpose: the doc carries an explicit 'Owner decision: ___ (pending)' line plus an 'Approved by / Date' line for the owner to fill in. Nothing in the new section is binding and no motion, calibration or aiming code was touched.
+Owner approved option C in full (continuous still-detector bias/sign re-estimation, hold-still screen becomes fallback-only) on 2026-09-20. Target Range keeps per-draw recentring for now; per-volley (recommendation point 6) not approved, revisit after playtesting the estimator. Decision recorded in docs/architecture/motion.md's 'Where aim's zero comes from (CC-5.12)' section. Follow-up implementation story to be filed separately for the continuous estimator (packages/motion/src/calibration/rest.ts, signs.ts, apps/controller/src/motion/session.ts's conditional hold-still screen) and a small one for the touch-drag fallback to follow the same recentre moments as motion.
 <!-- SECTION:NOTES:END -->

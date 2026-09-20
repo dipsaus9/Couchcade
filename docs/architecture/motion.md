@@ -284,9 +284,9 @@ Everything after calibration uses the W3C signs: a phone lying face up reads abo
 
 ## Where aim's zero comes from (CC-5.12)
 
-**This section is a recommendation, not an approved decision.** Everything above it is binding. Nothing here is, until the owner fills in the line at the end. No code changes on the strength of this section before then.
+**Approved.** The owner approved option C on 2026-09-20 (see [The decision](#the-decision)). This section now records what's approved, not just a recommendation.
 
-> **Owner decision: ___ (pending)**
+> **Owner decision: Option C, approved.**
 
 During the Target Range playtest on 19 September 2026 the owner said: "Movement should always be relative to when you start drawing, calibration should not happen I think." The same evening produced CC-5.11, from "if you calibrated your phone wrong it is unplayable after."
 
@@ -415,9 +415,9 @@ What I am least sure about is point 6. Keeping per-draw recentring in Target Ran
 
 Approve, decline, or amend. If amending, the two knobs worth naming are how far to go with option C (the estimator alone, or the estimator plus removing the screen) and whether Target Range keeps per-draw recentring.
 
-> **Owner decision: ___ (pending)**
+> **Owner decision: Option C approved, in full (the continuous estimator, and the hold-still screen becomes conditional/fallback-only as described in the Recommendation section). Target Range keeps per-draw recentring for now — revisit after playtesting the estimator, per-volley recentring (point 6) is not approved at this time.**
 >
-> Approved by: ___  Date: ___
+> Approved by: the owner  Date: 2026-09-20
 
 ---
 
