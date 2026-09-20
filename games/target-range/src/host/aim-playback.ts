@@ -11,10 +11,12 @@
  *
  * A shot's aim is never read from here (`../controller/aim.ts`'s `shoot` carries it, per "The
  * phone decides its own shot"). Since CC-11.10, the controller keeps this in sync by replaying its
- * own streamed samples through the same `createPlayback`, `AIM_PLAYBACK_DELAY_MS` behind, instead
- * of the exact per-connection `playbackDelayMs` this file plays back with (which is host-only
- * tuning the phone has no way to learn without a new message) — so the shot lands close to what
- * this crosshair was actually showing, without the two ever exchanging that number.
+ * own streamed samples through the same `createPlayback`, the same delay behind: the phone can't
+ * learn this file's exact per-connection `playbackDelayMs` (host-only, and no message carries it),
+ * so it mirrors `apps/host/src/runtime/links.ts`'s two constants instead -- `relayPlaybackDelayMs`
+ * and `directPlaybackDelayMs`, picked by `channel.path` -- which is what `scene.ts`'s
+ * `playbackDelayMsOf` actually calls this with today (jitter isn't measured yet, so both sides
+ * assume none). The two sides land on the same "shown" aim without ever exchanging that number.
  *
  * ```ts
  * const playback = createCrosshairPlayback();

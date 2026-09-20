@@ -1,8 +1,9 @@
-import { AIM_PLAYBACK_DELAY_MS, addSample, createPlayback } from "@couchcade/game-sdk/input";
+import { addSample, createPlayback } from "@couchcade/game-sdk/input";
 import type { SampleTrack } from "@couchcade/game-sdk/input";
+import type { InputChannel } from "@couchcade/game-sdk/contract";
 import { createFakeAdapter } from "@couchcade/motion/sensors";
 import { describe, expect, it } from "vitest";
-import { createShotAim, type TargetRangeMotion } from "../../src/controller/aim.ts";
+import { createShotAim, shownDelayMs, type TargetRangeMotion } from "../../src/controller/aim.ts";
 import { inputSchema, type TargetRangeInput } from "../../src/shared/input.ts";
 import { createTestChannel } from "./channel.ts";
 import { virtualTime } from "./clock.ts";
@@ -10,9 +11,9 @@ import { flatCalibration, turn } from "./motion.ts";
 
 const calibration = flatCalibration();
 
-function setup() {
+function setup(path: InputChannel<TargetRangeInput>["path"] = "direct") {
   const time = virtualTime();
-  const { channel, sent, timestamps } = createTestChannel();
+  const { channel, sent, timestamps } = createTestChannel(path);
   const aim = createShotAim(channel);
   const adapter = createFakeAdapter();
   const motion: TargetRangeMotion = { mode: "motion", adapter, calibration };
@@ -29,14 +30,15 @@ function setup() {
 const types = (sent: TargetRangeInput[]) => sent.map((input) => input.type);
 
 /**
- * Independently replays every "aim" message actually sent so far, `AIM_PLAYBACK_DELAY_MS` behind
- * `t`, with the same generic `createPlayback` the TV's crosshair uses (CC-11.10). This is the
- * expected `shoot` aim: what the TV was showing at release, not the freshest live sample.
+ * Independently replays every "aim" message actually sent so far, `shownDelayMs(path)` behind `t`,
+ * with the same generic `createPlayback` the TV's crosshair uses (CC-11.10). This is the expected
+ * `shoot` aim: what the TV was showing at release, not the freshest live sample.
  */
 function shownAim(
   sent: readonly TargetRangeInput[],
   timestamps: Map<TargetRangeInput, number | undefined>,
   t: number,
+  path: InputChannel<TargetRangeInput>["path"] = "direct",
 ): { yaw: number; pitch: number } | null {
   let track: SampleTrack<[number, number]> = [];
   for (const input of sent) {
@@ -45,7 +47,7 @@ function shownAim(
     if (at === undefined) continue;
     track = addSample(track, at, [input.payload.yaw, input.payload.pitch]);
   }
-  const value = createPlayback<[number, number]>().at(track, t, AIM_PLAYBACK_DELAY_MS, 0);
+  const value = createPlayback<[number, number]>().at(track, t, shownDelayMs(path), 0);
   return value === null ? null : { yaw: round3(value[0]), pitch: round3(value[1]) };
 }
 
@@ -99,6 +101,29 @@ describe("createShotAim with motion", () => {
 
     play(1000, 30);
     expect(sent.length).toBe(before + 1);
+  });
+
+  it("uses the relay's playback delay instead of the direct link's when the channel is on the relay", () => {
+    // CC-11.10: the TV renders a relay-path player's crosshair much further behind (180 ms,
+    // relayPlaybackDelayMs) than a direct-path one (~33 ms, directPlaybackDelayMs at 30 Hz) --
+    // `shoot` must pick the delay that matches `channel.path`, not a single fixed guess.
+    const { aim, motion, sent, timestamps, play, time } = setup("relay");
+    aim.use(motion);
+    play(200, 0);
+    aim.startDraw(time.now());
+    play(1000, 10);
+
+    const t = time.now();
+    const expectedRelay = shownAim(sent, timestamps, t, "relay");
+    const expectedDirect = shownAim(sent, timestamps, t, "direct");
+    expect(expectedRelay).not.toEqual(expectedDirect);
+
+    aim.shoot(3, 0.8, t);
+    const shot = sent.at(-1);
+    expect(shot).toEqual({
+      type: "shoot",
+      payload: { volley: 3, aim: expectedRelay, power: 0.8 },
+    });
   });
 
   it("lowers the bow, and the next draw shows the crosshair again from the centre", () => {

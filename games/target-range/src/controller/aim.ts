@@ -11,17 +11,21 @@
  *   draw is held or, in touch mode, the pad is dragged. `shoot` and `lower` go with
  *   `channel.fire`.
  * - `shoot` carries the aim the TV was shown, not the phone's freshest live sample (CC-11.10;
- *   realtime-link.md, "The phone decides its own shot", rule 2). The phone has no way to learn the
- *   TV's exact `playbackDelayMs` or its interpolated position (that's per-connection, host-only
- *   tuning: `apps/host/src/runtime/links.ts`), so instead it keeps its own short buffer of the
- *   samples it actually streamed and, at release, replays that buffer through the same
- *   `createPlayback` the TV's crosshair uses (`../host/aim-playback.ts`'s `createCrosshairPlayback`),
- *   `AIM_PLAYBACK_DELAY_MS` behind. Both sides run the identical, deterministic algorithm over the
- *   same samples, so they land on the same "shown" aim without a new message.
+ *   realtime-link.md, "The phone decides its own shot", rule 2). The phone can't learn the TV's
+ *   exact interpolated position, and no new message carries it, so instead it keeps its own short
+ *   buffer of the samples it actually streamed and, at release, replays that buffer through the
+ *   same `createPlayback` the TV's crosshair uses (`../host/aim-playback.ts`'s
+ *   `createCrosshairPlayback`), the same `shownDelayMs` behind: a flat 180 ms on the relay path
+ *   (and off the link entirely, which also runs input through the relay) or `1000 / hz` on the
+ *   direct path, mirroring `relayPlaybackDelayMs` and `directPlaybackDelayMs`
+ *   (`apps/host/src/runtime/links.ts`, CC-11.9) -- the two numbers `scene.ts`'s
+ *   `playbackDelayMsOf` actually renders with today (jitter isn't measured yet, so, like the
+ *   host, this assumes none). `channel.path` is read only to pick which of those two numbers
+ *   applies, never to change what's sent or how the game behaves.
  */
 import type { ControllerMotion, InputChannel } from "@couchcade/game-sdk/contract";
 import type { Aim, SampleTrack } from "@couchcade/game-sdk/input";
-import { AIM_PLAYBACK_DELAY_MS, addSample, createPlayback } from "@couchcade/game-sdk/input";
+import { addSample, createPlayback } from "@couchcade/game-sdk/input";
 import { type Calibration, createPoseTracker } from "@couchcade/motion/calibration";
 import { type AimDrag, createAimDrag, type PointerPoint } from "@couchcade/motion/fallbacks";
 import {
@@ -40,8 +44,22 @@ export type TargetRangeMotion = ControllerMotion<MotionAdapter, Calibration>;
 /** What the shot needs from the controller's one `InputChannel`. */
 export type ShotChannel = Pick<
   InputChannel<TargetRangeInput>,
-  "stream" | "fire" | "clear" | "last"
+  "stream" | "fire" | "clear" | "last" | "path"
 >;
+
+/** `../controller/index.ts`'s declared `streams.aim.hz`. */
+const AIM_STREAM_HZ = 30;
+
+/**
+ * How far behind the TV plays this player's crosshair right now (CC-11.10), mirroring
+ * `apps/host/src/runtime/links.ts`'s `relayPlaybackDelayMs` (180, also used off the link, which
+ * runs input through the relay too) and `directPlaybackDelayMs` (`1000 / hz` clamped to 25-120,
+ * jitter assumed 0 until it's measured -- same assumption the host makes).
+ */
+export function shownDelayMs(path: ShotChannel["path"]): number {
+  if (path === "direct") return Math.min(120, Math.max(25, 1000 / AIM_STREAM_HZ));
+  return 180;
+}
 
 export interface ShotAim {
   /** Which controls are live. */
@@ -187,13 +205,14 @@ export function createShotAim(channel: ShotChannel, options: AimSenderOptions = 
 
     shoot(volley, power, t) {
       // The aim the TV was shown, not a fresh sensor reading at release (realtime-link.md, "The
-      // phone decides its own shot", rule 2; CC-11.10): replay `streamed` the same
-      // `AIM_PLAYBACK_DELAY_MS` behind, with the same generic `createPlayback` the TV's crosshair
-      // uses, so both sides land on the same value without a new message. `startDraw` (or `pad`'s
-      // `down`) always forces a sample through first, so `streamed` is never empty here; the
+      // phone decides its own shot", rule 2; CC-11.10): replay `streamed` `shownDelayMs(channel.
+      // path)` behind, with the same generic `createPlayback` the TV's crosshair uses, so both
+      // sides land on the same value without a new message. `startDraw` (or `pad`'s `down`)
+      // always forces a sample through first, so `streamed` is never empty here; the
       // `channel.last`/`aim()` fallbacks only guard a track `addSample` happened to reject
       // (non-finite time or value, which never occurs in practice).
-      const played = createPlayback<[number, number]>().at(streamed, t, AIM_PLAYBACK_DELAY_MS, 0);
+      const delayMs = shownDelayMs(channel.path);
+      const played = createPlayback<[number, number]>().at(streamed, t, delayMs, 0);
       const released =
         played === null
           ? (channel.last("aim")?.payload ?? aim())
