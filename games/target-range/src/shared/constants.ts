@@ -72,12 +72,30 @@ export const aimPxPerDegree = 6;
 /** World px of aim movement per CSS px of touch-pad drag, in both directions (same tuning). */
 export const padPxPerCssPx = 1.5;
 
-/** The target centre lies in `x` 160 to 320 and `y` 110 to 160, in steps of 2 px. */
+/** The target centre's `x` always lies in 160 to 320, in steps of 2 px. */
 export const targetMinX = 160;
 export const targetMaxX = 320;
+/** The target centre's `y` always reaches this far toward the horizon (the farthest it ever rolls). */
 export const targetMinY = 110;
-export const targetMaxY = 160;
+/** Round 1's near edge: how close to the couch (how large a `y`) the target may roll, unchanged. */
+export const targetMaxYNear = 160;
 export const targetStepPx = 2;
+
+/**
+ * How close to the couch (how large a `y`) the target may roll for a round of this `radius`: the
+ * full window for round 1 (radius 36, the nearest), capped progressively closer to the horizon as
+ * a later round's physics distance grows (docs/games/target-range.md, "Target"). Round 1's target
+ * still rolls anywhere from 110 to 160; round 4's (radius 24) is capped near 144. Without this, the
+ * target's on-screen depth rolled independently of the round's radius/drop/flight-time/wind, so a
+ * later, physically farther round could land visually closer than an earlier one (CC-11.11).
+ */
+export function targetMaxY(radius: number): number {
+  const span = targetMaxYNear - targetMinY;
+  const nearRadius = (rounds[0] as RoundRules).radius;
+  const steps = Math.round((span * radius) / (nearRadius * targetStepPx));
+  return targetMinY + steps * targetStepPx;
+}
+
 /** A target centre this close to where a still phone lands at full draw is rolled again. */
 export const stillShotClearancePx = 6;
 
