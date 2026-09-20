@@ -3,10 +3,10 @@ id: CC-5.14
 title: >-
   Continuously re-estimate motion calibration instead of a one-shot hold-still
   step
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-20 11:40'
-updated_date: '2026-09-20 12:10'
+updated_date: '2026-09-20 12:38'
 labels:
   - story
 dependencies:
@@ -121,4 +121,91 @@ numerically identical to the old one-shot window average.
 
 Sequencing note: CC-5.12 (the design doc) merged to main (PR #153) mid-delivery; this story was
 implemented against its approved content.
+
+Review round 1 (sonnet): BLOCK on AC#1. Finding: finish() in session.ts called stopAll() the
+moment calibration first completed, tearing down the listener that fed rest.push(); watchForStall's
+replacement listener never called rest.push again, so bias was frozen for the rest of a normal game
+-- the same one-shot behaviour the story replaces, just moved earlier (before game start instead of
+never). AC#2, #3, #4 passed round 1; no scope violations.
+
+Fix: added a session-scoped `motionRest` (the RestCalibration instance), kept alive across
+finish()/watchForStall()/pause/resume for the whole game, and wired watchForStall's onSample to
+also call motionRest.push(sample) and update state.value.calibration whenever a fresh still stretch
+produces a new measurement. Changed rest.ts to fire once per fresh still stretch (not continuously
+refine every sample while already still) so mid-game updates are discrete. Added two tests:
+re-measures the bias mid-game after an interruption+fresh still stretch; keeps the existing
+calibration (object identity) when the phone never goes properly still again. Full verify
+(check/check:style/check:deps/test/build) re-run green.
+
+Review round 2 (sonnet): PASS. Verified motionRest is fed on every path reaching an unpaused
+"ready" game (initial grant, resume-from-pause, resume-recovery, follow()-into-already-ready), no
+staleness/wrong-game risk, all 4 ACs met, no scope violations. One advisory finding: a wall-clock
+gap between samples (e.g. across a page-visibility pause where the sensor listener is fully torn
+down) doesn't explicitly break the still-stretch accumulator, so in principle a stale partial
+window could be "completed" by a single post-resume sample. Reproduced the reviewer's scenario and
+implemented a fix (maxGapMs option in rest.ts, defaulting to 200ms, resetting the still stretch on
+a large timestamp gap the same way turning/drift already does), with a new test.
+
+That fix had to be reverted before committing: pnpm test's tooling/budgets/test/budgets.test.ts
+started failing ("Controller initial JS 80.02 KB / 80.00 KB") with it in place. Root-caused this to
+a pre-existing bug in tooling/budgets/src/budgets.ts's buildApp(), which calls Vite's programmatic
+build() without forcing production mode -- when invoked from inside vitest (which sets
+process.env.NODE_ENV=test), this measures a non-production/dev Vue build, inflating the controller
+bundle by roughly 15 KB versus the real, deployed build. Confirmed via a throwaway worktree of
+origin/main: main itself measures 79.93 KB / 80.00 KB under this same condition (NODE_ENV=test),
+just 70 bytes of headroom -- already on the edge before this story touched anything. The real,
+CI-facing check (`pnpm budgets`, i.e. `node src/cli.ts`, invoked without vitest's environment)
+passes comfortably on both main and this branch (64.71 KB and 64.76 KB respectively / 80 KB), so
+there is no real deployment-size regression -- only a test-measurement artifact that any story
+adding a similarly modest amount of code to the controller's initial bundle would also trip.
+
+tooling/budgets/src/budgets.ts is outside this story's References, so the real fix (force
+mode: "production" in buildApp()'s build() call, or reset process.env.NODE_ENV around it) isn't
+made here. Recommend a small follow-up story/fix for that file. Since the maxGapMs guard was only
+advisory (not required by any AC) and reverting it costs nothing but that one defensive test case,
+delivered without it: the branch is back to the round-2-reviewed, fully green state (pnpm
+check/check:style/check:deps/test/build all pass, including tooling/budgets, at commit c17c279).
+The gap-across-pause scenario stays a known, documented, non-blocking risk for a future story.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Replaced the one-shot rest calibration with a continuous still detector, per motion.md's
+owner-approved "Where aim's zero comes from (CC-5.12)" recommendation (points 1-5, 7; point 6
+recentre cadence untouched). packages/motion/src/calibration/rest.ts keeps its public API
+(push/progress/reset) but now runs for the whole session, re-measuring the gyroscope bias and
+gravity direction on every fresh still stretch, and never falls back to a zero bias (the old 5s
+timeout did; it now uses the real, possibly noisy, recent-window average instead, and accelerometer
+-only phones still correctly report zero since there's nothing to measure). signs.ts adds
+createSignTracker, detecting the gravity sign from the first sample outside the unclear band and
+letting any later clear sample correct it, instead of averaging one dedicated still window.
+apps/controller/src/motion/session.ts starts the still detector as soon as permission is granted,
+concurrently with the existing up-to-1s real-sensor-data wait, and keeps it running (via a
+session-scoped motionRest fed through watchForStall) for the whole game -- a fresh still stretch
+between shots keeps updating the calibration mid-game, not just once at the start. The hold-still
+screen is now conditional: it only shows when no still stretch has completed by the time the game
+wants to start (right after the data check resolves), which most players never see since they're
+naturally still while the browser resolves the permission prompt.
+
+Reviewed twice (dipsaus-ai:story-reviewer, sonnet): round 1 blocked on AC#1 (the still detector's
+listener was torn down the moment calibration first completed, so bias was frozen for the rest of
+a normal game -- fixed by keeping it alive through watchForStall/pause/resume); round 2 passed all
+four criteria, with one advisory finding (a wall-clock gap across a page-visibility pause could in
+principle let a stale partial still window complete from a single post-resume sample). A fix for
+that advisory finding was implemented and tested, but reverted before commit: it tripped
+tooling/budgets/test/budgets.test.ts (an unrelated, pre-existing bug where that test's Vite build
+inherits vitest's NODE_ENV=test and measures a non-production bundle -- confirmed reproducible on
+origin/main itself, at 79.93/80.00 KB, just 70 bytes of headroom, before this story touched
+anything; the real CI check, `pnpm budgets`, passes comfortably at 64.76/80 KB on this branch).
+tooling/budgets is outside this story's References, so the underlying tooling bug is left as a
+documented follow-up rather than fixed here, and the advisory gap-detection improvement was
+dropped rather than fought past it, since it was optional.
+
+Full verify (check, check:style, check:deps, test, build) green. 240 packages/motion tests (17
+files) and 204 apps/controller tests (23 files), all new/rewritten for this story's four acceptance
+criteria: continuous re-estimation across multiple still stretches in a simulated session, the
+never-zero-bias guarantee (including the fixed timeout path), sign correction from a later sample,
+mid-game re-estimation after entering "ready", and the conditional hold-still screen (skips when
+already still during the data wait, shows and proceeds as a fallback otherwise).
+<!-- SECTION:FINAL_SUMMARY:END -->
