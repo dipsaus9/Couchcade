@@ -4,9 +4,11 @@ title: Let a player recalibrate motion mid-session
 status: To Do
 assignee: []
 created_date: '2026-09-19 08:23'
+updated_date: '2026-09-20 11:41'
 labels:
   - story
-dependencies: []
+dependencies:
+  - CC-5.14
 references:
   - apps/controller/src/motion/
   - apps/controller/src/screens/calibration/
@@ -32,3 +34,9 @@ Reported during the CC-3.24 owner replay (2026-09-19): "if you calibrated your p
 - [ ] #1 A player can trigger a fresh calibration from inside a running motion game, without a full reload or leaving the room
 - [ ] #2 Recalibrating doesn't lose the player's seat, score, or connection
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Per CC-5.12's owner-approved decision (docs/architecture/motion.md, 'Where aim's zero comes from'): once CC-5.14's continuous estimator lands, most bad-calibration cases self-correct within seconds, so this story shrinks to a manual 'fix my controls now' shortcut/fast-path rather than the only remedy. Build after CC-5.14, not before -- don't ship a button whose only job is a measurement the phone could take itself.
+<!-- SECTION:NOTES:END -->
