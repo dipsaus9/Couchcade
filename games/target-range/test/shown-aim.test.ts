@@ -1,0 +1,92 @@
+/**
+ * CC-11.10: a shot's aim must match what the TV's crosshair (`createCrosshairPlayback`,
+ * `../src/host/aim-playback.ts`) was actually rendering at release, not the phone's freshest live
+ * sample (the bug found during the CC-3.24 owner replay).
+ *
+ * Drives the real controller (`createShotAim`) with fake motion, feeds every "aim" sample it
+ * actually streamed through the real host reducer (`onPlayerInput`), and checks the shot lands on
+ * the exact screen point the host's own `createCrosshairPlayback` renders for that same instant --
+ * proving the fix without re-implementing either side's playback math.
+ */
+import { AIM_PLAYBACK_DELAY_MS } from "@couchcade/game-sdk/input";
+import { createPlayers } from "@couchcade/game-sdk/testing";
+import { createFakeAdapter } from "@couchcade/motion/sensors";
+import { describe, expect, it } from "vitest";
+import { createShotAim, type TargetRangeMotion } from "../src/controller/aim.ts";
+import { createCrosshairPlayback } from "../src/host/aim-playback.ts";
+import { aimPoint, init, onPlayerInput } from "../src/shared/index.ts";
+import type { TargetRangeInput } from "../src/shared/input.ts";
+import { ctxAt, tickUntil } from "./helpers.ts";
+import { createTestChannel } from "./controller/channel.ts";
+import { virtualTime } from "./controller/clock.ts";
+import { flatCalibration, turn } from "./controller/motion.ts";
+
+const [alice] = createPlayers(1) as [ReturnType<typeof createPlayers>[number]];
+
+describe("a Target Range shot's aim matches the TV's shown crosshair", () => {
+  it("lands on the point createCrosshairPlayback was rendering at release, not the phone's freshest sample", () => {
+    const time = virtualTime();
+    const { channel, sent, timestamps } = createTestChannel();
+    const shotAim = createShotAim(channel);
+    const adapter = createFakeAdapter();
+    const motion: TargetRangeMotion = {
+      mode: "motion",
+      adapter,
+      calibration: flatCalibration(),
+    };
+    const play = (durationMs: number, gamma: number) => {
+      for (const sample of turn(time.now(), durationMs, gamma)) {
+        time.advance(Math.max(0, sample.t - time.now()));
+        adapter.push(sample);
+      }
+    };
+
+    shotAim.use(motion);
+    play(200, 0);
+    shotAim.startDraw(time.now());
+    play(1000, 10); // still turning right up to release
+
+    const staleLive = channel.last("aim")?.payload;
+    expect(staleLive).toBeDefined();
+
+    const t = time.now();
+    shotAim.shoot(1, 1, t);
+
+    const shotMessage = sent.find(
+      (input): input is Extract<TargetRangeInput, { type: "shoot" }> => input.type === "shoot",
+    );
+    expect(shotMessage).toBeDefined();
+
+    // Replay the same "aim" messages the controller actually streamed through the real host
+    // reducer, so `state.players[0].aim` is exactly what the TV would have received.
+    let state = tickUntil(init([alice], 1), "open");
+    for (const input of sent) {
+      if (input.type !== "aim") continue;
+      const atMs = timestamps.get(input);
+      if (atMs === undefined) continue;
+      state = onPlayerInput(state, alice, input, ctxAt(atMs));
+    }
+    state = { ...state, nowMs: t };
+
+    const playback = createCrosshairPlayback();
+    const shown = playback
+      .at(state, 0, () => AIM_PLAYBACK_DELAY_MS)
+      .find((crosshair) => crosshair.id === alice.id);
+    expect(shown).toBeDefined();
+
+    const shotPoint = aimPoint(shotMessage!.payload.aim);
+    expect({ x: Math.round(shotPoint.x), y: Math.round(shotPoint.y) }).toEqual({
+      x: shown!.x,
+      y: shown!.y,
+    });
+
+    // Proves the fix matters: the old code sent the phone's freshest live sample instead, which
+    // lands on a different screen point while the aim is still moving at release.
+    const livePoint = aimPoint(staleLive!);
+    expect({ x: Math.round(livePoint.x), y: Math.round(livePoint.y) }).not.toEqual({
+      x: shown!.x,
+      y: shown!.y,
+    });
+    expect(shotMessage!.payload.aim).not.toEqual(staleLive);
+  });
+});

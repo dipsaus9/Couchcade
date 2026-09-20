@@ -9,11 +9,19 @@
  *   doesn't recentre it.
  * - Both stream through one `createAimSender` into the game's one `InputChannel`, only while a
  *   draw is held or, in touch mode, the pad is dragged. `shoot` and `lower` go with
- *   `channel.fire`, and `shoot` carries the aim the TV was shown: `channel.last("aim")`
- *   (realtime-link.md, "The phone decides its own shot").
+ *   `channel.fire`.
+ * - `shoot` carries the aim the TV was shown, not the phone's freshest live sample (CC-11.10;
+ *   realtime-link.md, "The phone decides its own shot", rule 2). The phone has no way to learn the
+ *   TV's exact `playbackDelayMs` or its interpolated position (that's per-connection, host-only
+ *   tuning: `apps/host/src/runtime/links.ts`), so instead it keeps its own short buffer of the
+ *   samples it actually streamed and, at release, replays that buffer through the same
+ *   `createPlayback` the TV's crosshair uses (`../host/aim-playback.ts`'s `createCrosshairPlayback`),
+ *   `AIM_PLAYBACK_DELAY_MS` behind. Both sides run the identical, deterministic algorithm over the
+ *   same samples, so they land on the same "shown" aim without a new message.
  */
 import type { ControllerMotion, InputChannel } from "@couchcade/game-sdk/contract";
-import type { Aim } from "@couchcade/game-sdk/input";
+import type { Aim, SampleTrack } from "@couchcade/game-sdk/input";
+import { AIM_PLAYBACK_DELAY_MS, addSample, createPlayback } from "@couchcade/game-sdk/input";
 import { type Calibration, createPoseTracker } from "@couchcade/motion/calibration";
 import { type AimDrag, createAimDrag, type PointerPoint } from "@couchcade/motion/fallbacks";
 import {
@@ -63,6 +71,9 @@ export interface ShotAim {
 
 const noop = (): void => {};
 
+/** Rounds to 3 decimals, without `-0`, matching `createAimSender`'s streamed precision. */
+const round3 = (value: number): number => Math.round(value * 1000) / 1000 + 0;
+
 /** What the shot needs from either aim source. */
 type Source = Pick<AimSource<unknown>, "aim" | "recentre" | "on">;
 
@@ -76,7 +87,19 @@ const yawDragPx = (2 * yawPx) / padPxPerCssPx;
 const pitchDragPx = (2 * pitchPx) / padPxPerCssPx;
 
 export function createShotAim(channel: ShotChannel, options: AimSenderOptions = {}): ShotAim {
-  const sender = createAimSender<TargetRangeInput>(channel, options);
+  /** The "aim" samples that actually reached `channel.stream` this draw, oldest first: what
+   * `shoot` replays (CC-11.10). Only samples `createAimSender` keeps (it skips one that barely
+   * moved) land here, so this is exactly what the TV received, not every raw sensor reading. */
+  let streamed: SampleTrack<[number, number]> = [];
+  const tracked: Pick<InputChannel<TargetRangeInput>, "stream"> = {
+    stream(input, t) {
+      if (input.type === "aim" && t !== undefined) {
+        streamed = addSample(streamed, t, [input.payload.yaw, input.payload.pitch]);
+      }
+      channel.stream(input, t);
+    },
+  };
+  const sender = createAimSender<TargetRangeInput>(tracked, options);
 
   let mode: "motion" | "touch" = "touch";
   /** The drag pad, only in touch mode. */
@@ -121,6 +144,7 @@ export function createShotAim(channel: ShotChannel, options: AimSenderOptions = 
     padHeld = false;
     sender.reset();
     channel.clear();
+    streamed = [];
   };
 
   useTouch();
@@ -162,10 +186,18 @@ export function createShotAim(channel: ShotChannel, options: AimSenderOptions = 
     },
 
     shoot(volley, power, t) {
-      // The aim the TV was shown, not a fresh sensor reading at release (realtime-link.md,
-      // "The phone decides its own shot", rule 2): `channel.last("aim")` is always set here,
-      // since `startDraw` (or `pad`'s `down`) always forces a sample through first.
-      const released = channel.last("aim")?.payload ?? aim();
+      // The aim the TV was shown, not a fresh sensor reading at release (realtime-link.md, "The
+      // phone decides its own shot", rule 2; CC-11.10): replay `streamed` the same
+      // `AIM_PLAYBACK_DELAY_MS` behind, with the same generic `createPlayback` the TV's crosshair
+      // uses, so both sides land on the same value without a new message. `startDraw` (or `pad`'s
+      // `down`) always forces a sample through first, so `streamed` is never empty here; the
+      // `channel.last`/`aim()` fallbacks only guard a track `addSample` happened to reject
+      // (non-finite time or value, which never occurs in practice).
+      const played = createPlayback<[number, number]>().at(streamed, t, AIM_PLAYBACK_DELAY_MS, 0);
+      const released =
+        played === null
+          ? (channel.last("aim")?.payload ?? aim())
+          : { yaw: round3(played[0]), pitch: round3(played[1]) };
       settle();
       channel.fire({ type: "shoot", payload: { volley, aim: released, power } }, t);
     },

@@ -9,6 +9,13 @@
  * crosshairs it's given. This is the stateful piece the scene calls once a frame, alongside the
  * other per-frame state it already keeps outside `TState` (`RangeWorld`'s Phaser actors).
  *
+ * A shot's aim is never read from here (`../controller/aim.ts`'s `shoot` carries it, per "The
+ * phone decides its own shot"). Since CC-11.10, the controller keeps this in sync by replaying its
+ * own streamed samples through the same `createPlayback`, `AIM_PLAYBACK_DELAY_MS` behind, instead
+ * of the exact per-connection `playbackDelayMs` this file plays back with (which is host-only
+ * tuning the phone has no way to learn without a new message) — so the shot lands close to what
+ * this crosshair was actually showing, without the two ever exchanging that number.
+ *
  * ```ts
  * const playback = createCrosshairPlayback();
  * // Each frame: const crosshairs = playback.at(state, frameMs, (id) => host.link?.(id)?.playbackDelayMs ?? fallbackMs);

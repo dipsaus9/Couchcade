@@ -1,3 +1,5 @@
+import { AIM_PLAYBACK_DELAY_MS, addSample, createPlayback } from "@couchcade/game-sdk/input";
+import type { SampleTrack } from "@couchcade/game-sdk/input";
 import { createFakeAdapter } from "@couchcade/motion/sensors";
 import { describe, expect, it } from "vitest";
 import { createShotAim, type TargetRangeMotion } from "../../src/controller/aim.ts";
@@ -10,7 +12,7 @@ const calibration = flatCalibration();
 
 function setup() {
   const time = virtualTime();
-  const { channel, sent } = createTestChannel();
+  const { channel, sent, timestamps } = createTestChannel();
   const aim = createShotAim(channel);
   const adapter = createFakeAdapter();
   const motion: TargetRangeMotion = { mode: "motion", adapter, calibration };
@@ -21,10 +23,35 @@ function setup() {
       adapter.push(sample);
     }
   };
-  return { time, sent, aim, adapter, motion, play };
+  return { time, sent, timestamps, aim, adapter, motion, play };
 }
 
 const types = (sent: TargetRangeInput[]) => sent.map((input) => input.type);
+
+/**
+ * Independently replays every "aim" message actually sent so far, `AIM_PLAYBACK_DELAY_MS` behind
+ * `t`, with the same generic `createPlayback` the TV's crosshair uses (CC-11.10). This is the
+ * expected `shoot` aim: what the TV was showing at release, not the freshest live sample.
+ */
+function shownAim(
+  sent: readonly TargetRangeInput[],
+  timestamps: Map<TargetRangeInput, number | undefined>,
+  t: number,
+): { yaw: number; pitch: number } | null {
+  let track: SampleTrack<[number, number]> = [];
+  for (const input of sent) {
+    if (input.type !== "aim") continue;
+    const at = timestamps.get(input);
+    if (at === undefined) continue;
+    track = addSample(track, at, [input.payload.yaw, input.payload.pitch]);
+  }
+  const value = createPlayback<[number, number]>().at(track, t, AIM_PLAYBACK_DELAY_MS, 0);
+  return value === null ? null : { yaw: round3(value[0]), pitch: round3(value[1]) };
+}
+
+function round3(value: number): number {
+  return Math.round(value * 1000) / 1000 + 0;
+}
 
 describe("createShotAim with motion", () => {
   it("sends nothing while the phone moves without a draw", () => {
@@ -46,21 +73,28 @@ describe("createShotAim with motion", () => {
     expect(sent).toEqual([{ type: "aim", payload: { yaw: 0, pitch: 0 } }]);
   });
 
-  it("streams aim while drawing and shoots with the aim the TV was shown", () => {
-    const { aim, motion, sent, play, time } = setup();
+  it("streams aim while drawing and shoots with the aim the TV was shown, not the freshest live sample", () => {
+    const { aim, motion, sent, timestamps, play, time } = setup();
     aim.use(motion);
     play(200, 0);
     aim.startDraw(time.now());
-    play(1000, 10);
-    const released = aim.aim();
-    expect(Math.abs(released.yaw)).toBeGreaterThan(0.2);
+    play(1000, 10); // still turning right up to release
+    const live = aim.aim();
+    expect(Math.abs(live.yaw)).toBeGreaterThan(0.2);
     expect(types(sent).filter((type) => type === "aim").length).toBeGreaterThan(2);
 
     const before = sent.length;
-    aim.shoot(3, 0.8, time.now());
+    const t = time.now();
+    // CC-11.10: while still moving, the TV's delayed/interpolated crosshair lags the phone's own
+    // freshest live sample -- the shot must carry the delayed value, not `live`.
+    const expected = shownAim(sent, timestamps, t);
+    expect(expected).not.toBeNull();
+    expect(expected).not.toEqual(live);
+
+    aim.shoot(3, 0.8, t);
     time.advance(300);
     expect(sent.slice(before)).toEqual([
-      { type: "shoot", payload: { volley: 3, aim: released, power: 0.8 } },
+      { type: "shoot", payload: { volley: 3, aim: expected, power: 0.8 } },
     ]);
 
     play(1000, 30);
@@ -168,7 +202,7 @@ describe("createShotAim with touch", () => {
   });
 
   it("doesn't recentre at the draw, so the shot carries the pad's aim", () => {
-    const { aim, sent, time } = setup();
+    const { aim, sent, timestamps, time } = setup();
     aim.pad({ t: time.now(), x: 0, y: 0, type: "down" });
     aim.pad({ t: time.now() + 16, x: -50, y: 0, type: "move" });
     aim.pad({ t: time.now() + 32, x: -50, y: 0, type: "up" });
@@ -176,11 +210,15 @@ describe("createShotAim with touch", () => {
     aim.startDraw(time.now());
     expect(aim.aim()).toEqual({ yaw: -0.375, pitch: 0 });
     time.advance(300);
-    aim.shoot(2, 1, time.now());
+    const t = time.now();
+    // CC-11.10: the shot carries the TV's shown aim, replayed the same way `aim-playback.ts`
+    // would render this same sparse track, not simply the pad's steady live reading.
+    const expected = shownAim(sent, timestamps, t);
+    aim.shoot(2, 1, t);
     time.advance(300);
     expect(sent.at(-1)).toEqual({
       type: "shoot",
-      payload: { volley: 2, aim: { yaw: -0.375, pitch: 0 }, power: 1 },
+      payload: { volley: 2, aim: expected, power: 1 },
     });
   });
 });
