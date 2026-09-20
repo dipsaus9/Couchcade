@@ -1,10 +1,10 @@
 ---
 id: CC-3.26
 title: Report the phone's measured link round trip and jitter to the host
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-18 05:04'
-updated_date: '2026-09-20 11:55'
+updated_date: '2026-09-20 11:57'
 labels: []
 dependencies:
   - CC-3.19
@@ -50,4 +50,12 @@ Branch: CC-3.26/phone-rtt-report
 Found while delivering CC-3.20 (2026-09-18): the reviewer independently verified the rttMs gap against the live protocol schemas and called leaving it null on CC-3.20 a defensible, documented gap rather than a defect, and the owner (relayed via the orchestrator) accepted that as an engineering call -- this story is the tracked fix. Collision check (bun backlog-workflow.ts collisions CC-3.26) flags an overlap with CC-3.23 (Skip periodic relay clock samples while a phone is on the direct link, To Do, not in flight) on apps/controller/src/runtime/link.ts -- both touch the phone's link:ping send path for different reasons (CC-3.23: switching toHostTime to the link offset; this story: piggybacking rttMs/jitter onto the ping payload). Not colliding right now since neither is in flight; whichever of the two is delivered second reconciles the overlap at merge time, per the usual collision-resolution rule -- no --dep edge needed between them.
 
 Implemented: linkPingPayloadSchema now carries required rttMs (nullable number) and jitterMs (number). Controller link.ts computes both from the existing 20-sample rttSamples window (median for rttMs, unchanged; new percentileOf/jitterOf for jitterMs = p90-p50) and piggybacks them on every link:ping; also exposed jitterMs on ControllerLink for symmetry with rttMs. Host links.ts stores rttMs/jitterMs per PeerLink (default null/0), updates them in handlePing, and link() now returns the phone's reported rttMs and feeds jitterMs into directPlaybackDelayMs -- the zero-jitter default is simply the untouched initial state, no special-casing needed. Scope note: also updated packages/protocol/test/messages.test.ts (one existing link:ping fixture, outside the story's declared References) because making rttMs/jitterMs required broke its pre-existing round-trip assertion; this was the minimal mechanical fixture fix to keep pnpm test green, no new logic added there.
+
+Reviewer (dipsaus-ai:story-reviewer, model sonnet, round 1): verdict pass. All 4 acceptance criteria met, no scope violations. Advisory finding: packages/protocol/test/messages.test.ts (outside declared References) judged a justified, minimal, mechanical fixture fix forced by the in-scope schema change -- not scope creep.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+link:ping now piggybacks the phone's own measured link quality instead of a new message type: linkPingPayloadSchema gained required rttMs (nullable, running median of the last 20 pongs) and jitterMs (p90 minus p50 of the same window, via a new jitterOf() alongside the existing median()) fields. The controller computes both from the unchanged rttSamples window on every ping send. The host's PeerLink now stores rttMs/jitterMs (default null/0), handlePing updates them from each ping, HostSceneData.link() returns the phone's reported rttMs on the direct path, and directPlaybackDelayMs is fed the phone's measured jitter instead of a hardcoded 0 -- the zero-jitter default falls out naturally from the link's initial state before the phone's first report. A phone that never goes direct, or whose link drops before pinging, is unaffected (relay defaults, never throws). Verify: pnpm check, check:style, check:deps, test (full monorepo, 0 failures) and build all green. Reviewer (sonnet, round 1): pass, all 4 ACs met, no scope violations.
+<!-- SECTION:FINAL_SUMMARY:END -->
