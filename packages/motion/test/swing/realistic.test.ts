@@ -37,12 +37,12 @@ import { PEAK_MS, replay, swingTrace, type SwingTraceSpec } from "./traces.ts";
  *   (240).
  * - **Release delay.** A full swing's own deceleration after the peak scales with arc/peak (see
  *   `SWING_RELEASE_WINDOW_MS`'s comment in `swing.ts`): half the swing's duration is spent
- *   decelerating after the peak, before the arm "feels done". For arc=155°/peak=450 that tail is
- *   ≈300 ms; for arc=165°/peak=260 it stretches to ≈555 ms. On top of that a player has to
- *   consciously let go of the on-screen grip - unlike a Wii Remote button physically released
- *   mid-throw, this needs a deliberate ~150-250 ms reaction. `gripUpMs` below reflects both: a
- *   generous but still bounded delay after the peak, never left at an unrealistic "instant"
- *   release.
+ *   decelerating after the peak, before the arm "feels done" - `(π × armArcDeg × 1000) / (4 ×
+ *   peak)`. For arc=155°/peak=450 that tail is ≈270 ms; for arc=165°/peak=260 it stretches to
+ *   ≈500 ms. On top of that a player has to consciously let go of the on-screen grip - unlike a
+ *   Wii Remote button physically released mid-throw, this needs a deliberate ~150-280 ms reaction.
+ *   `gripUpMs` below reflects both: a generous but still bounded delay after the peak, never left
+ *   at an unrealistic "instant" release.
  */
 
 const localTime = (t: number) => t;
@@ -50,14 +50,14 @@ const localTime = (t: number) => t;
 const firmRealisticSwing: SwingTraceSpec = {
   peak: 450,
   armArcDeg: 155,
-  // ~300 ms mechanical deceleration tail + ~250 ms reaction to let go.
+  // ~270 ms mechanical deceleration tail + ~280 ms reaction to let go.
   gripUpMs: PEAK_MS + 550,
 };
 
 const cautiousRealisticSwing: SwingTraceSpec = {
   peak: 260,
   armArcDeg: 165,
-  // ~555 ms mechanical deceleration tail + ~150 ms reaction to let go, still inside the window.
+  // ~500 ms mechanical deceleration tail + ~150 ms reaction to let go, still inside the window.
   gripUpMs: PEAK_MS + 650,
 };
 

@@ -65,7 +65,7 @@ export const SWING_FULL_SPIN_RATE = 540;
  * much bigger arc — from behind the body, through the bottom, to a forward follow-through — so it
  * keeps decelerating for longer after its peak before the arm "feels done": for a firm real swing
  * (~150° arc, ~450 deg/s peak) that tail alone is already ~260 ms, and a slower, wider, more
- * cautious swing (~165° arc, near the 240 deg/s floor) stretches to ~430 ms. On top of that, a
+ * cautious swing (~165° arc, near the 240 deg/s floor) stretches to ~540 ms. On top of that, a
  * player still has to consciously let go of the on-screen grip, which — unlike a physical Wii
  * Remote button released mid-throw — adds a further ~150-250 ms of human reaction time for a
  * first attempt at this gesture. 300 ms covered neither: it silently dropped a real swing that
