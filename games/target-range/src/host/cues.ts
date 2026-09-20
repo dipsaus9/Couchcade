@@ -5,8 +5,9 @@ import type { TargetRangeState } from "../shared/index.ts";
 /**
  * Moments the TV marks with a sound (docs/games/target-range.md, "TV scene", Sound). The scene
  * emits each one on its event emitter under `targetRangeCueEvent`, the frame it first shows it.
- * The sounds arrive with CC-11.5 and subscribe here; until then nothing listens. Every cue already
- * has its visual in the scene, so the game works with the sound off.
+ * `./sounds.ts`'s `playCueSound` subscribes to it (CC-7.8) and turns each cue into an
+ * `@couchcade/audio` call. Every cue already has its visual in the scene, so the game works with
+ * the sound off.
  */
 export type TargetRangeCue =
   /** `intro` starts: the music loop, and the wind loop from round 2. */

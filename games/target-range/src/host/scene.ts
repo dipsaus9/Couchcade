@@ -1,7 +1,9 @@
+import { audio } from "@couchcade/audio";
 import type { HostSceneData } from "@couchcade/game-sdk/contract";
 import { AIM_PLAYBACK_DELAY_MS } from "@couchcade/game-sdk/input";
 import { StageScene, worldToOverlay } from "@couchcade/stage";
 import type { Callout, Scoreboard } from "@couchcade/stage";
+import { Scenes } from "phaser";
 import { roundCount } from "../shared/index.ts";
 import type { Point, TargetRangeState } from "../shared/index.ts";
 import { createCrosshairPlayback } from "./aim-playback.ts";
@@ -12,6 +14,7 @@ import { placeTagsBelow } from "./label-layout.ts";
 import { InstructionPanel, PointsTag, RoundResults, scoreboardBottom, tagGap } from "./overlays.ts";
 import { present } from "./present.ts";
 import type { Presentation } from "./present.ts";
+import { playCueSound, targetRangeSounds } from "./sounds.ts";
 import { RangeWorld } from "./world.ts";
 import { worldPipLook } from "./world-pip.ts";
 import type { WorldPipLook } from "./world-pip.ts";
@@ -67,6 +70,13 @@ export default class TargetRangeScene extends StageScene<TargetRangeState> {
   }
 
   create(): void {
+    void audio.load(targetRangeSounds);
+    this.events.on(targetRangeCueEvent, playCueSound);
+    this.events.once(Scenes.Events.SHUTDOWN, () => {
+      this.events.off(targetRangeCueEvent, playCueSound);
+      audio.unload(targetRangeSounds);
+    });
+
     const state = this.host.getState();
     const view = this.present(state, 0);
     this.cameras.main.setRoundPixels(true);
