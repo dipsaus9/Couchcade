@@ -133,6 +133,43 @@ describe("rest calibration: continuous re-estimation over a session (CC-5.14)", 
     expect(rest.progress().calibrated).toBe(true);
   });
 
+  it("a wall-clock gap between samples breaks the still stretch, the same as turning would", () => {
+    // A handful of real samples, then a big gap in sample timestamps (the sensors were stopped --
+    // e.g. the page went hidden -- for far longer than any real interval), then one more sample.
+    // The gap alone must not let a still stretch complete: nothing in between is known to have
+    // stayed still, so the accumulator has to start over, exactly like a turn or a magnitude jump.
+    // (`timeoutMs` separately kicks in past 5 s without a real stretch, per AC4 -- that's a real,
+    // intentional fallback, not the bug this test guards: the point here is that the post-gap
+    // result is never a *confident*, non-fallback measurement built from essentially one sample.)
+    const rest = createRestCalibration();
+    for (const sample of samplesOf({ durationMs: 32, gravity: () => portrait(20) })) {
+      expect(rest.push(sample)).toBeNull();
+    }
+    const afterGap = rest.push({
+      t: 10_000,
+      interval: 16,
+      acceleration: { x: 0, y: 0, z: 0 },
+      gravityAcceleration: { x: 0, y: portrait(20)[1], z: portrait(20)[2] },
+      rotationRate: { alpha: 0, beta: 0, gamma: 0 },
+    });
+    // Not a confident still-stretch measurement -- only the never-zero timeout fallback fired
+    // (5 s elapsed since t=0), and even that comes from just this one post-gap sample.
+    expect(afterGap?.timedOut).toBe(true);
+    expect(rest.progress().calibrated).toBe(false);
+    expect(rest.progress().stillMs).toBe(0);
+    expect(rest.progress().restarts).toBeGreaterThanOrEqual(1);
+  });
+
+  it("does not break the still stretch on the normal sample-to-sample interval", () => {
+    // A sanity check that the gap guard doesn't false-trigger on ordinary 60 Hz spacing.
+    const rest = createRestCalibration();
+    const samples = traceSamples(synthetic.still({ durationMs: 1000 }));
+    const calibration = samples.map((sample) => rest.push(sample)).find(Boolean);
+    expect(calibration).not.toBeNull();
+    expect(calibration?.timedOut).toBe(false);
+    expect(rest.progress().restarts).toBe(0);
+  });
+
   it("skips samples without gravity but keeps the last known estimate", () => {
     const rest = createRestCalibration();
     for (const sample of traceSamples(synthetic.still({ durationMs: 1000 }))) rest.push(sample);

@@ -37,6 +37,14 @@ export interface RestCalibrationOptions {
   signBand?: number;
   /** The sign decision from an earlier calibration in this page session, kept when the pose is unclear. */
   previousInverted?: boolean;
+  /**
+   * A gap between two samples longer than this, in ms, breaks the current still stretch, the same
+   * as turning or a magnitude jump would -- the sensors were stopped (the page went hidden, or a
+   * pause) for at least this long, so nothing in between is known to have stayed still. Without
+   * this, a wall-clock gap alone could satisfy the still-stretch duration test on its own, from a
+   * handful of real samples either side of the gap. Defaults to 200.
+   */
+  maxGapMs?: number;
 }
 
 export interface RestProgress {
@@ -89,12 +97,14 @@ export function createRestCalibration(options: RestCalibrationOptions = {}): Res
     fallbackMs = 250,
     signBand = SIGN_UNCLEAR_BAND,
     previousInverted,
+    maxGapMs = 200,
   } = options;
 
   const signs = createSignTracker(previousInverted, signBand);
 
   let startT: number | null = null;
   let lastT = 0;
+  let lastReadingT: number | null = null;
   let restarts = 0;
   let still: Reading[] = [];
   let magnitudeSum = 0;
@@ -155,15 +165,22 @@ export function createRestCalibration(options: RestCalibrationOptions = {}): Res
       startT ??= reading.t;
       lastT = reading.t;
 
+      // A gap this long means the sensors were stopped for a while (the page went hidden, a
+      // pause) -- nothing in between is known to have stayed still, so it breaks the stretch the
+      // same as turning would, rather than letting the wall-clock gap alone satisfy `stillMs`.
+      const gapped = lastReadingT !== null && reading.t - lastReadingT > maxGapMs;
+      lastReadingT = reading.t;
+
       // The sign is read from every sample, still or moving: it needs no stillness, just a clear
       // enough pose (signs.ts, `createSignTracker`).
       signs.push(gravity);
 
-      // Still test: no turning, and the magnitude close to the running mean of this still stretch.
+      // Still test: no turning, no gap, and the magnitude close to the running mean of this still
+      // stretch.
       const magnitude = length(gravity);
       const drifted =
         still.length > 0 && Math.abs(magnitude - magnitudeSum / still.length) > maxMagnitudeDrift;
-      if (isTurning(reading) || drifted) {
+      if (isTurning(reading) || drifted || gapped) {
         if (still.length > 0) restarts++;
         still = [];
         magnitudeSum = 0;
@@ -204,6 +221,7 @@ export function createRestCalibration(options: RestCalibrationOptions = {}): Res
     reset() {
       startT = null;
       lastT = 0;
+      lastReadingT = null;
       restarts = 0;
       still = [];
       magnitudeSum = 0;
