@@ -796,7 +796,7 @@ Playwright can't slow down a data channel with its network emulation, which only
 7. **Target Range moves over** with the aim tuning, the crosshair snap and single-sample aim.
 8. **E2E specs.**
 9. **Owner replay** of Target Range with `?link=1` on every phone. Feedback becomes stories.
-10. **Switch on in production.** `VITE_REALTIME_LINK` defaults to on. `?link=0` stays as the escape hatch, and setting the variable off in `deploy.yml` turns the link off for everyone on the next deploy.
+10. **Switch on in production.** `VITE_REALTIME_LINK` defaults to on. `?link=0` stays as the escape hatch, and setting the variable off in `deploy.yml` turns the link off for everyone on the next deploy. **Done (CC-3.24, 2026-09-19):** the owner replayed Target Range with `?link=1`, approved the link's own behaviour, and approved switching it on for everyone. `deploy.yml` sets `VITE_REALTIME_LINK: "true"`.
 11. **Later:** skip relay clock samples while direct. Screens over the link, STUN or TURN each need a new owner decision.
 
 ---
