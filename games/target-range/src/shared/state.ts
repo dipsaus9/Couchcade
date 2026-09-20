@@ -133,14 +133,17 @@ export function findPlayer(state: TargetRangeState, id: string): TargetRangePlay
 }
 
 /**
- * A target centre for `round`: `x` 160 to 320 and `y` 110 to 160 in steps of 2 px, rolled again
- * while it lies within 6 px of where a still phone lands at full draw, `(240, 140 + drop)`.
+ * A target centre for `round`: `x` 160 to 320 in steps of 2 px, and `y` 110 up to
+ * `targetMaxY(round.radius)` (160 for round 1, capped closer to the horizon for a later round's
+ * greater physics distance, CC-11.11), rolled again while it lies within 6 px of where a still
+ * phone lands at full draw, `(240, 140 + drop)`.
  */
 export function rollTarget(rng: Rng, round: RoundRules): Point {
   const stillY = aimHomeY + round.dropPx;
+  const maxY = targetMaxY(round.radius);
   for (;;) {
     const x = targetMinX + targetStepPx * rng.int(0, (targetMaxX - targetMinX) / targetStepPx);
-    const y = targetMinY + targetStepPx * rng.int(0, (targetMaxY - targetMinY) / targetStepPx);
+    const y = targetMinY + targetStepPx * rng.int(0, (maxY - targetMinY) / targetStepPx);
     const dx = x - aimHomeX;
     const dy = y - stillY;
     if (dx * dx + dy * dy > stillShotClearancePx * stillShotClearancePx) return { x, y };
