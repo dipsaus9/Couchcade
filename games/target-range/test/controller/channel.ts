@@ -6,9 +6,10 @@ import type { TargetRangeInput } from "../../src/shared/input.ts";
  * call sends at once, in order, with no hz gating or relay packing (the channel's own concern,
  * tested where `createInputChannel` lives). `last` reflects the newest value given to `stream`,
  * exactly as the real channel does. `timestamps` maps each sent input (by reference) to the
- * `eventTimeStamp` it was sent with, for tests that check timing. `path` is fixed at `"direct"`.
+ * `eventTimeStamp` it was sent with, for tests that check timing. `path` defaults to `"direct"`;
+ * pass `"relay"` or `"off"` for tests that check `shoot`'s path-aware playback delay (CC-11.10).
  */
-export function createTestChannel(): {
+export function createTestChannel(path: InputChannel<TargetRangeInput>["path"] = "direct"): {
   channel: InputChannel<TargetRangeInput>;
   sent: TargetRangeInput[];
   timestamps: Map<TargetRangeInput, number | undefined>;
@@ -33,7 +34,7 @@ export function createTestChannel(): {
       > | null;
     },
     clear() {},
-    path: "direct",
+    path,
   };
   return { channel, sent, timestamps };
 }
