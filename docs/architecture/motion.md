@@ -6,7 +6,7 @@ This is the design for using phones as motion controllers: which sensors we read
 
 **For agents.** Everything after the owner sections is binding for CC-5.2 to CC-5.10 and for every game controller that uses `@couchcade/motion`. [platform.md](platform.md), [security.md](security.md), [session-flow.md](session-flow.md), [platform-screens.md](../design/platform-screens.md), README.md, [TECH_STACK.md](../TECH_STACK.md) and [HOUSE_STYLE.md](../HOUSE_STYLE.md) still apply, and this doc doesn't repeat them. Where this doc, platform.md and a story disagree, stop and flag it. [Conflicts found while writing this doc](#conflicts-with-stories-and-other-docs) lists the ones already known.
 
-Status: approved by the owner on 16 September 2026 (CC-5.1), with the decisions in rows 15 to 19.
+Status: approved by the owner on 16 September 2026 (CC-5.1), with the decisions in rows 15 to 19. One later section, [Where aim's zero comes from](#where-aims-zero-comes-from-cc-512) (CC-5.12), is a recommendation awaiting the owner and is not binding yet.
 
 ---
 
@@ -20,6 +20,7 @@ Status: approved by the owner on 16 September 2026 (CC-5.1), with the decisions 
 - [Sensor adapter](#sensor-adapter)
 - [Permission, calibration and resume flow](#permission-calibration-and-resume-flow)
 - [Calibration and the motion frame](#calibration-and-the-motion-frame)
+- [Where aim's zero comes from (CC-5.12)](#where-aims-zero-comes-from-cc-512)
 - [Gesture contracts](#gesture-contracts)
 - [Fitting the input budget](#fitting-the-input-budget)
 - [Safety](#safety)
@@ -278,6 +279,145 @@ Everything after calibration uses the W3C signs: a phone lying face up reads abo
 3. **Unclear pose.** If `|y + z| <= 2` m/s² (the phone is on its side), calibration keeps the last decision from this page session, or W3C signs if there is none.
 4. **Rotation rate is never flipped.** Both WebKit and Chrome convert the platform's right-handed rates straight to degrees per second, which matches the spec. CC-5.3 proves it with a test: integrating the rotation rate over a recorded tilt must predict the gravity change the accelerometer saw. The first real iPhone trace from CC-5.9 settles points 1 and 4 for good.
 5. **Traces record raw values.** A trace keeps the samples exactly as the browser delivered them and stores the detected sign in `rawSigns`, so tests replay both conventions (CC-5.3 criterion 2).
+
+---
+
+## Where aim's zero comes from (CC-5.12)
+
+**This section is a recommendation, not an approved decision.** Everything above it is binding. Nothing here is, until the owner fills in the line at the end. No code changes on the strength of this section before then.
+
+> **Owner decision: ___ (pending)**
+
+During the Target Range playtest on 19 September 2026 the owner said: "Movement should always be relative to when you start drawing, calibration should not happen I think." The same evening produced CC-5.11, from "if you calibrated your phone wrong it is unplayable after."
+
+Both quotes point at the one-second hold-still step in [Permission, calibration and resume flow](#permission-calibration-and-resume-flow). This section works out what that step actually gives us, what a bad one really costs, and which of three options to take.
+
+### Aim is already relative to the draw
+
+Target Range recentres on every single draw. `createShotAim().startDraw()` calls `source.recentre(t)` in motion mode (`games/target-range/src/controller/aim.ts`), and `recentre` stores the phone's current heading and elevation as the new zero (`packages/motion/src/gestures/aim.ts`). It has worked that way since CC-11.3, the first version of the controller, which is the version the owner played on 19 September.
+
+The swing detector does the same at grip-down. It captures the phone's heading as forward for that swing, so a bowl is measured from wherever the player was standing ([Swing](#swing-cc-54), detection rule 1).
+
+So the literal request, zero at the start of each gesture, is already the design for both gestures, and the game still felt wrong. The origin is not the problem. Something else in the calibration is, and the rest of this section finds it.
+
+### What the calibration object actually holds
+
+A `Calibration` carries four things. Only one of them is an origin, and it is the one that already cancels out.
+
+| Field | Measured from | What it is | Does a recentre cancel a bad value? |
+|---|---|---|---|
+| `frame.forward`, `frame.right` | the heading the phone had at rest | an origin | Yes, completely |
+| `frame.up` | the mean gravity direction, `up0` | an axis | No, but the pose tracker repairs it |
+| `bias` | the mean rotation rate over the still second | a rate | No. Nothing repairs it |
+| `inverted` | the gravity sign over the still second | one bit | No. Nothing repairs it |
+
+Taking them in turn:
+
+1. **Heading is free.** Aim's yaw is `heading − centre.heading`, so any yaw error baked into the frame subtracts out at the first recentre. A player who calibrates facing the kitchen and then turns to the TV loses nothing at all.
+2. **A wrong `up0` repairs itself.** A tilted Z skews aim, because yaw is measured around Z and pitch is elevation above it, so moving the phone level would slide the crosshair diagonally. The [pose tracker](#pose-tracker) turns the pose 2% of the way towards measured gravity per sample, which at 60 Hz pulls the error down by half every half second and puts world Z back on true gravity inside a couple of seconds. The exception is a phone that never stops accelerating past the ±1.5 m/s² gate, which a drawn bow is not.
+3. **A wrong `bias` lasts the whole game.** `correctSample` subtracts the same fixed `bias` from every sample for the rest of the session, and nothing ever re-measures it. Pitch and roll survive because gravity corrects them. Yaw has no compass (decision 3), so a residual bias is a crosshair that slides sideways at a constant rate, forever. Recentring sets the offset back to zero at each draw and the slide immediately starts again.
+4. **A wrong `inverted` is worse and rarer.** Every acceleration gets negated, so the gravity correction drags the pose upside down and swing angles mirror. The decision is taken from one second and never revisited.
+
+Point 3 is the answer. A bad calibration hurts because of the **gyroscope bias**, not because of the origin.
+
+### What a bad bias costs, in Target Range's own numbers
+
+Target Range maps 33.3° of yaw to a full ±1 at 6 world px per degree (`aimPxPerDegree`, `games/target-range/src/shared/constants.ts`). A far target has a radius of 24 world px.
+
+A residual bias of 3 deg/s, an ordinary figure for a phone gyroscope measured while the hand was not quite still, slides the crosshair 18 world px every second. A one-and-a-half-second draw therefore ends 27 px from where the player aimed, which is wider than the far target, and always in the same direction. The player learns to compensate, the next draw recentres, and the compensation is wiped. That is what "unplayable after" feels like from the couch.
+
+The worst case is not a shaky hand during the still second. It is the timeout. [Rest calibration](#rest-calibration) rule 3 gives up after 5 seconds and carries on with **a zero bias**, meaning no correction at all. The players who hit that timeout are the ones who could not hold still, which is the same group least able to shoot around a drifting crosshair.
+
+### The three options
+
+| | A. Keep absolute calibration | B. Relative only, no calibration | C. Hybrid: keep the reference, drop the ceremony |
+|---|---|---|---|
+| Hold-still screen | Before every motion game | Gone | Gone for most players, kept as a fallback |
+| Gyroscope bias | Measured once, never again | Not measured | Re-measured whenever the phone is still, all session |
+| Gravity sign | From the still second | From the first sample that is clear enough | From the first sample that is clear enough, revisited |
+| A bad measurement | Ruins the session | Cannot happen | Replaced by the next good one, within seconds |
+| Yaw drift within one gesture | Constant, uncorrected | Constant, uncorrected, and larger | Shrinks as the session goes on |
+| Work | None | Medium, and it removes protection we need | Medium, mostly inside `packages/motion/src/calibration/` |
+
+**Option A, keep it as it is.** Cheap, and the doc is already written. It leaves the exact failure the owner hit in place: one unlucky second at the start of a game, and every shot after it drifts. CC-5.11 would be the only way out, and it asks the player to notice the problem, name it, and press a button mid-game. Most players will just play worse and not know why.
+
+**Option B, drop calibration entirely and zero at every gesture.** This is the owner's words taken literally. It removes a screen nobody enjoys, and Nintendo learned the same lesson: reviewers disliked Wii Sports Resort asking for recalibration before nearly every game ([Nintendo World Report](http://www.nintendoworldreport.com/review/19125/wii-sports-resort-wii)). The trouble is that the two fields doing real work are not origins. Without a bias measurement, yaw drift gets worse, not better, so the exact symptom the owner complained about gets louder. Without a sign measurement, iPhones may run the whole pipeline upside down ([Sign conventions](#sign-conventions)). Option B fixes the ceremony and breaks the maths.
+
+**Option C, keep the reference and drop the ceremony.** Keep the `Calibration` object and everything built on it, and change where its numbers come from. Instead of one second at the start, run a still detector for the whole session: every time the phone goes quiet, which it does between shots, while the player listens to the host, whenever they put it down, re-measure the bias and refresh the gravity sign. The first estimate can come from the first few hundred milliseconds after the permission tap, so no screen is needed at all in the common case. The hold-still screen survives only as the thing shown when a phone never goes quiet long enough.
+
+Option C costs more code than A and about the same as B, and it is the only one of the three where a bad first measurement stops mattering after a few seconds.
+
+### Does relative aiming lose absolute aiming?
+
+Yes, and Target Range has already paid that price without anyone writing it down.
+
+Because every draw recentres, the crosshair starts at its home every time. There is no way to place a shot against the last one. "A bit up and to the left of that" means moving the phone during the draw, not holding it where the last shot landed. Aim behaves like a mouse, where movement is what counts, instead of a light gun, where pointing is what counts.
+
+Whether that is a loss depends on the game:
+
+- **Target Range** draws a bow per shot and the volley is short, so the crosshair starting at home each time is defensible, and it playtested acceptably.
+- **Duck Season** tracks a moving duck across a round, and it already has an explicit "point at the TV and tap" recentre ([mapping table](#how-wii-style-games-map-to-our-gestures)). Recentring on every shot would throw away the lead the player built.
+- **Double Top** is three darts from one stance, where "that one went high, aim lower" is the whole skill. Per-throw recentring would delete the game.
+
+The real knob is therefore the **cadence** of the zero, not whether a zero exists. There are three sensible cadences, and the right one is a per-game choice: per gesture (Target Range today), per turn or volley (drift bounded to one turn, shots comparable within it), or only when the player asks (full absolute aiming, and it needs drift to be small).
+
+One inconsistency worth naming while we are here. The drag fallback does **not** recentre at draw start; only motion does (`games/target-range/src/controller/aim.ts`, `startDraw`). Decision 6 says a game cannot tell a motion player from a touch player, and on this point the two behave differently. Whatever cadence the owner picks should apply to both paths, and `fallbacks/aim.ts` should follow the game's recentre moments the same way the detector does.
+
+### How this sits with CC-5.11
+
+They are complementary, and option C shrinks CC-5.11 without removing it.
+
+CC-5.11 is a manual escape hatch for a bad calibration. Option C is an automatic one that runs the whole time. If option C lands, the escape hatch stops being the only remedy and becomes a fast path for the player who wants to force the issue now rather than wait for the next quiet second. That is still worth having, because a player can be wrong about what is broken and a visible "fix my controls" button buys confidence even when it changes little.
+
+The ordering matters more than the scope: build the continuous estimator first, then decide how much UI CC-5.11 still needs. Building CC-5.11's screen first risks shipping a button whose only job is to redo a measurement the phone could have taken by itself.
+
+### Does the same idea apply to Strike Night's swing?
+
+Mostly no, and for an interesting reason.
+
+The swing detector already zeroes at grip-down and it barely cares about calibration:
+
+- `angle` is measured in the grip-down heading frame, so the frame's heading cancels exactly as aim's does (`packages/motion/src/gestures/swing.ts`).
+- The thresholds that decide whether a swing happened, 120 deg/s to start, 240 deg/s to count, 900 deg/s for full power, are magnitudes of the rotation rate vector. A 3 deg/s bias against a 240 deg/s threshold is noise. Aim cares about the same 3 deg/s because it integrates it over seconds; a swing lasts about 100 ms and never integrates yaw at all.
+- `spin` reads `rotationRate.beta` directly over 120 ms, so bias shifts it by well under a hundredth of its 540 deg/s scale.
+
+What a swing does still need from calibration is the **sign**. Get `inverted` wrong and the linear acceleration flips, so `angle` mirrors and a hook becomes a slice. That is an argument for keeping sign detection, which option C does, and not an argument about origins.
+
+So: relative-to-gesture-start is the right model for a throw and it is already implemented there. The problem the owner hit is specific to sustained aiming, where small rate errors have time to turn into large angle errors. Fixing it is a Target Range and Duck Season and Double Top concern, and Strike Night just comes along for free.
+
+### Recommendation
+
+Take **option C**, in this shape:
+
+1. Keep the `Calibration` object, the motion frame, and everything in [Calibration and the motion frame](#calibration-and-the-motion-frame). Nothing downstream changes shape.
+2. Replace the one-shot rest calibration with a still detector that runs for the whole session. Same stillness test as today (rotation rate under 10 deg/s, gravity magnitude steady within 0.5 m/s²), but it keeps watching, and every fresh still stretch updates the bias and the gravity direction.
+3. Never run with a zero bias. If no still stretch has happened yet, use the best estimate so far, and prefer a short noisy one to nothing at all.
+4. Detect the gravity sign from the first sample outside the unclear band rather than from a dedicated second, and let a later clear sample correct it.
+5. Show the hold-still screen only when a phone has not gone still by the time the game wants to start. For most players the step disappears, which is what the owner asked for.
+6. Leave the zero's cadence to each game spec, with per-gesture the default, and write the chosen cadence into the game's own doc. Target Range keeps per-draw. Double Top and Duck Season should not use per-gesture.
+7. Make the touch drag fallback follow the same recentre moments as the motion detector, so decision 6 holds.
+
+What I am least sure about is point 6. Keeping per-draw recentring in Target Range is the conservative call, but if drift stops being a problem once the bias is estimated properly, per-volley recentring would give better players something to work with: shots that can be compared to each other. That is a playtest question, not a design one, and it is the part of this recommendation most worth the owner overruling.
+
+### What changes for existing games if this is approved
+
+| Where | Change | Story |
+|---|---|---|
+| `packages/motion/src/calibration/rest.ts` | Continuous still detection and rolling bias, replacing the one-shot version. Keep the current API so callers do not change. | New CC-5 story |
+| `packages/motion/src/calibration/signs.ts` | Sign detection from any clear sample, revisited later | Same story |
+| `apps/controller/src/motion/session.ts` | The hold-still screen becomes conditional instead of unconditional | Same story |
+| `apps/controller/src/motion/` | CC-5.11 re-scoped to a manual "fix my controls" shortcut on top of the estimator | CC-5.11 |
+| `games/target-range/src/controller/aim.ts` | No change to the zero's cadence. The touch pad starts following the same recentre moments as motion. | New small story |
+| `packages/motion/src/gestures/swing.ts` | No change | None |
+| Flow rules 1 and 6, and [Rest calibration](#rest-calibration) | Reworded once the owner decides | This doc |
+
+### The decision
+
+Approve, decline, or amend. If amending, the two knobs worth naming are how far to go with option C (the estimator alone, or the estimator plus removing the screen) and whether Target Range keeps per-draw recentring.
+
+> **Owner decision: ___ (pending)**
+>
+> Approved by: ___  Date: ___
 
 ---
 
@@ -567,6 +707,7 @@ Found while writing this doc. None changes a decision the owner already approved
 | Area | Story |
 |---|---|
 | This doc | CC-5.1 |
+| Where aim's zero comes from (recommendation, pending) | CC-5.12 |
 | Sensor adapter, permission request, visibility, fake adapter | CC-5.2 |
 | Rest calibration, motion frame, pose tracker, sign normalisation | CC-5.3 |
 | Swing detector with swipe and tap fallbacks | CC-5.4 |
