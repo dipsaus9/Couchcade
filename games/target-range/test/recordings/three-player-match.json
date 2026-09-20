@@ -903,7 +903,7 @@
     "phaseAtMs": 118600.00000001163,
     "target": {
       "x": 264,
-      "y": 150
+      "y": 138
     },
     "winds": [-3, 4, -4],
     "openAtMs": 108166.66666667526,
@@ -923,7 +923,7 @@
         "y": 150.4,
         "flightMs": 650,
         "landsAtMs": 95950.00000000426,
-        "points": 10,
+        "points": 5,
         "landed": true
       },
       {
@@ -939,7 +939,7 @@
         "y": 151.8,
         "flightMs": 739,
         "landsAtMs": 97039.00000000426,
-        "points": 10,
+        "points": 5,
         "landed": true
       },
       {
@@ -971,7 +971,7 @@
         "y": 150.4,
         "flightMs": 650,
         "landsAtMs": 103383.33333333976,
-        "points": 10,
+        "points": 5,
         "landed": true
       },
       {
@@ -987,7 +987,7 @@
         "y": 151.8,
         "flightMs": 739,
         "landsAtMs": 104472.33333333976,
-        "points": 9,
+        "points": 5,
         "landed": true
       },
       {
@@ -1003,7 +1003,7 @@
         "y": 146.1,
         "flightMs": 929,
         "landsAtMs": 106662.33333333976,
-        "points": 6,
+        "points": 5,
         "landed": true
       },
       {
@@ -1019,7 +1019,7 @@
         "y": 150.4,
         "flightMs": 650,
         "landsAtMs": 110816.66666667526,
-        "points": 10,
+        "points": 5,
         "landed": true
       },
       {
@@ -1035,7 +1035,7 @@
         "y": 151.8,
         "flightMs": 739,
         "landsAtMs": 111905.66666667526,
-        "points": 9,
+        "points": 5,
         "landed": true
       },
       {
@@ -1051,7 +1051,7 @@
         "y": 146.1,
         "flightMs": 929,
         "landsAtMs": 114095.66666667526,
-        "points": 7,
+        "points": 6,
         "landed": true
       }
     ],
@@ -1059,48 +1059,48 @@
       {
         "id": "AAAAAAAA",
         "name": "Player 1",
-        "points": 120,
-        "tens": 12,
+        "points": 93,
+        "tens": 3,
         "left": false,
         "aiming": false,
         "aim": [],
-        "result": 10,
-        "last": 10
+        "result": 5,
+        "last": 5
       },
       {
         "id": "BBBBBBBB",
         "name": "Player 2",
-        "points": 111,
-        "tens": 4,
+        "points": 82,
+        "tens": 1,
         "left": false,
         "aiming": false,
         "aim": [],
-        "result": 9,
-        "last": 9
+        "result": 5,
+        "last": 5
       },
       {
         "id": "CCCCCCCC",
         "name": "Player 3",
-        "points": 71,
+        "points": 70,
         "tens": 0,
         "left": false,
         "aiming": false,
         "aim": [],
-        "result": 7,
-        "last": 7
+        "result": 6,
+        "last": 6
       }
     ],
     "rng": 4059463425,
     "roundStart": {
       "r": 4,
       "pts": {
-        "AAAAAAAA": 90,
-        "BBBBBBBB": 83,
-        "CCCCCCCC": 52
+        "AAAAAAAA": 78,
+        "BBBBBBBB": 67,
+        "CCCCCCCC": 53
       },
       "tens": {
-        "AAAAAAAA": 9,
-        "BBBBBBBB": 3,
+        "AAAAAAAA": 3,
+        "BBBBBBBB": 1,
         "CCCCCCCC": 0
       },
       "rng": 2291838809
@@ -1111,17 +1111,17 @@
       {
         "playerId": "AAAAAAAA",
         "place": 1,
-        "score": 120
+        "score": 93
       },
       {
         "playerId": "BBBBBBBB",
         "place": 2,
-        "score": 111
+        "score": 82
       },
       {
         "playerId": "CCCCCCCC",
         "place": 3,
-        "score": 71
+        "score": 70
       }
     ]
   }

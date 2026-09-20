@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { createRng } from "@couchcade/utils";
 import { tickMs } from "@couchcade/game-sdk/contract";
 import { createPlayers } from "@couchcade/game-sdk/testing";
 import { SHAPE_SIZE } from "@couchcade/stage/draw";
@@ -22,11 +23,14 @@ import {
   aimPoint,
   init,
   pitchPx,
+  rollTarget,
   rounds,
   targetMaxX,
   targetMaxY,
+  targetMaxYNear,
   targetMinX,
   targetMinY,
+  targetStepPx,
   volleyMs,
   volleyOf,
 } from "../../src/shared/index.ts";
@@ -80,10 +84,11 @@ describe("layout", () => {
 
   it("keeps every target face between y = 60 and 210 and its boss and flag clear of the overlays", () => {
     for (const round of rounds) {
+      const maxY = targetMaxY(round.radius);
       for (const [x, y] of [
         [targetMinX, targetMinY],
-        [targetMaxX, targetMaxY],
-        [targetMinX, targetMaxY],
+        [targetMaxX, maxY],
+        [targetMinX, maxY],
         [targetMaxX, targetMinY],
       ] as const) {
         expect(y - round.radius).toBeGreaterThanOrEqual(60);
@@ -100,6 +105,33 @@ describe("layout", () => {
         const callout = calloutAt({ x, y });
         expect(callout.x - 100).toBeGreaterThanOrEqual(24);
         expect(callout.x + 100).toBeLessThanOrEqual(world.width - 24);
+      }
+    }
+  });
+
+  it("caps how close the target can roll to the couch as the round's physics distance grows (CC-11.11)", () => {
+    // Round 1 (radius 36, the nearest) keeps the full window; later rounds are capped further
+    // toward the horizon in step with their shrinking radius, so the target's on-screen depth
+    // never rolls independently of the physics distance the round's flight and scoring use.
+    const maxYs = rounds.map((round) => targetMaxY(round.radius));
+    expect(maxYs[0]).toBe(targetMaxYNear);
+    for (let i = 1; i < maxYs.length; i++) {
+      expect(maxYs[i]).toBeLessThanOrEqual(maxYs[i - 1] as number);
+    }
+    for (const maxY of maxYs) {
+      expect(maxY).toBeGreaterThanOrEqual(targetMinY);
+      expect(maxY).toBeLessThanOrEqual(targetMaxYNear);
+      expect((maxY - targetMinY) % targetStepPx).toBe(0);
+    }
+
+    // rollTarget() itself never rolls past the round's cap, across many draws of each round.
+    const rng = createRng(42);
+    for (const round of rounds) {
+      const maxY = targetMaxY(round.radius);
+      for (let i = 0; i < 200; i++) {
+        const target = rollTarget(rng, round);
+        expect(target.y).toBeGreaterThanOrEqual(targetMinY);
+        expect(target.y).toBeLessThanOrEqual(maxY);
       }
     }
   });
