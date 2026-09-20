@@ -407,6 +407,67 @@ describe("createMotionSession", () => {
     expect(time.pending).toBe(0);
   });
 
+  it("re-measures the bias mid-game on a fresh still stretch, not just once at the start (CC-5.14)", async () => {
+    const { motion, time, adapter, statuses } = await inGame();
+    const before = motion.state.value?.calibration;
+    expect(before?.bias).toEqual({ alpha: 0.5, beta: 0, gamma: 0 });
+
+    // The player moves the phone between shots -- turning fast enough to interrupt the still
+    // stretch -- then holds it still again with a different gyroscope bias, as if the phone had
+    // drifted or changed hands.
+    const turnStart = time.now();
+    for (let t = 0; t <= 100; t += 16) {
+      time.advance(t === 0 ? 0 : 16);
+      adapter.push({
+        t: turnStart + t,
+        interval: 16,
+        acceleration: { x: 0, y: 0, z: 0 },
+        gravityAcceleration: { x: 0, y: 6.9, z: 6.9 },
+        rotationRate: { alpha: 50, beta: 0, gamma: 0 },
+      });
+    }
+    const settleStart = time.now();
+    for (let t = 0; t <= 1100; t += 16) {
+      time.advance(t === 0 ? 0 : 16);
+      adapter.push({
+        t: settleStart + t,
+        interval: 16,
+        acceleration: { x: 0, y: 0, z: 0 },
+        gravityAcceleration: { x: 0, y: 6.9, z: 6.9 },
+        rotationRate: { alpha: 2, beta: 0, gamma: 0 },
+      });
+    }
+
+    const after = motion.state.value?.calibration;
+    expect(after).not.toBe(before);
+    expect(after?.bias).toEqual({ alpha: 2, beta: 0, gamma: 0 });
+    // This happens seamlessly during play: no screen, no new status, still "ready".
+    expect(motion.state.value?.flow).toEqual({ kind: "ready" });
+    expect(statuses()).toEqual(["granted"]);
+  });
+
+  it("keeps the same calibration between shots when the phone never goes properly still again", async () => {
+    const { motion, time, adapter, statuses } = await inGame();
+    const before = motion.state.value?.calibration;
+
+    // Turning too fast to ever complete a fresh still stretch: the good first measurement is kept,
+    // not overwritten by noise, and the game keeps playing on motion.
+    for (let t = 0; t <= 500; t += 16) {
+      time.advance(t === 0 ? 0 : 16);
+      adapter.push({
+        t: time.now(),
+        interval: 16,
+        acceleration: { x: 0, y: 0, z: 0 },
+        gravityAcceleration: { x: 0, y: 6.9, z: 6.9 },
+        rotationRate: { alpha: 50, beta: 0, gamma: 0 },
+      });
+    }
+
+    expect(motion.state.value?.calibration).toBe(before);
+    expect(motion.state.value?.flow).toEqual({ kind: "ready" });
+    expect(statuses()).toEqual(["granted"]);
+  });
+
   it("a phone still deciding when the game starts plays with touch, without another message", () => {
     const { motion, statuses } = setup();
     motion.follow(step());

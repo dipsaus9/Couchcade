@@ -1,4 +1,8 @@
-import { createRestCalibration, type Calibration } from "@couchcade/motion/calibration";
+import {
+  createRestCalibration,
+  type Calibration,
+  type RestCalibration,
+} from "@couchcade/motion/calibration";
 import { waitForCapability } from "@couchcade/motion/sensors";
 import type {
   MotionAdapter,
@@ -159,6 +163,13 @@ export function createMotionSession(options: MotionSessionOptions): MotionSessio
   /** Stops whatever sensor listener and timers the current flow started. */
   let stopWork: Array<() => void> = [];
   let listening = false;
+  /**
+   * The continuous still detector for the current motion game (CC-5.14). Created once per grant
+   * (`afterGranted`) and kept alive for the rest of the game -- including through `watchForStall`,
+   * pauses and resumes -- so a fresh still stretch between shots keeps re-measuring the bias
+   * instead of freezing it at whatever the first estimate was.
+   */
+  let motionRest: RestCalibration | null = null;
 
   const update = (patch: Partial<MotionGame>): void => {
     if (state.value !== null) state.value = { ...state.value, ...patch };
@@ -180,6 +191,7 @@ export function createMotionSession(options: MotionSessionOptions): MotionSessio
   function toTouch(reason: "denied" | "unsupported", tell = true): void {
     generation += 1;
     stopAll();
+    motionRest = null;
     update({
       flow: { kind: "touch", reason, acknowledged: !tell },
       calibration: null,
@@ -214,6 +226,7 @@ export function createMotionSession(options: MotionSessionOptions): MotionSessio
     if (state.value === null) return;
     generation += 1;
     stopAll();
+    motionRest = null;
     if (listening) doc.removeEventListener("visibilitychange", onVisibilityChange);
     listening = false;
     options.exitFullscreen();
@@ -222,15 +235,22 @@ export function createMotionSession(options: MotionSessionOptions): MotionSessio
     clearMotionGrant(grantStorage);
   }
 
-  /** Motion rule 7: no sample for 2 s while the game runs and the page is visible means touch. */
+  /**
+   * Motion rule 7: no sample for 2 s while the game runs and the page is visible means touch.
+   * Also keeps feeding `motionRest` (CC-5.14): a fresh still stretch between shots re-measures the
+   * bias, and the game's calibration is updated whenever that happens, so a bad early estimate
+   * stops mattering within seconds instead of lasting the whole game.
+   */
   function watchForStall(): void {
     const game = state.value;
     if (game === null || !game.playing || game.flow.kind !== "ready" || game.paused) return;
     stopAll();
     const adapter = options.adapter();
     let lastSampleAt = now();
-    const onSample: MotionListener = () => {
+    const onSample: MotionListener = (sample) => {
       lastSampleAt = now();
+      const calibration = motionRest?.push(sample);
+      if (calibration && calibration !== state.value?.calibration) update({ calibration });
     };
     const stopListening = adapter.start(onSample);
     let cancelCheck: (() => void) | undefined;
@@ -247,14 +267,17 @@ export function createMotionSession(options: MotionSessionOptions): MotionSessio
 
   /**
    * After `request()` answers `granted`: a continuous still detector (CC-5.14) starts watching
-   * for stillness right away, in parallel with the up-to-1-s wait for real sensor data below. Once
-   * that wait resolves, "the game wants to start" -- the host is waiting on this phone's
-   * `motion:status` -- so the hold-still screen is shown only as a fallback, when no still stretch
-   * has completed yet (motion.md, "Where aim's zero comes from (CC-5.12)", recommendation point 5).
+   * for stillness right away, in parallel with the up-to-1-s wait for real sensor data below, and
+   * keeps running for the rest of the game (via `motionRest` and `watchForStall`) so a fresh still
+   * stretch between shots keeps re-measuring the bias. Once the data wait resolves, "the game wants
+   * to start" -- the host is waiting on this phone's `motion:status` -- so the hold-still screen is
+   * shown only as a fallback, when no still stretch has completed yet (motion.md, "Where aim's zero
+   * comes from (CC-5.12)", recommendation point 5).
    */
   async function afterGranted(current: number): Promise<void> {
     const adapter = options.adapter();
     const rest = createRestCalibration();
+    motionRest = rest;
     let latest: Calibration | null = null;
 
     const finish = (calibration: Calibration): void => {

@@ -101,6 +101,8 @@ export function createRestCalibration(options: RestCalibrationOptions = {}): Res
   let recent: Reading[] = [];
   let best: Calibration | null = null;
   let calibrated = false;
+  /** Whether the current still stretch has already produced a measurement (fires once per stretch). */
+  let measuredThisStretch = false;
 
   const isTurning = (reading: Reading) =>
     reading.rate !== null && length(reading.rate) >= maxRotationRate;
@@ -165,6 +167,7 @@ export function createRestCalibration(options: RestCalibrationOptions = {}): Res
         if (still.length > 0) restarts++;
         still = [];
         magnitudeSum = 0;
+        measuredThisStretch = false;
       }
       if (!isTurning(reading)) {
         still.push(reading);
@@ -175,10 +178,11 @@ export function createRestCalibration(options: RestCalibrationOptions = {}): Res
       while ((recent[0]?.t ?? reading.t) <= reading.t - fallbackMs) recent.shift();
 
       const first = still[0];
-      if (first && reading.t - first.t >= stillMs) {
-        // A fresh still stretch: re-measure for real. Keeps refining while the phone stays still.
+      if (first && !measuredThisStretch && reading.t - first.t >= stillMs) {
+        // A fresh still stretch just crossed the threshold: re-measure for real, once.
         best = finish(still, false);
         calibrated = true;
+        measuredThisStretch = true;
       } else if (!calibrated && reading.t - (startT ?? reading.t) >= timeoutMs) {
         // No still stretch yet and it's been a while: the best noisy estimate beats none at all.
         // Keeps refreshing from the latest window until a real still stretch replaces it.
@@ -206,6 +210,7 @@ export function createRestCalibration(options: RestCalibrationOptions = {}): Res
       recent = [];
       best = null;
       calibrated = false;
+      measuredThisStretch = false;
       signs.reset();
     },
   };
