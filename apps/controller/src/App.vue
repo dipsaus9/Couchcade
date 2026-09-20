@@ -75,6 +75,8 @@ const resuming = computed(() => {
     game !== null && game.paused && (motionStep.value !== null || showsGameController(state.value))
   );
 });
+// CC-5.13: a reload lost the calibration too, not just the sensors, so "Tap to resume" says so.
+const resumeReason = computed(() => (motionGame.value?.calibration === null ? "reload" : "sleep"));
 
 onBeforeUnmount(() => {
   motion.dispose();
@@ -131,6 +133,7 @@ onBeforeUnmount(() => {
   <MotionResume
     v-if="resuming && state.status === 'room'"
     :name="state.you.name"
+    :reason="resumeReason"
     @resume="motion.resume"
   />
   <!-- Motion works whichever way the page turns, so a motion game never shows the rotate panel. -->

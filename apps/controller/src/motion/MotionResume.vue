@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { CcBigAction } from "@couchcade/ui";
+import { computed } from "vue";
 import { motionCopy as copy } from "./copy.ts";
 
 // "Tap to resume" (docs/design/platform-screens.md, "Motion"; motion.md flow rule 6): after the
@@ -7,9 +8,17 @@ import { motionCopy as copy } from "./copy.ts";
 // restarts the sensors and the wake lock, so it listens to `click`, which counts as a user
 // gesture, rather than the big action's `press` on pointerdown, which doesn't on iPhones. A key press
 // on the big action is a user gesture too.
+//
+// CC-5.13: the same screen also covers a game recovered after a reload (session.ts's `follow`),
+// where the phone lost its sensors to the reload, not to sleep, so `reason` swaps in copy that
+// says so.
 
-defineProps<{ name: string }>();
+const props = defineProps<{ name: string; reason?: "sleep" | "reload" }>();
 const emit = defineEmits<{ resume: [] }>();
+
+const body = computed(() =>
+  props.reason === "reload" ? copy.resume.reloadBody : copy.resume.body,
+);
 
 function onPress(event: Event): void {
   if (event instanceof KeyboardEvent) emit("resume");
@@ -21,7 +30,7 @@ function onPress(event: Event): void {
     <div class="column">
       <div class="status" role="status">
         <h1 class="title">{{ copy.resume.title(name) }}</h1>
-        <p class="body">{{ copy.resume.body }}</p>
+        <p class="body">{{ body }}</p>
       </div>
       <!-- A click bubbles up from the big action. Keys press it without a click. -->
       <div class="action" @click="emit('resume')">
