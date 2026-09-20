@@ -1,10 +1,10 @@
 ---
 id: CC-2.8
 title: 'Turn on GitHub repo security: CodeQL, Dependabot alerts and pnpm audit in CI'
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-16 15:58'
-updated_date: '2026-09-20 12:28'
+updated_date: '2026-09-20 12:30'
 labels:
   - story
 dependencies:
@@ -68,4 +68,12 @@ Follow-up from the approved security doc (CC-2.1). Private vulnerability reporti
 
 ### AC#4 — docs/architecture/security.md untouched
 - Confirmed no diff to `docs/architecture/security.md`; this section is the record the AC asks for instead.
+
+Reviewer verdict (round 1): pass. All 4 acceptance criteria met (AC#1/#2 judged from task-file evidence as out-of-band GitHub settings not visible in the diff; AC#3/#4 judged directly from the ci.yml diff). No scope violations, no findings.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Enabled GitHub repo security via gh api: CodeQL default setup for javascript-typescript + actions (confirmed by a completed scan on main, two analyses on commit bca4451), Dependabot alerts, and Dependabot security updates (Renovate keeps version updates — no dependabot.yml added). Added a standalone 'audit' job to .github/workflows/ci.yml running 'pnpm audit --prod --audit-level high', proved it fails on a real high-severity vulnerability using an isolated, never-committed scratchpad fixture, and confirmed the real repo passes clean. docs/architecture/security.md was left untouched; all settings and re-verification commands are recorded in this task's Implementation Notes. Reviewer verdict: pass, round 1, no scope violations.
+<!-- SECTION:FINAL_SUMMARY:END -->
