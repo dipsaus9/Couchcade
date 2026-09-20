@@ -85,16 +85,26 @@ async function buildApp(rootDir: string, app: BudgetCheckConfig["app"]): Promise
   const root = join(rootDir, "apps", app);
   // `root` must be passed explicitly: Vite otherwise resolves the html entry against
   // `process.cwd()`, not the config file's own directory, and this CLI runs from elsewhere.
-  const result = await build({
-    root,
-    configFile: join(root, "vite.config.ts"),
-    // Forced explicitly: this file is also called from inside Vitest (NODE_ENV=test), which
-    // otherwise makes Vite build a larger, unminified-equivalent bundle and inflates every
-    // measurement here well past what actually ships.
-    mode: "production",
-    build: { write: false },
-    logLevel: "warn",
-  });
+  // This file also runs from inside Vitest, which sets `process.env.NODE_ENV = "test"` in-process
+  // for the whole run. Vite's own `mode: "production"` option isn't enough on its own:
+  // @vitejs/plugin-vue's dev/prod branching reads `process.env.NODE_ENV` directly rather than
+  // Vite's resolved mode, so without this override the plugin still emits a larger,
+  // dev-mode-equivalent bundle and every measurement below is inflated past what actually ships.
+  const previousNodeEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = "production";
+  let result: Awaited<ReturnType<typeof build>>;
+  try {
+    result = await build({
+      root,
+      configFile: join(root, "vite.config.ts"),
+      mode: "production",
+      build: { write: false },
+      logLevel: "warn",
+    });
+  } finally {
+    if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previousNodeEnv;
+  }
   const outputs = Array.isArray(result) ? result : [result];
 
   const items: BuiltItem[] = [];
