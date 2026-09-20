@@ -106,6 +106,8 @@ export const uiActions = [
   "back-to-menu",
   "skip-calibration",
   "ready",
+  /** CC-3.27: end the running game early. The host applies it, gated to the current VIP. */
+  "end-game",
 ] as const;
 export const uiActionPayloadSchema = z.object({
   action: z.enum(uiActions),

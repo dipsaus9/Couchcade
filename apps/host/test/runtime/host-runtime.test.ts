@@ -453,6 +453,65 @@ describe("createHostRuntime", () => {
     ]);
   });
 
+  describe("end game early (CC-3.27)", () => {
+    it("the VIP's end-game action stops the game and reopens the menu, with no results screen", async () => {
+      const { runtime, handle, play, vip, ofType, stageLog } = setup();
+      play();
+      await settle();
+
+      handle({ t: "ui:action", from: vip, d: { action: "end-game" } });
+
+      expect(runtime.running).toBeNull();
+      expect(runtime.results).toBeNull();
+      expect(runtime.phase).toBe("menu");
+      expect(stageLog).toContain("stop echo");
+      expect(ofType("room:phase").map((message) => message.d.phase)).toEqual([
+        "menu",
+        "playing",
+        "menu",
+      ]);
+    });
+
+    it("ignores end-game from anyone but the VIP", async () => {
+      const { runtime, handle, play, second } = setup();
+      play();
+      await settle();
+
+      handle({ t: "ui:action", from: second, d: { action: "end-game" } });
+
+      expect(runtime.running).not.toBeNull();
+      expect(runtime.phase).toBe("playing");
+    });
+
+    it("does nothing outside a running game", () => {
+      const { runtime, handle, vip, ofType } = setup();
+
+      handle({ t: "ui:action", from: vip, d: { action: "end-game" } });
+
+      expect(runtime.phase).toBe("lobby");
+      expect(ofType("room:phase")).toEqual([]);
+    });
+
+    it("the TV's own endGameEarly() ends the game directly, without a ui:action", async () => {
+      const { runtime, play } = setup();
+      play();
+      await settle();
+
+      runtime.endGameEarly();
+
+      expect(runtime.running).toBeNull();
+      expect(runtime.phase).toBe("menu");
+    });
+
+    it("endGameEarly() does nothing outside a running game", () => {
+      const { runtime } = setup();
+
+      runtime.endGameEarly();
+
+      expect(runtime.phase).toBe("lobby");
+    });
+  });
+
   it("recomputes canPlayAgain when the seated count changes during results", async () => {
     const { runtime, handle, play, second, lobby, time } = setup({
       games: [echoGame({ min: 3, max: 3 })],

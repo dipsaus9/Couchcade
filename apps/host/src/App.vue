@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { audio } from "@couchcade/audio";
 import { roomClock } from "@couchcade/game-sdk/clock";
+import { CcButton } from "@couchcade/ui";
 import { onBeforeUnmount, ref, watch } from "vue";
 import { watchButtonPresses } from "./audio/button-press.ts";
 import { isClickForSoundVisible } from "./audio/click-for-sound.ts";
@@ -19,7 +20,7 @@ import ResultsScreen from "./screens/results/ResultsScreen.vue";
 import { useHostSession } from "./session/use-host-session.ts";
 import { watchMuteHotkey } from "./settings/mute-hotkey.ts";
 
-const { screen, openRoom, endRoom, calibration, moderate } = useHostSession();
+const { screen, openRoom, endRoom, calibration, moderate, endGameEarly } = useHostSession();
 const origin = window.location.origin;
 const roomNow = () => roomClock.toHostTime(localNow());
 const toRoomTime = (localTimestamp: number) => roomClock.toHostTime(localTimestamp);
@@ -120,6 +121,11 @@ onBeforeUnmount(stopWatchingAudioState);
       :open-room="openRoom"
     />
     <!-- While a game runs the frame stays empty, so the stage under it shows the game's scene. -->
+    <!-- CC-3.27: the host's own "End game" escape hatch, so a running game doesn't have to run to
+         completion. Always allowed: no guard needed for the host's own screen. -->
+    <div v-if="screen.name === 'playing'" class="playing-controls">
+      <CcButton screen="tv" variant="stop" small @press="endGameEarly">End game</CcButton>
+    </div>
 
     <!-- audio.md owner decision 4: a refreshed TV has had no click or key press yet. -->
     <p v-if="audioLocked" class="sound-chip">Click for sound</p>
@@ -134,6 +140,14 @@ onBeforeUnmount(stopWatchingAudioState);
   box-sizing: border-box;
   /* safe-tv: 96px left and right, 54px top and bottom at 1080p. */
   padding: 54px 96px;
+}
+
+.playing-controls {
+  /* .frame's own padding is the safe-tv margin; absolute children sit outside it, so this repeats
+     those two values to land inside the safe area instead. */
+  position: absolute;
+  top: 54px;
+  right: 96px;
 }
 
 .sound-chip {
