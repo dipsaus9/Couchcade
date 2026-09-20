@@ -4,13 +4,22 @@ title: Let the VIP or host end a running game early
 status: To Do
 assignee: []
 created_date: '2026-09-19 08:25'
+updated_date: '2026-09-20 09:01'
 labels:
   - story
 dependencies: []
 references:
-  - apps/host/src/
-  - apps/controller/src/
-  - packages/game-sdk/
+  - packages/protocol/src/messages/index.ts
+  - apps/server/src/room/moderation.ts
+  - apps/server/src/room/room.ts
+  - apps/host/src/runtime/host-runtime.ts
+  - apps/host/src/App.vue
+  - apps/controller/src/runtime/GameController.vue
+  - apps/controller/src/runtime/send.ts
+  - apps/host/test/runtime/host-runtime.test.ts
+  - apps/controller/test/runtime/send.test.ts
+  - apps/server/test/room.test.ts
+  - apps/server/test/moderation.test.ts
 parent_task_id: CC-3
 type: feature
 ordinal: 233000

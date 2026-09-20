@@ -9,11 +9,23 @@
  *   doesn't recentre it.
  * - Both stream through one `createAimSender` into the game's one `InputChannel`, only while a
  *   draw is held or, in touch mode, the pad is dragged. `shoot` and `lower` go with
- *   `channel.fire`, and `shoot` carries the aim the TV was shown: `channel.last("aim")`
- *   (realtime-link.md, "The phone decides its own shot").
+ *   `channel.fire`.
+ * - `shoot` carries the aim the TV was shown, not the phone's freshest live sample (CC-11.10;
+ *   realtime-link.md, "The phone decides its own shot", rule 2). The phone can't learn the TV's
+ *   exact interpolated position, and no new message carries it, so instead it keeps its own short
+ *   buffer of the samples it actually streamed and, at release, replays that buffer through the
+ *   same `createPlayback` the TV's crosshair uses (`../host/aim-playback.ts`'s
+ *   `createCrosshairPlayback`), the same `shownDelayMs` behind: a flat 180 ms on the relay path
+ *   (and off the link entirely, which also runs input through the relay) or `1000 / hz` on the
+ *   direct path, mirroring `relayPlaybackDelayMs` and `directPlaybackDelayMs`
+ *   (`apps/host/src/runtime/links.ts`, CC-11.9) -- the two numbers `scene.ts`'s
+ *   `playbackDelayMsOf` actually renders with today (jitter isn't measured yet, so, like the
+ *   host, this assumes none). `channel.path` is read only to pick which of those two numbers
+ *   applies, never to change what's sent or how the game behaves.
  */
 import type { ControllerMotion, InputChannel } from "@couchcade/game-sdk/contract";
-import type { Aim } from "@couchcade/game-sdk/input";
+import type { Aim, SampleTrack } from "@couchcade/game-sdk/input";
+import { addSample, createPlayback } from "@couchcade/game-sdk/input";
 import { type Calibration, createPoseTracker } from "@couchcade/motion/calibration";
 import { type AimDrag, createAimDrag, type PointerPoint } from "@couchcade/motion/fallbacks";
 import {
@@ -29,11 +41,29 @@ import type { TargetRangeInput } from "../shared/input.ts";
 /** The motion step's result, as the controller runtime passes it. */
 export type TargetRangeMotion = ControllerMotion<MotionAdapter, Calibration>;
 
-/** What the shot needs from the controller's one `InputChannel`. */
+/** What the shot needs from the controller's one `InputChannel`. `path` is optional so a minimal
+ * fallback channel (a no-op stub, a test double) doesn't have to supply it: `shownDelayMs` treats
+ * a missing `path` the same as `"relay"`, the larger (safer) of the two known delays. */
 export type ShotChannel = Pick<
   InputChannel<TargetRangeInput>,
   "stream" | "fire" | "clear" | "last"
->;
+> & {
+  path?: InputChannel<TargetRangeInput>["path"];
+};
+
+/** `../controller/index.ts`'s declared `streams.aim.hz`. */
+const AIM_STREAM_HZ = 30;
+
+/**
+ * How far behind the TV plays this player's crosshair right now (CC-11.10), mirroring
+ * `apps/host/src/runtime/links.ts`'s `relayPlaybackDelayMs` (180, also used off the link, and
+ * when `path` is unknown) and `directPlaybackDelayMs` (`1000 / hz` clamped to 25-120, jitter
+ * assumed 0 until it's measured -- same assumption the host makes).
+ */
+export function shownDelayMs(path: ShotChannel["path"]): number {
+  if (path === "direct") return Math.min(120, Math.max(25, 1000 / AIM_STREAM_HZ));
+  return 180;
+}
 
 export interface ShotAim {
   /** Which controls are live. */
@@ -63,6 +93,9 @@ export interface ShotAim {
 
 const noop = (): void => {};
 
+/** Rounds to 3 decimals, without `-0`, matching `createAimSender`'s streamed precision. */
+const round3 = (value: number): number => Math.round(value * 1000) / 1000 + 0;
+
 /** What the shot needs from either aim source. */
 type Source = Pick<AimSource<unknown>, "aim" | "recentre" | "on">;
 
@@ -76,7 +109,19 @@ const yawDragPx = (2 * yawPx) / padPxPerCssPx;
 const pitchDragPx = (2 * pitchPx) / padPxPerCssPx;
 
 export function createShotAim(channel: ShotChannel, options: AimSenderOptions = {}): ShotAim {
-  const sender = createAimSender<TargetRangeInput>(channel, options);
+  /** The "aim" samples that actually reached `channel.stream` this draw, oldest first: what
+   * `shoot` replays (CC-11.10). Only samples `createAimSender` keeps (it skips one that barely
+   * moved) land here, so this is exactly what the TV received, not every raw sensor reading. */
+  let streamed: SampleTrack<[number, number]> = [];
+  const tracked: Pick<InputChannel<TargetRangeInput>, "stream"> = {
+    stream(input, t) {
+      if (input.type === "aim" && t !== undefined) {
+        streamed = addSample(streamed, t, [input.payload.yaw, input.payload.pitch]);
+      }
+      channel.stream(input, t);
+    },
+  };
+  const sender = createAimSender<TargetRangeInput>(tracked, options);
 
   let mode: "motion" | "touch" = "touch";
   /** The drag pad, only in touch mode. */
@@ -121,6 +166,7 @@ export function createShotAim(channel: ShotChannel, options: AimSenderOptions = 
     padHeld = false;
     sender.reset();
     channel.clear();
+    streamed = [];
   };
 
   useTouch();
@@ -162,10 +208,19 @@ export function createShotAim(channel: ShotChannel, options: AimSenderOptions = 
     },
 
     shoot(volley, power, t) {
-      // The aim the TV was shown, not a fresh sensor reading at release (realtime-link.md,
-      // "The phone decides its own shot", rule 2): `channel.last("aim")` is always set here,
-      // since `startDraw` (or `pad`'s `down`) always forces a sample through first.
-      const released = channel.last("aim")?.payload ?? aim();
+      // The aim the TV was shown, not a fresh sensor reading at release (realtime-link.md, "The
+      // phone decides its own shot", rule 2; CC-11.10): replay `streamed` `shownDelayMs(channel.
+      // path)` behind, with the same generic `createPlayback` the TV's crosshair uses, so both
+      // sides land on the same value without a new message. `startDraw` (or `pad`'s `down`)
+      // always forces a sample through first, so `streamed` is never empty here; the
+      // `channel.last`/`aim()` fallbacks only guard a track `addSample` happened to reject
+      // (non-finite time or value, which never occurs in practice).
+      const delayMs = shownDelayMs(channel.path);
+      const played = createPlayback<[number, number]>().at(streamed, t, delayMs, 0);
+      const released =
+        played === null
+          ? (channel.last("aim")?.payload ?? aim())
+          : { yaw: round3(played[0]), pitch: round3(played[1]) };
       settle();
       channel.fire({ type: "shoot", payload: { volley, aim: released, power } }, t);
     },
