@@ -4,6 +4,8 @@ Couchcade must cost €0 to build and run. This document records what was checke
 
 Research date: 16 September 2026, against official docs and pricing pages. Sources are at the bottom. Free tiers change, so check them again before relying on a number.
 
+Amended by CC-3.14 for the real-time link (docs/architecture/realtime-link.md, approved by the owner on 17 September 2026): the "Peer-to-peer WebRTC" row and the WebRTC fallback line in [The request budget](#the-request-budget) no longer describe it as a hypothetical later option.
+
 ---
 
 ## Contents
@@ -77,7 +79,7 @@ When a free limit is reached, requests of that type fail until the daily reset a
 | **Render free** | One instance, so in-memory rooms work. It sleeps after 15 minutes idle, takes about a minute to wake, and can restart at any time. **This is the fallback** if the Cloudflare limits don't hold. |
 | Fly.io, Railway, Koyeb, Northflank, Google Cloud Run, AWS | No lasting free tier, or a credit card is required. |
 | Ably, Pusher, Supabase Realtime, PubNub, Liveblocks, Azure Web PubSub | Free message quotas last between minutes and a few hours of play per month. Pusher caps client events at 10/s, and Supabase caps at 100 msg/s and pauses idle projects. |
-| Peer-to-peer WebRTC | Phones on 4G often need a TURN server, and free TURN is limited. A later option for gameplay traffic, with the Durable Object kept for signalling and fallback. |
+| Peer-to-peer WebRTC (own design, not an alternative host) | Phones on 4G, guest Wi-Fi or a network with client isolation often can't find each other without a TURN server, and free TURN is limited. Couchcade uses it anyway, with no STUN and no TURN: a direct data channel between a seated phone and the host laptop for real-time input, with the Durable Object kept only for signalling and as the fallback path when a phone can't connect directly. See [docs/architecture/realtime-link.md](architecture/realtime-link.md). |
 
 ### Verified free limits
 
@@ -106,7 +108,7 @@ One room, a 2-hour game night, 8 phones:
 | Worst case: every phone at 15 msg/s for 2 hours | ~972,000 | ~48,600 requests: about 2 nights a day | Over the limit after ~12 minutes |
 | Typical: 30% real-time, the rest turn-based | ~302,000 | ~15,100 requests: about 6 nights a day | Over the limit during the first night |
 
-If the ratio doesn't apply on Free, phones batch input to at most 5 messages per second. If that still isn't enough, gameplay messages move to WebRTC data channels, and the Durable Object handles only signalling.
+If the ratio doesn't apply on Free, phones batch input to at most 4 messages per second on the relay path (platform.md). Real-time gameplay input already moves off that path and onto a direct WebRTC data channel between a seated phone and the host when one connects, with the Durable Object handling only signalling; it costs no requests at all (docs/architecture/realtime-link.md). A phone the link can't reach keeps using the relay path above.
 
 ### Design rules that follow
 

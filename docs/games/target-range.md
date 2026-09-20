@@ -8,7 +8,7 @@ Couchcade's first gyroscope game. Everyone stands on a sunny archery range and s
 
 **For agents.** Everything below is binding for CC-11.2 to CC-11.7. [platform.md](../architecture/platform.md), [motion.md](../architecture/motion.md), [session-flow.md](../architecture/session-flow.md), [HOUSE_STYLE.md](../HOUSE_STYLE.md) and [platform-screens.md](../design/platform-screens.md) still apply. Where this spec and a story disagree, stop and flag it.
 
-Status: approved by the owner on 2026-09-17 (CC-11.1), with the four decisions below.
+Status: approved by the owner on 2026-09-17 (CC-11.1), with the four decisions below. Amended by CC-3.14 for the real-time link (docs/architecture/realtime-link.md, approved by the owner on 17 September 2026): aim speed, sending, playback delay and the budget check.
 
 ---
 
@@ -45,7 +45,7 @@ Status: approved by the owner on 2026-09-17 (CC-11.1), with the four decisions b
 | Scoring | Rings score 10 in the gold centre down to 1 at the white edge, and 0 for a miss. Highest total after 12 arrows wins. Ties go to the player with more 10s. |
 | Skill | Arrows drop and drift with the wind, more at a distance and more with a weak draw. Full power comes at a firm pull. Pulling further adds nothing. |
 | Fairness | A shot uses where the phone pointed at the moment of release, not where the crosshair on the TV had got to. Targets don't move, so TV lag and Wi-Fi speed never change a score. |
-| Cost | About 1,300 requests for a typical 8-player match, never more than 4 messages per second per phone. About 0.25 `controller:state` messages per second from the TV. |
+| Cost | About 1,300 requests for a typical 8-player match on the relay path (never more than 4 messages per second per phone), 0 on the direct link (docs/architecture/realtime-link.md). About 0.25 `controller:state` messages per second from the TV. |
 | Assets | CC0 packs from Kenney and OpenGameArt, recoloured to a new `range` palette. The target, wind flag, bow and arrows are drawn from scratch. |
 
 ## Owner decisions (2026-09-17)
@@ -53,7 +53,7 @@ Status: approved by the owner on 2026-09-17 (CC-11.1), with the four decisions b
 The owner approved the spec and took the recommendation on all four open questions.
 
 1. **Everyone shoots each arrow together.** Each arrow is a volley that lasts up to 10 seconds and ends early once everyone has shot. Wind is the same for everyone, and the TV reveals all the arrows together. Free fire, with 3 arrows at your own pace in a 30-second round, was rejected. It would bring arrows landing at random moments, no wind change per arrow, and slow players feeling rushed.
-2. **Static targets for now.** A hit depends only on the phone's aim, so TV lag and the 250 ms crosshair trail never change a score. No rewind and no lag calibration are needed. A sliding target is revisited after the playtest (CC-11.7) as a follow-up story. It would be judged at `atMs − displayLagMs − 250 ms`.
+2. **Static targets for now.** A hit depends only on the phone's aim, so TV lag and the crosshair's playback delay never change a score. No rewind and no lag calibration are needed. A sliding target is revisited after the playtest (CC-11.7) as a follow-up story. It would be judged at `atMs − displayLagMs − delay`, `delay` being the playback delay from [Fairness](#fairness) rule 1 (amended by CC-3.14; the number here was 250 ms before the real-time link).
 3. **The crosshair shows where the phone points.** Players allow for drop and wind themselves and learn from the arrows that stay in the target. Round 1 has no wind and little drop, so first-timers still land arrows. A crosshair that shows the landing point was rejected, because wind and draw power would stop mattering.
 4. **No hidden bonus target for now.** Scoring stays one simple rule, and nothing small competes with 8 crosshairs. Whether rounds feel samey is decided after the playtest.
 
@@ -82,7 +82,7 @@ Research on controls and code:
 
 - **Drag to draw.** Open-source browser archery games turn drag distance into power with a cap: [archery-master](https://github.com/bibhuticoder/archery-master) clamps power to 10–100 from the drag length and draws a power bar, and [ArcheryCanvasGame](https://github.com/rgliever/ArcheryCanvasGame) caps the pull at a circle's radius and adds a constant gravity each frame. The slingshot in [js_slingshot](https://github.com/pemmyz/js_slingshot) caps the pull at `maxPull` and sets a minimum speed. Target Range follows the same pattern: full power at a 150 px pull, and nothing below 0.3.
 - **Wind.** [Bowman_3D](https://github.com/claytonnida/Bowman_3D) picks a random wind at the start, shows it with a weather vane, and applies it as a constant sideways push. Target Range does the same, per arrow, in closed form (see [Arrow flight](#arrow-flight)).
-- **Phones as motion controllers.** AirConsole's API streams phone accelerometer and gyroscope readings to the screen at a set interval and warns that some browsers block sensors in iframes ([airconsole-api](https://github.com/AirConsole/airconsole-api)). Couchcade's own `@couchcade/motion` does the maths on the phone instead and sends a few packed aim samples (motion.md).
+- **Phones as motion controllers.** AirConsole's API streams phone accelerometer and gyroscope readings to the screen at a set interval and warns that some browsers block sensors in iframes ([airconsole-api](https://github.com/AirConsole/airconsole-api)). Couchcade's own `@couchcade/motion` does the maths on the phone instead and sends aim samples through the input channel, packed only on the relay path (motion.md, docs/architecture/realtime-link.md).
 - **Several pointers on one screen.** Super Mario Galaxy tells a second player's pointer apart by colour and size ([Super Mario Wiki](https://www.mariowiki.com/Star_Pointer)). The Game Accessibility Guidelines say never to use colour alone, and to add a symbol or shape ([guideline](https://gameaccessibilityguidelines.com/ensure-no-essential-information-is-conveyed-by-a-colour-alone/)). Every crosshair here carries the player's shape.
 
 ---
@@ -164,7 +164,7 @@ What that means for a player:
 - **Full draw is best.** A weak draw at 30% makes the arrow fly 1.7 times longer, drop 3 times as far and drift 1.7 times as much. At full draw a far arrow drops 14 px, over half the target's radius, so players aim a little high.
 - **Wind pushes across.** In round 4, wind 4 at full draw moves the arrow 16 px, two thirds of the radius.
 - **The crosshair is where the phone points.** It doesn't show drop or wind. Arrows from earlier volleys stay in the target for the round, so each player sees how far off they were and corrects. See [owner decision 3](#owner-decisions-2026-09-17).
-- Aim ranges are the `@couchcade/motion` defaults: ±25° of yaw is ±200 px and ±15° of pitch is ±90 px, so 1° is about 8 px on the TV world, and the near target's 10 ring (3.6 px) is about half a degree. CC-11.3 checks this against a recorded aim trace (motion.md, [Manual check](../architecture/motion.md#test-layers)) and may tune the two range numbers once, before the playtest.
+- Aim ranges use the game's own `aimPxPerDegree = 6` (`games/target-range/src/shared/constants.ts`), 6 world pixels per degree in both directions, not the `@couchcade/motion` defaults (owner decision, docs/architecture/realtime-link.md, "Tuning Target Range's aim speed"): ±33.3° of yaw is ±200 px and ±15° of pitch is ±90 px, so the near target's 10 ring (3.6 px) is 0.6° across. The touch pad matches at `padPxPerCssPx = 1.5` in both directions. The recorded-trace check against motion.md's [Manual check](../architecture/motion.md#test-layers) that set this value is CC-11.9's, not CC-11.3's.
 
 The crosshair's home, where `yaw = 0` and `pitch = 0`, is (240, 140) in the world. A phone held still at full draw lands at (240, 140 + drop), plus wind. When the RNG puts the target centre within 6 px of that point, it rolls again, so nobody scores a 10 just by holding still.
 
@@ -181,7 +181,7 @@ The crosshair's home, where `yaw = 0` and `pitch = 0`, is (240, 140) in the worl
 - **Power.** `power = clamp(pull / 150, 0, 1)`, where `pull` is how far the finger has moved down from where it touched, in CSS px, rounded to 2 decimals. Full power at 150 px, a firm pull. Pulling further adds nothing (owner decision 3 in motion.md, applied to the draw). The circle fills from the bottom as power grows and its label says "Full draw!" at 1.
 - **Shoot.** `pointerup` with `power >= 0.3` sends `shoot` with `aim.aim()` at that instant and `power`, through `stream.fire(input, event.timeStamp)`. The phone switches to the shot state at once.
 - **Lower.** `pointerup` below 0.3, or `pointercancel`, sends `lower`, so the TV hides the crosshair. The hint says "Pull further to shoot".
-- **Aim stream.** Aim streams only while the finger is down: `createAimDetector()` fed by the pose tracker, into `createAimSender(stream)`. That's 15 samples a second, packed into at most 4 messages a second, with nothing sent while the phone is still (motion.md [Aim](../architecture/motion.md#aim-cc-55)).
+- **Aim stream.** Aim streams only while the finger is down: `createAimDetector()` fed by the pose tracker, into `createAimSender(stream)`, which sends one sample per call into the game's `InputChannel`. Over the direct link that's 30 samples a second, one per message; on the relay path the channel packs up to 8 of them into each of the at-most-4 messages a second. Nothing is sent while the phone is still (motion.md [Aim](../architecture/motion.md#aim-cc-55), docs/architecture/realtime-link.md).
 - **Aim during a draw is the whole skill.** Pulling a thumb down tips the phone a little. Players learn to hold steady before letting go, like a real bow.
 
 ### Touch controls
@@ -221,7 +221,7 @@ type TargetRangeView = {
 
 ## Input message schema
 
-Three input types, all through one CC-3.6 input stream. `aim` is a continuous value sent with `set`. `shoot` and `lower` are events sent with `fire`, so they go before any waiting aim message.
+Three input types, all through one `InputChannel` (docs/architecture/realtime-link.md). `aim` is a continuous value sent with `channel.stream`. `shoot` and `lower` are events sent with `channel.fire`, so they go before any waiting aim message.
 
 ```ts
 import { z } from "zod/mini";
@@ -230,14 +230,11 @@ const unit = z.number().check(z.gte(-1), z.lte(1));
 const volley = z.int().check(z.gte(1), z.lte(12));
 
 export const inputSchema = z.discriminatedUnion("type", [
-  // Packed aim samples from createAimSender: [dtMs, yaw, pitch], newest last, at most 4.
+  // One aim sample, 3 decimals, from createAimSender. Packing into up to 8 samples per
+  // message on the relay path is the InputChannel's job, not this schema's.
   z.object({
     type: z.literal("aim"),
-    payload: z.object({
-      aim: z
-        .array(z.tuple([z.int().check(z.gte(-10_000), z.lte(0)), unit, unit]))
-        .check(z.minLength(1), z.maxLength(4)),
-    }),
+    payload: z.object({ yaw: unit, pitch: unit }),
   }),
   // The aim the phone had at release, and the draw power.
   z.object({
@@ -254,16 +251,16 @@ export const inputSchema = z.discriminatedUnion("type", [
 export type TargetRangeInput = z.infer<typeof inputSchema>;
 ```
 
-`aim` has no volley number because `createAimSender` sends `{ aim }` only. The host ignores it outside `open`.
+`aim` has no volley number because `createAimSender` sends `{ yaw, pitch }` only. The host ignores it outside `open`.
 
 On the wire, with `at` added by the send helper and `from` by the relay:
 
 ```text
 { "t": "input", "d": { "type": "shoot", "payload": { "volley": 5, "aim": { "yaw": -0.12, "pitch": 0.31 }, "power": 1 }, "at": 1789571234567 } }
-{ "t": "input", "d": { "type": "aim", "payload": { "aim": [[-200, 0.1, 0.2], [-133, 0.11, 0.21], [-67, 0.12, 0.2], [0, 0.13, 0.22]] }, "at": 1789571234567 } }
+{ "t": "input", "d": { "type": "aim", "payload": { "yaw": 0.13, "pitch": 0.22 }, "at": 1789571234567 } }
 ```
 
-Both inputs are under 150 bytes, about 150 once the relay adds its envelope. That is well inside the 1 KB cap and within motion.md's 150-byte limit for an aim input.
+Both inputs are well under 150 bytes. That is well inside the 1 KB cap. On the relay path the channel packs several `aim` samples into one message before it reaches the room; that packed frame is still under 1 KB and within motion.md's 150-byte limit for an aim input.
 
 What `onPlayerInput` does:
 
@@ -301,7 +298,7 @@ Up to 8 players aim at one target at once. The rules that keep that readable fro
 2. **Ring plus shape.** A crosshair is a 15×15 ring, 1 px of the player's colour inside 1 px of Ink, with a 3 px gap in the middle so the target shows through. The player's shape (9×9, `drawPlayerShape`) sits at the ring's top right, touching it. At 1080p that's a 60 px ring and a 36 px shape, above the 24 px minimum.
 3. **Colour is never the only cue.** Every crosshair and every stuck arrow carries the player's shape, as the house style requires.
 4. **Stable stacking.** Crosshairs are always drawn in seat order, so overlapping ones never swap places. A crosshair never changes size or blinks, so movement is the only thing that draws the eye.
-5. **Smooth, not jumpy.** The TV plays aim 250 ms behind with `aimAt` (owner decision 2 in motion.md), so crosshairs glide instead of jumping 4 times a second.
+5. **Smooth, not jumpy.** The TV plays each player's aim back behind a playback delay (owner decision 2 in motion.md, amended by CC-3.14), so crosshairs glide instead of jumping: about 180 ms on the relay path, about 40 to 50 ms on the direct link (docs/architecture/realtime-link.md).
 6. **Find yourself fast.** The first time a player's crosshair appears in a match, its shape pops once with the `ui` token (no pop with reduced motion).
 7. **Clear space.** The target never sits under the scoreboard or the bottom panel. Its whole face stays between y = 60 and y = 210.
 
@@ -309,9 +306,9 @@ Up to 8 players aim at one target at once. The rules that keep that readable fro
 
 ## Fairness
 
-1. **The phone's aim decides.** `shoot` carries the aim at `pointerup` (motion.md, "Fitting the input budget", rule 3). The crosshair on the TV trails the hand by 250 ms plus the TV's own lag, but the hit uses the phone's own aim. A player who holds still while releasing hits where the crosshair shows.
+1. **The phone's aim decides.** `shoot` carries the aim the TV was shown at release, not a fresh reading (motion.md, "Fitting the input budget", rule 3; realtime-link.md, "The phone decides its own shot"). The crosshair on the TV trails the hand by the playback delay (about 180 ms on the relay path, about 40 to 50 ms on the direct link, docs/architecture/realtime-link.md) plus the TV's own lag, but the hit uses the phone's own aim. A player who holds still while releasing hits where the crosshair shows.
 2. **Room clock, not arrival time.** The shot's `at` comes from the `pointerup` `event.timeStamp` through `toHostTime`. The host judges "shot before the close" on `ctx.atMs`, and waits 500 ms after the clock runs out for late messages, the most the platform lets `atMs` lag behind.
-3. **TV lag doesn't matter here.** Targets don't move, so a hit doesn't depend on when the player saw something. Target Range ignores `ctx.displayLagMs` and doesn't mention calibration in its intro. If moving targets come later ([owner decision 2](#owner-decisions-2026-09-17)), the target's position is judged at `atMs − displayLagMs − 250`, what the player saw when they let go.
+3. **TV lag doesn't matter here.** Targets don't move, so a hit doesn't depend on when the player saw something. Target Range ignores `ctx.displayLagMs` and doesn't mention calibration in its intro. If moving targets come later ([owner decision 2](#owner-decisions-2026-09-17)), the target's position is judged at `atMs − displayLagMs − delay`, `delay` being the same playback delay as rule 1, what the player saw when they let go.
 4. **No rewind.** One player's arrow never affects another's, and nothing in the world moves, so there's nothing to rewind. Target Range doesn't use `withRewind` (CC-3.7).
 5. **Same wind for everyone.** Wind is fixed for the whole volley, so shooting early or late in a volley changes nothing.
 6. **Touch versus motion.** Dragging a pad is steadier than holding a phone in the air. For friends on a couch that's accepted, as motion.md says the touch fallback is fair. The playtest (CC-11.7) watches for it. If touch players win clearly, a follow-up can add a gentle sway to touch aim.
@@ -340,7 +337,7 @@ Up to 8 players aim at one target at once. The rules that keep that readable fro
 
 ## Budget check
 
-Caps from [platform.md](../architecture/platform.md#the-caps): phones at most 4 messages per second, host `controller:state` at most 1.5 per second. Every message that reaches the room costs 1 request.
+Caps from [platform.md](../architecture/platform.md#the-caps): phones at most 4 messages per second on the relay path, host `controller:state` at most 1.5 per second. Every message that reaches the room costs 1 request. **These numbers are the relay-path worst case,** the one the budget must fit even if every phone's direct link fails. A seated phone whose direct WebRTC link is up (docs/architecture/realtime-link.md) streams `aim` at up to 60 a second instead, and none of it reaches the room or costs a request.
 
 **Per volley, per phone.** A player watches the wind for a moment, then holds the draw button for about 3 seconds while aiming. A hand-held phone moves more than 0.01 all the time, so the aim sender runs at the stream cap: 3 s × 4 = 12 `aim` messages, plus 1 `shoot`. That's 13. At most, a player holds the draw for the whole 10 s window: the stream cap allows 10 × 4 = 40 messages, the shot included.
 
@@ -371,7 +368,7 @@ Target Range adds no new platform code. Anything missing below belongs to the ow
 |---|---|---|
 | `@couchcade/game-sdk/contract` | `defineGame`, `defineController`, `InputContext.atMs`, `outcome`, `snapshot`/`restore`, `onPlayerLeft` | CC-1.13 |
 | `@couchcade/game-sdk/clock` | `toHostTime` inside `send`, the synced check before the draw button turns on | CC-1.14 |
-| `@couchcade/game-sdk/input` | `createInputStream` (one per phone: `aim` with `set`, `shoot` and `lower` with `fire`), `addAimSamples` and `aimAt` on the host with `AIM_PLAYBACK_DELAY_MS` (250 ms), the rate constants | CC-3.6 |
+| `@couchcade/game-sdk/input` | One `InputChannel` per phone (`aim` with `stream`, `shoot` and `lower` with `fire`), and `createPlayback` on the host for the crosshair, at the relay or direct playback delay per player (docs/architecture/realtime-link.md) | CC-3.6, CC-3.17, CC-3.18 |
 | `@couchcade/game-sdk/testing` | `testGameContract`, `createFakeRoom`, `replay` with one recorded match | CC-1.13 |
 | `@couchcade/motion/calibration` | `createPoseTracker` from the calibration the motion step took | CC-5.3 |
 | `@couchcade/motion/gestures` | `createAimDetector` (defaults ±25° and ±15°, `recentre` at every draw), `createAimSender` | CC-5.5 |
@@ -454,4 +451,4 @@ None of these changes an approved decision.
 | 1 | HOUSE_STYLE.md, Scene palettes | The table has no Range row, and CC-11.5's References only list the theme file | Add the row in CC-11.5 (amend its References) once this spec is approved |
 | 2 | `@couchcade/stage` | No bottom instruction panel yet. Quick Draw built a game-local one (CC-10.8). | CC-11.4 follows Quick Draw's pattern. A shared panel belongs in a stage story, not this game. |
 | 3 | CC-6.4 World Pips | Still To Do. Quick Draw draws its Pips from a game-local `world-pip.ts`. | CC-11.4 does the same until CC-6.4 lands |
-| 4 | Aim range | The ±25° and ±15° defaults set how hard a 10 is. They haven't been checked against a real aim trace yet. | CC-11.3 records one aim trace per platform (motion.md manual check) and tunes once before CC-11.7 |
+| 4 | Aim range | The `@couchcade/motion` defaults (±25° yaw, ±15° pitch) set how hard a 10 is. Superseded: the owner decided a uniform `aimPxPerDegree = 6` (±33.3° yaw, ±15° pitch) in docs/architecture/realtime-link.md, "Tuning Target Range's aim speed" | Checked against a real aim trace (motion.md manual check) and set by CC-11.9 |
