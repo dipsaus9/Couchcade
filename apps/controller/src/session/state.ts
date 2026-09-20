@@ -214,6 +214,17 @@ export function screenOf(state: PhoneState): PhoneScreen {
   return "waiting";
 }
 
+/**
+ * True on the current VIP's phone while a game runs (CC-3.28): the host sets `view.vip` alongside
+ * the running game's own `data` (host-runtime.ts's `withVip`), the same way lobby, menu and results
+ * views already carry an explicit `vip` flag from the host. Lets `GameController.vue` show a
+ * VIP-only in-game control (CC-3.27's "End game") only to the current VIP's phone, instead of every
+ * seated player.
+ */
+export function isVipInGame(state: PhoneState): boolean {
+  return state.status === "room" && state.view?.vip === true;
+}
+
 const endReasonByCloseCode: Record<number, EndReason> = {
   [closeCodes.kicked]: "kicked",
   [closeCodes.roomClosed]: "room-closed",

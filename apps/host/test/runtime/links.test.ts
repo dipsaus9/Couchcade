@@ -436,7 +436,9 @@ describe("AC6: the host answers link:ping with link:pong, and sets no host timer
 
     const pongs: unknown[] = [];
     peer.phoneSide(0).onMessage((data) => pongs.push(JSON.parse(data as string)));
-    peer.phoneSide(0).send(JSON.stringify({ t: "link:ping", d: { id: 3, t0: 111 } }));
+    peer
+      .phoneSide(0)
+      .send(JSON.stringify({ t: "link:ping", d: { id: 3, t0: 111, rttMs: null, jitterMs: 0 } }));
     await rig.virtual.advance(0);
 
     expect(pongs).toEqual([
@@ -487,5 +489,97 @@ describe("AC7: HostSceneData.link reports path, round trip and playback delay", 
     peer?.channels[0]?.open(); // only cc-stream
     await rig.virtual.advance(0);
     expect(rig.links.link(player1).path).toBe("relay");
+  });
+});
+
+describe("CC-3.26: link() reports the phone's link:ping-reported rttMs and jitter", () => {
+  async function directRig(): Promise<{ rig: ReturnType<typeof createRig>; peer: FakePeer }> {
+    const rig = createRig();
+    await offer(rig, player1);
+    const peer = rig.currentPeer();
+    if (peer === null) throw new Error("no peer");
+    openChannels(peer);
+    await rig.virtual.advance(0);
+    return { rig, peer };
+  }
+
+  it("AC3: falls back to the zero-jitter default before the phone's first link:ping", async () => {
+    const { rig } = await directRig();
+    const info = rig.links.link(player1);
+    expect(info.path).toBe("direct");
+    expect(info.rttMs).toBeNull();
+    expect(info.playbackDelayMs).toBeCloseTo(1000 / 30, 5); // clamp(1000/30 + 2*0, 25, 120)
+  });
+
+  it("AC2/AC3: stores the phone's reported rttMs/jitterMs and feeds jitter into playbackDelayMs", async () => {
+    const { rig, peer } = await directRig();
+    peer
+      .phoneSide(0)
+      .send(JSON.stringify({ t: "link:ping", d: { id: 1, t0: 0, rttMs: 42, jitterMs: 15 } }));
+    await rig.virtual.advance(0);
+
+    const info = rig.links.link(player1);
+    expect(info.path).toBe("direct");
+    expect(info.rttMs).toBe(42);
+    expect(info.playbackDelayMs).toBeCloseTo(Math.min(120, Math.max(25, 1000 / 30 + 2 * 15)), 5);
+  });
+
+  it("AC2: updates rttMs/jitterMs on every later link:ping", async () => {
+    const { rig, peer } = await directRig();
+    peer
+      .phoneSide(0)
+      .send(JSON.stringify({ t: "link:ping", d: { id: 1, t0: 0, rttMs: 42, jitterMs: 15 } }));
+    await rig.virtual.advance(0);
+    peer
+      .phoneSide(0)
+      .send(JSON.stringify({ t: "link:ping", d: { id: 2, t0: 10, rttMs: 30, jitterMs: 5 } }));
+    await rig.virtual.advance(0);
+
+    const info = rig.links.link(player1);
+    expect(info.rttMs).toBe(30);
+    expect(info.playbackDelayMs).toBeCloseTo(Math.min(120, Math.max(25, 1000 / 30 + 2 * 5)), 5);
+  });
+
+  it("still answers link:pong for a ping that also carries rttMs/jitterMs", async () => {
+    const { rig, peer } = await directRig();
+    const pongs: unknown[] = [];
+    peer.phoneSide(0).onMessage((data) => pongs.push(JSON.parse(data as string)));
+    peer
+      .phoneSide(0)
+      .send(JSON.stringify({ t: "link:ping", d: { id: 9, t0: 111, rttMs: 20, jitterMs: 4 } }));
+    await rig.virtual.advance(0);
+
+    expect(pongs).toEqual([
+      {
+        t: "link:pong",
+        d: { id: 9, t0: 111, t1: expect.any(Number), t2: expect.any(Number), r: 7 },
+      },
+    ]);
+  });
+
+  it("AC4: a phone whose own link never got a pong yet reports null rttMs and 0 jitter", async () => {
+    const { rig, peer } = await directRig();
+    peer
+      .phoneSide(0)
+      .send(JSON.stringify({ t: "link:ping", d: { id: 1, t0: 0, rttMs: null, jitterMs: 0 } }));
+    await rig.virtual.advance(0);
+
+    const info = rig.links.link(player1);
+    expect(info.path).toBe("direct");
+    expect(info.rttMs).toBeNull();
+    expect(info.playbackDelayMs).toBeCloseTo(1000 / 30, 5);
+  });
+
+  it("AC4: a link that drops before its first pong never throws and stays at the relay default", async () => {
+    const rig = createRig();
+    await offer(rig, player1);
+    const peer = rig.currentPeer();
+    if (peer === null) throw new Error("no peer");
+    peer.channels[0]?.open(); // only cc-stream: never reaches direct, never pings
+    await rig.virtual.advance(0);
+    peer.channels[0]?.close(); // and now drops entirely
+
+    expect(() => rig.links.link(player1)).not.toThrow();
+    expect(rig.links.link(player1)).toEqual({ path: "relay", rttMs: null, playbackDelayMs: 180 });
   });
 });

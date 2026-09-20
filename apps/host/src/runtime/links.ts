@@ -48,11 +48,12 @@ const iceGatherTimeoutMs = 1_000;
 /** The relay path's playback delay starting point (Fallback detection and smoothing). */
 const relayPlaybackDelayMs = 180;
 /** Direct-path playback delay bounds, `D = clamp(1000 / hz + 2 * jitter, 25, 120)` (Smoothing on
- * the direct path). The host doesn't yet learn a phone's measured jitter -- link:ping/pong only
- * gives the host `t0`, `t1` and `t2`, never `t3`, so only the phone can compute a true round trip
- * (Clock and latency measurement). Until a later story reports it to the host, this assumes zero
- * jitter at the default 30 Hz stream rate, which the doc's own numbers put close to the observed
- * range ("about 40 to 50 ms" on a quiet Wi-Fi). `rttMs` stays null until then. */
+ * the direct path). `link:ping`/`pong` only ever gives the host `t0`, `t1` and `t2`, never `t3`,
+ * so only the phone can compute a true round trip (Clock and latency measurement); it piggybacks
+ * its own measured `rttMs`/jitter on the next `link:ping` it sends instead (CC-3.26), which
+ * `handlePing` stores per link below. Before a phone's first report -- and for any player still on
+ * the relay path -- `jitterMs` is 0, the same zero-jitter default this formula always used, at the
+ * default 30 Hz stream rate. */
 function directPlaybackDelayMs(jitterMs: number, hz: 30 | 60 = 30): number {
   return Math.min(120, Math.max(25, 1000 / hz + 2 * jitterMs));
 }
@@ -136,6 +137,11 @@ interface PeerLink {
   readonly guard: LinkGuard;
   streamOpen: boolean;
   eventsOpen: boolean;
+  /** The phone's own last-reported round trip and jitter, piggybacked on its most recent
+   * `link:ping` (CC-3.26). Null/0 before the first one, e.g. a link that drops before its first
+   * ping. */
+  rttMs: number | null;
+  jitterMs: number;
   /** The highest direct-stream `n` applied yet, so a message an unordered channel redelivered or
    * reordered under one already applied is dropped without counting against the cutoff (Link
    * messages: "the host drops a stream message older than one it already applied"). */
@@ -297,6 +303,8 @@ export function createHostLinks(options: HostLinksOptions): HostLinks {
     const t1 = now();
     const r = roomOffsetMs();
     const t2 = now();
+    link.rttMs = ping.d.rttMs;
+    link.jitterMs = ping.d.jitterMs;
     sendRaw(link.streamChannel, {
       t: "link:pong",
       d: { id: ping.d.id, t0: ping.d.t0, t1, t2, r },
@@ -378,6 +386,8 @@ export function createHostLinks(options: HostLinksOptions): HostLinks {
         guard: createLinkGuard(),
         streamOpen: false,
         eventsOpen: false,
+        rttMs: null,
+        jitterMs: 0,
         lastAppliedN: -1,
         drops: [],
       };
@@ -444,7 +454,11 @@ export function createHostLinks(options: HostLinksOptions): HostLinks {
       if (link === undefined || !link.streamOpen || !link.eventsOpen) {
         return { path: "relay", rttMs: null, playbackDelayMs: relayPlaybackDelayMs };
       }
-      return { path: "direct", rttMs: null, playbackDelayMs: directPlaybackDelayMs(0) };
+      return {
+        path: "direct",
+        rttMs: link.rttMs,
+        playbackDelayMs: directPlaybackDelayMs(link.jitterMs),
+      };
     },
   };
 }

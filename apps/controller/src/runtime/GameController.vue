@@ -6,6 +6,7 @@ import { computed, onBeforeUnmount, onMounted, watch } from "vue";
 import { motionAdapter } from "../motion/adapter.ts";
 import type { MotionGame } from "../motion/session.ts";
 import WaitingScreen from "../screens/waiting/WaitingScreen.vue";
+import { isVipInGame } from "../session/state.ts";
 import { loadingControllerCopy, missingGameCopy } from "./copy.ts";
 import {
   controllerMotion,
@@ -36,11 +37,14 @@ const send = createInputSender({
 });
 
 /**
- * "End game" (CC-3.27): every seated player in the running game sees the control, because the
- * host is the only one who knows who the current VIP is (docs/architecture/session-flow.md,
- * "the VIP's phone" screens all work the same way); the host silently ignores anyone else's tap
- * (apps/host/src/runtime/host-runtime.ts).
+ * "End game" (CC-3.27, gated to the VIP by CC-3.28): the host still ignores anyone else's tap
+ * (apps/host/src/runtime/host-runtime.ts), but the button itself is now shown only to the current
+ * VIP's phone, using the `vip` flag the host sends alongside the running game's own view
+ * (`isVipInGame`, session/state.ts) -- the same platform-level signal lobby, menu and results
+ * screens already carry, just delivered outside the game's own `data` this time.
  */
+const isVip = computed(() => isVipInGame(props.state));
+
 function endGame(): void {
   props.sendMessage(endGameAction());
 }
@@ -77,7 +81,13 @@ const devReadout = new URLSearchParams(globalThis.location?.search ?? "").get("d
   <component :is="status.component" v-if="status.kind === 'ready'" v-bind="bound" />
   <WaitingScreen v-else-if="status.kind === 'missing'" v-bind="missingGameCopy" />
   <WaitingScreen v-else v-bind="loadingControllerCopy" />
-  <CcButton class="end-game" variant="stop" :disabled="!props.state.online" @press="endGame">
+  <CcButton
+    v-if="isVip"
+    class="end-game"
+    variant="stop"
+    :disabled="!props.state.online"
+    @press="endGame"
+  >
     End game
   </CcButton>
   <p v-if="devReadout" class="link-dev-readout">

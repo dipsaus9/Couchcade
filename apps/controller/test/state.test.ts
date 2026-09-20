@@ -4,6 +4,7 @@ import { lookForSlot } from "../src/session/look.ts";
 import {
   endReasonForClose,
   initialState,
+  isVipInGame,
   reduce,
   screenOf,
   type PhoneEvent,
@@ -327,6 +328,43 @@ describe("motion permission", () => {
     expect(screenOf(inRoom(reduce(lobby, motionView({ title: "Swing", step: 1 }))))).toBe(
       "waiting",
     );
+  });
+});
+
+describe("isVipInGame (CC-3.28)", () => {
+  const lobby = run(initialState(null, session), welcome());
+  const gameView = (vip?: boolean) =>
+    message({
+      t: "controller:state",
+      d: { gameId: "quick-draw", view: { screen: "quick-draw", data: { text: "" }, vip } },
+    });
+
+  it("is false before any view arrives, and outside a room", () => {
+    expect(isVipInGame(lobby)).toBe(false);
+    expect(isVipInGame(initialState(null, null))).toBe(false);
+  });
+
+  it("is false on a platform screen, which carries its own vip flag inside data instead", () => {
+    const platform = message({
+      t: "controller:state",
+      d: { gameId: null, view: { screen: "lobby", data: { vip: true } } },
+    });
+    expect(isVipInGame(reduce(lobby, platform))).toBe(false);
+  });
+
+  it("reads the host's vip flag on a running game's view, independent of the game's own data", () => {
+    expect(isVipInGame(reduce(lobby, gameView(true)))).toBe(true);
+    expect(isVipInGame(reduce(lobby, gameView(false)))).toBe(false);
+    expect(isVipInGame(reduce(lobby, gameView(undefined)))).toBe(false);
+  });
+
+  it("updates when the VIP changes mid-game, such as the previous VIP disconnecting", () => {
+    const asVip = reduce(lobby, gameView(true));
+    expect(isVipInGame(asVip)).toBe(true);
+    const vipLeft = reduce(asVip, gameView(false));
+    expect(isVipInGame(vipLeft)).toBe(false);
+    const vipAgain = reduce(vipLeft, gameView(true));
+    expect(isVipInGame(vipAgain)).toBe(true);
   });
 });
 
