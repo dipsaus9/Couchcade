@@ -13,6 +13,9 @@ export const joinFailureCopy: Record<JoinFailure, string> = {
   "rate-limited": "Too many tries. Wait a minute, then try again.",
   turnstile: "We couldn't check this phone. Try again.",
   offline: "You're offline. Check your Wi-Fi or mobile data.",
+  // Shown here only for type completeness: App.vue's showsQuota intercepts this failure before it
+  // ever reaches the join form and shows the dedicated QuotaScreen instead (errors/copy.ts).
+  quota: "Free plays used up for today. Come back after the reset.",
   unavailable: "The room didn't answer. Try again in a moment.",
 };
 

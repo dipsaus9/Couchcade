@@ -46,13 +46,33 @@ describe("requestJoin", () => {
 
   it("falls back on the status when the body isn't an API error", () => {
     expect(joinFailureFor(409, "<html>")).toBe("room-full");
-    expect(joinFailureFor(502, null)).toBe("unavailable");
+  });
+
+  it("reads a non-JSON error body on a platform-load status as quota reached, not unavailable", () => {
+    // Our own Worker always answers with valid JSON (apps/server/src/api/errors.ts); a null body
+    // (no JSON parsed) on one of these statuses means Cloudflare's own edge answered instead
+    // (errors/classify.ts).
+    expect(joinFailureFor(429, null)).toBe("quota");
+    expect(joinFailureFor(502, null)).toBe("quota");
+    expect(joinFailureFor(503, null)).toBe("quota");
+  });
+
+  it("keeps an unrecognised but valid JSON error as unavailable, not quota", () => {
+    expect(joinFailureFor(500, { error: "not-configured" })).toBe("unavailable");
   });
 
   it("reports offline when the request never gets an answer", async () => {
     expect(await requestJoin("BEAN", { name: "Sam", turnstile: "" }, offlineFetch)).toEqual({
       ok: false,
       failure: "offline",
+    });
+  });
+
+  it("reports quota reached for a non-JSON error page from Cloudflare's own edge", async () => {
+    const html: FetchFn = async () => new Response("<html>error</html>", { status: 503 });
+    expect(await requestJoin("BEAN", { name: "Sam", turnstile: "" }, html)).toEqual({
+      ok: false,
+      failure: "quota",
     });
   });
 

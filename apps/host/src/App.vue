@@ -2,7 +2,7 @@
 import { audio } from "@couchcade/audio";
 import { roomClock } from "@couchcade/game-sdk/clock";
 import { CcButton } from "@couchcade/ui";
-import { onBeforeUnmount, ref, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import AttractScreen from "./attract/AttractScreen.vue";
 import { watchButtonPresses } from "./audio/button-press.ts";
 import { isClickForSoundVisible } from "./audio/click-for-sound.ts";
@@ -11,6 +11,12 @@ import { applyPhaseMusic } from "./audio/phase-music.ts";
 import { applyPhaseScene } from "./audio/phase-scene.ts";
 import { registerPlatformSounds } from "./audio/platform-sounds.ts";
 import { watchForUnlock } from "./audio/unlock.ts";
+import { watchConnectionDelay } from "./errors/connection-delay.ts";
+import ConnectionBadge from "./errors/ConnectionBadge.vue";
+import { connectionLostCopy, offlineCopy } from "./errors/copy.ts";
+import { watchNetwork } from "./errors/network.ts";
+import OfflineScreen from "./errors/OfflineScreen.vue";
+import QuotaScreen from "./errors/QuotaScreen.vue";
 import MotionStepScreen from "./motion/MotionStepScreen.vue";
 import { localNow } from "./runtime/timing.ts";
 import CalibrationScreen from "./screens/calibration/CalibrationScreen.vue";
@@ -21,7 +27,51 @@ import ResultsScreen from "./screens/results/ResultsScreen.vue";
 import { useHostSession } from "./session/use-host-session.ts";
 import { watchMuteHotkey } from "./settings/mute-hotkey.ts";
 
-const { screen, openRoom, endRoom, calibration, moderate, endGameEarly } = useHostSession();
+const { screen, openRoom, endRoom, calibration, moderate, endGameEarly, quotaReached } =
+  useHostSession();
+
+// "This TV is offline" (errors/OfflineScreen.vue): the browser's own online/offline signal,
+// app-wide, over whatever screen was showing. Full takeover everywhere except "playing" -- the
+// host stays authoritative and a running game never pauses for connectivity
+// (docs/architecture/session-flow.md, "On the host"), so it gets the small chip instead, the same
+// as a dropped relay below.
+const network = watchNetwork((next) => {
+  offline.value = next;
+});
+const offline = ref(network.isOffline());
+onBeforeUnmount(network.dispose);
+const showsOfflineScreen = computed(() => offline.value && screen.value.name !== "playing");
+
+// The "Connection lost" chip (errors/ConnectionBadge.vue): shown once the relay socket has been
+// away for a beat, on every phase that tracks a connection except the lobby (its own inline
+// "Reconnecting..." text already says so). While offline, the offline screen or chip already says
+// so, so this stays quiet rather than stacking a second, less specific message.
+const connectionLostTooLong = ref(false);
+const connectionDelay = watchConnectionDelay(() => {
+  connectionLostTooLong.value = true;
+});
+watch(
+  () => ("connection" in screen.value ? screen.value.connection : "open"),
+  (status) => {
+    if (status === "open") {
+      connectionDelay.restored();
+      connectionLostTooLong.value = false;
+    } else {
+      connectionDelay.lost();
+    }
+  },
+  { immediate: true },
+);
+onBeforeUnmount(connectionDelay.dispose);
+
+/** The small chip's text: "This TV is offline" during "playing", "Reconnecting..." otherwise. */
+const connectionBadgeText = computed(() =>
+  screen.value.name === "playing" ? offlineCopy.title : connectionLostCopy,
+);
+const showsConnectionBadge = computed(() => {
+  if (screen.value.name === "playing") return offline.value || connectionLostTooLong.value;
+  return !offline.value && connectionLostTooLong.value && screen.value.name !== "lobby";
+});
 const origin = window.location.origin;
 const roomNow = () => roomClock.toHostTime(localNow());
 const toRoomTime = (localTimestamp: number) => roomClock.toHostTime(localTimestamp);
@@ -80,8 +130,9 @@ onBeforeUnmount(stopWatchingAudioState);
       transform: `translate(-50%, -50%) scale(${scale})`,
     }"
   >
+    <OfflineScreen v-if="showsOfflineScreen" />
     <LobbyScreen
-      v-if="screen.name === 'lobby'"
+      v-else-if="screen.name === 'lobby'"
       :lobby="screen.lobby"
       :connection="screen.connection"
       :origin="origin"
@@ -123,6 +174,7 @@ onBeforeUnmount(stopWatchingAudioState);
       :lobby="screen.lobby"
       :results="screen.results"
     />
+    <QuotaScreen v-else-if="screen.name === 'passcode' && quotaReached" />
     <PasscodeScreen
       v-else-if="screen.name === 'passcode'"
       :notice="screen.notice"
@@ -137,6 +189,7 @@ onBeforeUnmount(stopWatchingAudioState);
 
     <!-- audio.md owner decision 4: a refreshed TV has had no click or key press yet. -->
     <p v-if="audioLocked" class="sound-chip">Click for sound</p>
+    <ConnectionBadge v-if="showsConnectionBadge" :text="connectionBadgeText" />
   </div>
 </template>
 

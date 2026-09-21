@@ -5,6 +5,7 @@ import {
   type CreateRoomResponse,
   type RejoinResponse,
 } from "@couchcade/protocol";
+import { isQuotaFailure } from "../errors/classify.ts";
 
 /** The part of a protocol schema this file needs. */
 interface Schema<T> {
@@ -51,7 +52,11 @@ async function post<T>(path: string, body: Record<string, string>, schema: Schem
   const data: unknown = await response.json().catch(() => null);
   if (!response.ok) {
     const error = apiErrorSchema.safeParse(data);
-    throw new ApiError(error.success ? error.data.error : "unexpected", response.status);
+    if (error.success) throw new ApiError(error.data.error, response.status);
+    // No parseable JSON body at all: Cloudflare's own edge answered, not our Worker
+    // (errors/classify.ts).
+    const code = isQuotaFailure(response.status, data) ? "quota" : "unexpected";
+    throw new ApiError(code, response.status);
   }
   const parsed = schema.safeParse(data);
   if (!parsed.success) throw new ApiError("unexpected", response.status);

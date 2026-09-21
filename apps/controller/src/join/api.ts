@@ -5,6 +5,7 @@ import {
   type JoinRoomRequest,
   type JoinRoomResponse,
 } from "@couchcade/protocol";
+import { isQuotaFailure } from "../errors/classify.ts";
 
 /** Why a join didn't work, as the join screen explains it. */
 export type JoinFailure =
@@ -15,6 +16,7 @@ export type JoinFailure =
   | "rate-limited"
   | "turnstile"
   | "offline"
+  | "quota"
   | "unavailable";
 
 export type JoinResult =
@@ -55,6 +57,8 @@ export function joinFailureFor(status: number, body: unknown): JoinFailure {
   if (byError) return byError;
   // A known code that isn't the player's fault (bad-request, forbidden-origin, not-configured).
   if (parsed.success) return "unavailable";
+  // No parseable JSON body at all: Cloudflare's own edge answered, not our Worker (errors/classify.ts).
+  if (isQuotaFailure(status, body)) return "quota";
   return joinFailureByStatus[status] ?? "unavailable";
 }
 
