@@ -8,19 +8,17 @@ covers the patch of court around them. All you do is swing your arm the instant 
 which way you swing is where the ball goes. Hit it clean and it screams past them off the back glass; hit
 it late and it flops into the net. 2 to 4 players, first side to 7 points, about 3 minutes.
 
-**For the owner.** Read [At a glance](#at-a-glance), [Owner decisions](#owner-decisions-2026-09-21) at the
-end, and finding 1 in [Found while writing this spec](#found-while-writing-this-spec). That takes about
-6 minutes.
+**For the owner.** Approved 2026-09-21 — see [Owner decisions](#owner-decisions-2026-09-21) at the end.
 
-**For agents.** Everything below is binding for CC-23.2 to CC-23.8 once the owner approves it.
+**For agents.** Everything below is binding for CC-23.2 to CC-23.8.
 [platform.md](../architecture/platform.md), [motion.md](../architecture/motion.md),
 [session-flow.md](../architecture/session-flow.md), [HOUSE_STYLE.md](../HOUSE_STYLE.md) and
 [platform-screens.md](../design/platform-screens.md) still apply. Where this spec and a story disagree,
 stop and flag it.
 
-Status: **awaiting the owner's approval** (CC-23.1). The four decisions in
-[Owner decisions](#owner-decisions-2026-09-21) were settled by the owner on 2026-09-21 before this spec was
-written, and the spec follows them.
+Status: **approved** (CC-23.1). The five decisions in [Owner decisions](#owner-decisions-2026-09-21) were
+settled by the owner on 2026-09-21 — the first four before this spec was written, the fifth (3-player
+matches) alongside its approval — and the spec follows them.
 
 ---
 
@@ -104,7 +102,7 @@ Research on the timing model:
    | 3 | Doubles, 2 v 2, one slot played by the game | `a-left`, `b-left`, `a-right` are people; `b-right` **auto-returns** ([rule 10](#rules-and-scoring)) |
    | 4 | Doubles, 2 v 2 | all four slots are people |
 
-   The 3-player rule is the one design decision in this spec that is not implied by the epic or by an owner decision. It is called out in [finding 1](#found-while-writing-this-spec) and it wants the owner's word.
+   The owner approved this rule on 2026-09-21 ([owner decision 4](#owner-decisions-2026-09-21)); see [finding 1](#found-while-writing-this-spec) for the alternatives it beat.
 3. **Home spots and reach.** Nobody moves in v1. Each slot stands on a fixed spot and can play any ball whose plan position is within `REACH` metres of it and whose height is between 0 and 2.4 m.
 
    | Slot | Home (x, y) | Reach |
@@ -689,7 +687,7 @@ None of these changes an approved decision. **Finding 1 is the one the owner sho
 
 | # | Where | Finding | Action |
 |---|---|---|---|
-| **1** | **[Rule 2](#rules-and-scoring), 3 players** | **An assumption, not a decision.** The epic says "2–4 (singles or doubles)" and CC-23.8 adds the CPU that fills empty doubles slots. But CC-23.8 lands *after* CC-23.2, so something has to happen with 3 players in between. This spec says the empty slot **auto-returns** from the start of the match, reusing the away-player stand-in ([rule 10](#rules-and-scoring)). Two alternatives were considered and rejected: **(a)** require exactly 2 or 4 players, which means telling a third friend to sit out and needs the lobby to refuse a legal player count; **(b)** 3 players is 2 v 1 with the lone player given a wider reach, which is a third set of home spots and reach values that nothing else in the epic ever uses. The recommendation is low-risk because **CC-23.6 (registration and the E2E test) depends on CC-23.8**, so Bandeja cannot reach the live site before the real CPU exists, and the interim rule only ever affects development. It still wants **the owner's word**, because it decides what a 3-player game *is*. | **Ask the owner alongside the spec approval.** If the owner prefers (a) or (b), only [rule 2](#rules-and-scoring) and CC-23.2's slot table change; nothing else in the spec moves. |
+| **1** | **[Rule 2](#rules-and-scoring), 3 players** | **An assumption, not a decision.** The epic says "2–4 (singles or doubles)" and CC-23.8 adds the CPU that fills empty doubles slots. But CC-23.8 lands *after* CC-23.2, so something has to happen with 3 players in between. This spec says the empty slot **auto-returns** from the start of the match, reusing the away-player stand-in ([rule 10](#rules-and-scoring)). Two alternatives were considered and rejected: **(a)** require exactly 2 or 4 players, which means telling a third friend to sit out and needs the lobby to refuse a legal player count; **(b)** 3 players is 2 v 1 with the lone player given a wider reach, which is a third set of home spots and reach values that nothing else in the epic ever uses. The recommendation is low-risk because **CC-23.6 (registration and the E2E test) depends on CC-23.8**, so Bandeja cannot reach the live site before the real CPU exists, and the interim rule only ever affects development. | **Decided.** The owner approved this recommendation alongside the spec on 2026-09-21 ([owner decision 5](#owner-decisions-2026-09-21)). |
 | 2 | Screen-relative aim | "Left" and "right" are the TV's, for both sides ([Swing timing and shots](#swing-timing-and-shots)). Side B's players face the camera, so a player-relative mapping would mirror for half the room and half the tap pad. It is the readable choice, but it is a choice. | CC-23.7's playtest is the check. Nothing to change first. |
 | 3 | `createSwingDetector` and the grip | The detector only listens between `grip-down` and `grip-up`, and motion.md describes the grip as a button. Bandeja has no grip button: the controller calls `mark()` at the point boundaries instead. `mark()` is a plain function call, so nothing in CC-5.4 changes. | None. Noted so CC-23.3 does not go looking for a button. |
 | 4 | `minPeak` 320 | Bandeja listens for three minutes with no button in front of it, so the 240 deg/s default would turn a phone waved in conversation into a swing. motion.md marks `minPeak` "game may tune". | CC-23.3 checks 320 against CC-5.9 traces and tunes it once. |
@@ -705,8 +703,9 @@ None of these changes an approved decision. **Finding 1 is the one the owner sho
 
 ## Owner decisions (2026-09-21)
 
-The owner settled these four before this spec was written. The spec above follows them. The spec itself is
-still awaiting approval.
+The owner settled the first four before this spec was written; the spec above follows them. The fifth
+(3-player matches) was decided alongside the spec's approval, choosing the recommendation from
+[finding 1](#found-while-writing-this-spec). The spec is **approved**.
 
 1. **The court has walls you can play off.** Bandeja's court is a padel court, with glass back walls,
    corner panels and mesh down the sides, and the ball bounces off them and stays in play, not a plain open tennis
@@ -727,3 +726,7 @@ still awaiting approval.
    shot the game is named after, "An overhand shot hit with spin rather than power towards the back of the
    court". So is spin of any kind, which is why `spin` is not in the
    [input schema](#input-message-schema).
+5. **3-player matches auto-return the empty slot.** Until CC-23.8 ships the real CPU partner, a 3-player
+   match plays the empty doubles slot as the auto-return stand-in from [rule 10](#rules-and-scoring), rather
+   than requiring exactly 2 or 4 players or giving the lone third player a wider-reach 2 v 1. See
+   [finding 1](#found-while-writing-this-spec) for the alternatives this beat.
