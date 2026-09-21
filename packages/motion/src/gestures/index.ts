@@ -8,8 +8,10 @@
  * - `swing.ts`: `createSwingDetector`, one event per swing while the grip is held (CC-5.4)
  * - `tilt.ts`: `createTiltDetector`, a normalised x/y steering vector with a dead zone, and
  *   `createTiltSender`, which streams it through `input.stream` (CC-5.7)
+ * - `shake.ts`: `createShakeDetector`, one dash event per shake, no grip needed (CC-5.8)
  */
 export * from "./aim.ts";
 export * from "./flick.ts";
+export * from "./shake.ts";
 export * from "./swing.ts";
 export * from "./tilt.ts";
