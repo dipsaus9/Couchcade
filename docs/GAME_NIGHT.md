@@ -25,7 +25,7 @@ Lost it, or want a new one? Whoever set Couchcade up can rotate it (`npx wrangle
 
 Some TVs and Chromecasts show the picture a beat late, which matters for games where timing counts. At the top of the lobby there's a **Check TV lag** button (it lights up once the room's connected).
 
-Tap it, and every player's phone shows a flash to tap along with — a few practice beats, then the real ones. Each player's last tap time shows in the lobby in milliseconds. You can **Skip** it any time, or **Try again** if a round of taps looked off.
+Tap it, and the TV switches to the calibration screen: every player's phone shows a flash to tap along with — a few practice beats, then the real ones. Each player's last tap time shows on that screen, in milliseconds. You can **Skip** it any time, or **Try again** if a round of taps looked off.
 
 You only need to do this once per laptop-and-TV setup — Couchcade remembers it in that browser for next time. Re-run it if you swap TVs, swap laptops, or a game feels unfair on timing.
 
