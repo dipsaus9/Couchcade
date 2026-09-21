@@ -1,6 +1,10 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import RotateNotice from "./components/RotateNotice.vue";
+import { showsQuota } from "./errors/join-quota.ts";
+import { watchNetwork } from "./errors/network.ts";
+import OfflineScreen from "./errors/OfflineScreen.vue";
+import QuotaScreen from "./errors/QuotaScreen.vue";
 import { motionAdapter } from "./motion/adapter.ts";
 import MotionResume from "./motion/MotionResume.vue";
 import MotionStepScreen from "./motion/MotionStepScreen.vue";
@@ -38,6 +42,16 @@ const state = session.state;
 const screen = computed(() => screenOf(state.value));
 const kicked = computed(() => kickedFrom(state.value));
 const roomFull = computed(() => showsRoomFull(state.value));
+const quota = computed(() => showsQuota(state.value));
+
+// "You're offline" (errors/OfflineScreen.vue): the browser's own online/offline signal, app-wide,
+// over whatever screen was showing -- a different question from the room socket being open
+// (session/state.ts's "online", the existing "Connection lost" screen).
+const network = watchNetwork((next) => {
+  offline.value = next;
+});
+const offline = ref(network.isOffline());
+onBeforeUnmount(network.dispose);
 const menuView = computed(() =>
   state.value.status === "room" && state.value.view !== null && screen.value === "menu"
     ? parseMenuView(state.value.view.data)
@@ -100,8 +114,10 @@ onBeforeUnmount(() => {
 
 <template>
   <main class="app">
-    <KickedScreen v-if="kicked !== null" :code="kicked" @leave="session.dismissNotice" />
+    <OfflineScreen v-if="offline" />
+    <KickedScreen v-else-if="kicked !== null" :code="kicked" @leave="session.dismissNotice" />
     <RoomFullScreen v-else-if="roomFull" @leave="session.dismissNotice" />
+    <QuotaScreen v-else-if="quota" />
     <JoinScreen
       v-else-if="state.status === 'join'"
       :draft="state.draft"
