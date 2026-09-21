@@ -1,10 +1,10 @@
 ---
 id: CC-9.4
 title: Add friendly error and offline screens
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-16 12:25'
-updated_date: '2026-09-21 04:35'
+updated_date: '2026-09-21 04:40'
 labels:
   - story
 dependencies:
@@ -130,4 +130,12 @@ Verify: pnpm check, pnpm check:style, pnpm check:deps, pnpm test and pnpm build 
 pnpm budgets also passes (Controller initial JS 66.25/80 KB, Host platform JS 424.09/450 KB).
 
 Round-1 reviewer feedback (block, 2 findings): (1) the new test/errors/ dirs on both apps were never added to References -- fixed by adding apps/controller/test/errors/ and apps/host/test/errors/ here, same amendment pattern as before. (2) room-full had no TV counterpart at all -- fixing by adding a small Signal 'Room full' tag to the TV lobby (apps/host/src/screens/lobby/LobbyScreen.vue), next to the existing 'Room locked' tag, shown once seated players + audience reach the 16-phone cap (seatCount * 2, mirrored from apps/server/src/room/audience.ts's maxPhones -- apps/host can't import apps/server across the app tier boundary, so the small constant is duplicated locally the same way errors/quota.ts already is per app).
+
+Review (dipsaus-ai:story-reviewer, sonnet): round 1 block (room-full had no TV counterpart; new test/errors/ dirs missing from References), fixed and re-reviewed. Round 2 pass: all 5 criteria (room not found, room full, quota reached, connection lost, offline) confirmed to have genuine phone and TV treatment, no scope violations, no findings. Verify commands re-run clean: pnpm check, test, check:style, check:deps, build, budgets.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Gave all 5 error/offline states from AC#1 (room not found, room full, quota reached, connection lost, offline) a phone and a TV screen in the referee voice. Room not found and room full already had approved phone screens (join-form inline notice, RoomFullScreen.vue); connection lost on phone was already built (CC-3.4's WaitingScreen). Built net-new: offline (apps/*/src/errors/OfflineScreen.vue on both apps, from the browser's online/offline signal), quota reached / 'free plays used up' (apps/*/src/errors/QuotaScreen.vue on both apps, detected from a non-JSON error body on a platform-load HTTP status -- the one signal Cloudflare's own edge produces that our always-JSON Worker never would, since platform.md forbids counting requests ourselves), and every TV treatment the approved design canvas explicitly left for this story ('Not in this canvas': the TV error screens): a small persistent Chalk-pill ConnectionBadge for a dropped relay, full-screen takeovers for offline/quota on administrative phases, a small chip instead during 'playing' so a running game is never hidden, and a new 'Room full' Signal tag in the TV lobby. Reviewed by dipsaus-ai:story-reviewer (sonnet): round 1 blocked on the missing room-full TV counterpart and two undeclared test directories, both fixed; round 2 passed with no scope violations and no findings. pnpm check, test, check:style, check:deps, build and budgets all green.
+<!-- SECTION:FINAL_SUMMARY:END -->
