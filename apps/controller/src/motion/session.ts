@@ -43,6 +43,14 @@ import { parseMotionPermissionView } from "./view.ts";
 //    the page is visible, the player switches to touch for the rest of the game (rule 7). The still
 //    detector keeps running and re-measuring the whole time, so a bad early estimate stops
 //    mattering within a few seconds instead of ruining the session.
+// 4a. "Fix my controls" (CC-5.11): a manual fast-path on top of step 4's continuous re-measuring
+//    (motion.md, "Where aim's zero comes from (CC-5.12)", "How this sits with CC-5.11"). Most bad
+//    calibrations self-correct within seconds without the player doing anything; `recalibrate()`
+//    is for the player who doesn't want to wait. It discards the still detector's current stretch
+//    (`RestCalibration.reset`) so the next quiet moment produces a guaranteed-fresh measurement,
+//    and exposes that wait as `recalibrating` for a small UI hint. It never touches `flow`,
+//    `playing`, `paused` or the phone's connection -- the game keeps running throughout, on the
+//    last known-good calibration, until a fresh one replaces it (AC#2).
 // 5. a full page reload (CC-5.13) loses this module's state entirely, but not the browser's own
 //    permission decision. If the reload lands mid-game, past the `motion-permission` screen this
 //    module never sees again, `grant.ts`'s record of the last game that reached "ready" tells
@@ -64,6 +72,12 @@ export type MotionFlow =
   /** "Touch controls it is". `acknowledged` once the player tapped "Ready". */
   | { kind: "touch"; reason: "denied" | "unsupported"; acknowledged: boolean };
 
+/** A manual recalibration in progress after "Fix my controls" (CC-5.11), or null outside one. */
+export interface RecalibrateProgress {
+  /** How far the fresh still stretch has got, 0 to 1, for a small progress hint. */
+  progress: number;
+}
+
 /** One motion game on this phone, from the motion step until the game ends. */
 export interface MotionGame {
   step: number;
@@ -78,6 +92,8 @@ export interface MotionGame {
   playing: boolean;
   /** True from the page coming back from hidden with motion on, until "Tap to resume". */
   paused: boolean;
+  /** Set by `recalibrate()` (CC-5.11) while waiting for a fresh forced still stretch. */
+  recalibrating: RecalibrateProgress | null;
 }
 
 /** How long the phone may go without a sample during the game before it switches to touch. */
@@ -142,6 +158,12 @@ export interface MotionSession {
   acknowledge(): void;
   /** "Tap to resume". Call it from the tap's click handler, before any `await`. */
   resume(): void;
+  /**
+   * "Fix my controls" (CC-5.11): forces a fresh still-stretch measurement without leaving the
+   * game. A no-op outside `flow.kind === "ready"`, while not `playing`, while `paused`, or while
+   * already recalibrating.
+   */
+  recalibrate(): void;
   dispose(): void;
 }
 
@@ -196,6 +218,7 @@ export function createMotionSession(options: MotionSessionOptions): MotionSessio
       flow: { kind: "touch", reason, acknowledged: !tell },
       calibration: null,
       paused: false,
+      recalibrating: null,
     });
     // Touch is the answer now, so a later reload has nothing granted to recover.
     clearMotionGrant(grantStorage);
@@ -212,7 +235,10 @@ export function createMotionSession(options: MotionSessionOptions): MotionSessio
       update({ flow: { kind: "ask" } });
     } else if (game.flow.kind === "ready") {
       stopAll();
-      update({ paused: true });
+      // Also drops a manual recalibration in progress: stopAll() already cancelled its give-up
+      // timer, and the hold-still hint would otherwise survive the sleep with nothing left
+      // advancing it.
+      update({ paused: true, recalibrating: null });
     }
   };
 
@@ -239,7 +265,9 @@ export function createMotionSession(options: MotionSessionOptions): MotionSessio
    * Motion rule 7: no sample for 2 s while the game runs and the page is visible means touch.
    * Also keeps feeding `motionRest` (CC-5.14): a fresh still stretch between shots re-measures the
    * bias, and the game's calibration is updated whenever that happens, so a bad early estimate
-   * stops mattering within seconds instead of lasting the whole game.
+   * stops mattering within seconds instead of lasting the whole game. While a manual recalibration
+   * is in progress (CC-5.11's `recalibrate()`), also tracks its progress for the "Fix my controls"
+   * hint and clears it the moment a fresh estimate lands.
    */
   function watchForStall(): void {
     const game = state.value;
@@ -250,7 +278,18 @@ export function createMotionSession(options: MotionSessionOptions): MotionSessio
     const onSample: MotionListener = (sample) => {
       lastSampleAt = now();
       const calibration = motionRest?.push(sample);
-      if (calibration && calibration !== state.value?.calibration) update({ calibration });
+      const game = state.value;
+      if (game?.recalibrating) {
+        if (calibration && calibration !== game.calibration) {
+          update({ calibration, recalibrating: null });
+          return;
+        }
+        const stillMsSoFar = motionRest?.progress().stillMs ?? 0;
+        const progress = Math.min(1, Math.floor((stillMsSoFar / stillMs) * 10) / 10);
+        if (game.recalibrating.progress !== progress) update({ recalibrating: { progress } });
+        return;
+      }
+      if (calibration && calibration !== game?.calibration) update({ calibration });
     };
     const stopListening = adapter.start(onSample);
     let cancelCheck: (() => void) | undefined;
@@ -352,6 +391,7 @@ export function createMotionSession(options: MotionSessionOptions): MotionSessio
           capability: "none",
           playing: false,
           paused: false,
+          recalibrating: null,
         };
         listen();
         return;
@@ -374,6 +414,7 @@ export function createMotionSession(options: MotionSessionOptions): MotionSessio
           capability: "none",
           playing: true,
           paused: true,
+          recalibrating: null,
         };
         listen();
         return;
@@ -459,6 +500,32 @@ export function createMotionSession(options: MotionSessionOptions): MotionSessio
         .catch(() => {
           if (current === generation) toTouch("unsupported");
         });
+    },
+
+    recalibrate() {
+      const game = state.value;
+      if (
+        game === null ||
+        game.flow.kind !== "ready" ||
+        !game.playing ||
+        game.paused ||
+        game.recalibrating !== null ||
+        motionRest === null
+      )
+        return;
+      // Discards the still detector's current stretch, so the next quiet moment -- not one that
+      // may already be part-way through, or a stale fallback average from before the tap -- is
+      // what produces the fresh estimate. `watchForStall`'s own sample listener is already
+      // running and keeps feeding it; this doesn't touch `flow`, `playing`, `paused` or the
+      // connection, so the game itself never notices (AC#2).
+      motionRest.reset();
+      update({ recalibrating: { progress: 0 } });
+      const cancelGiveUp = schedule(() => {
+        // The player never held still long enough: quietly drop the hint. The continuous
+        // detector (CC-5.14) keeps trying on its own regardless.
+        if (state.value?.recalibrating !== null) update({ recalibrating: null });
+      }, stillGiveUpMs);
+      stopWork.push(cancelGiveUp);
     },
 
     dispose: end,

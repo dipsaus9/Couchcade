@@ -446,6 +446,117 @@ describe("createMotionSession", () => {
     expect(statuses()).toEqual(["granted"]);
   });
 
+  describe('recalibrate: "Fix my controls" (CC-5.11)', () => {
+    it("forces a fresh still-stretch measurement without touching flow, playing, paused or the connection (AC#1, AC#2)", async () => {
+      const { motion, time, adapter, statuses } = await inGame();
+      const before = motion.state.value?.calibration;
+
+      motion.recalibrate();
+      // The trigger is visible straight away, and nothing about the running game changes: no
+      // reload, no new "motion:status", the seat and the old calibration both stay exactly as
+      // they were until a fresh measurement actually lands.
+      expect(motion.state.value?.recalibrating).toEqual({ progress: 0 });
+      expect(motion.state.value?.flow).toEqual({ kind: "ready" });
+      expect(motion.state.value?.playing).toBe(true);
+      expect(motion.state.value?.paused).toBe(false);
+      expect(motion.state.value?.calibration).toBe(before);
+      expect(statuses()).toEqual(["granted"]);
+
+      // Holding still, with a bias that differs from the one measured at game start, proves this
+      // is a genuinely fresh measurement, not the stale pre-tap estimate.
+      const start = time.now();
+      for (let t = 0; t <= 500; t += 16) {
+        time.advance(t === 0 ? 0 : 16);
+        adapter.push({
+          t: start + t,
+          interval: 16,
+          acceleration: { x: 0, y: 0, z: 0 },
+          gravityAcceleration: { x: 0, y: 6.9, z: 6.9 },
+          rotationRate: { alpha: 3, beta: 0, gamma: 0 },
+        });
+      }
+      const midway = motion.state.value?.recalibrating;
+      expect(midway?.progress).toBeGreaterThan(0);
+      expect(midway?.progress).toBeLessThan(1);
+
+      for (let t = 500; t <= 1100; t += 16) {
+        time.advance(16);
+        adapter.push({
+          t: start + t,
+          interval: 16,
+          acceleration: { x: 0, y: 0, z: 0 },
+          gravityAcceleration: { x: 0, y: 6.9, z: 6.9 },
+          rotationRate: { alpha: 3, beta: 0, gamma: 0 },
+        });
+      }
+
+      const after = motion.state.value?.calibration;
+      expect(after).not.toBe(before);
+      expect(after?.bias).toEqual({ alpha: 3, beta: 0, gamma: 0 });
+      expect(motion.state.value?.recalibrating).toBeNull();
+      expect(motion.state.value?.flow).toEqual({ kind: "ready" });
+      expect(motion.state.value?.playing).toBe(true);
+      expect(motion.state.value?.paused).toBe(false);
+      expect(statuses()).toEqual(["granted"]);
+    });
+
+    it("does nothing before the game is ready and playing", () => {
+      const { motion } = setup();
+      motion.follow(step());
+      motion.recalibrate();
+      expect(motion.state.value?.flow).toEqual({ kind: "ask" });
+      expect(motion.state.value?.recalibrating).toBeNull();
+    });
+
+    it("ignores a second tap while one recalibration is already in progress", async () => {
+      const { motion } = await inGame();
+      motion.recalibrate();
+      const first = motion.state.value?.recalibrating;
+      motion.recalibrate();
+      expect(motion.state.value?.recalibrating).toBe(first);
+    });
+
+    it("a sleep clears an in-flight recalibration, and it can't be started again while paused", async () => {
+      const { motion, setVisibility } = await inGame();
+      motion.recalibrate();
+      expect(motion.state.value?.recalibrating).not.toBeNull();
+      setVisibility("hidden");
+      expect(motion.state.value?.paused).toBe(true);
+      expect(motion.state.value?.recalibrating).toBeNull();
+      motion.recalibrate();
+      expect(motion.state.value?.recalibrating).toBeNull();
+    });
+
+    it("settles for the noisy fallback rather than hang, if the player never holds fully still (reuses CC-5.14's own timeout)", async () => {
+      const { motion, time, adapter, statuses } = await inGame();
+      const before = motion.state.value?.calibration;
+      motion.recalibrate();
+
+      // Keeps turning the whole time -- never still enough for a real still stretch -- but
+      // samples keep arriving, so the phone never looks stalled either.
+      const start = time.now();
+      for (let t = 0; t <= 5200; t += 16) {
+        time.advance(t === 0 ? 0 : 16);
+        adapter.push({
+          t: start + t,
+          interval: 16,
+          acceleration: { x: 0, y: 0, z: 0 },
+          gravityAcceleration: { x: 0, y: 6.9, z: 6.9 },
+          rotationRate: { alpha: 50, beta: 0, gamma: 0 },
+        });
+      }
+
+      // Rest calibration never runs with a zero/unmeasured bias (motion.md): its own 5 s timeout
+      // hands back the best noisy estimate, and the hint clears the moment it lands, same as a
+      // real still stretch would.
+      expect(motion.state.value?.recalibrating).toBeNull();
+      expect(motion.state.value?.calibration).not.toBe(before);
+      expect(motion.state.value?.flow).toEqual({ kind: "ready" });
+      expect(motion.state.value?.playing).toBe(true);
+      expect(statuses()).toEqual(["granted"]);
+    });
+  });
+
   it("keeps the same calibration between shots when the phone never goes properly still again", async () => {
     const { motion, time, adapter, statuses } = await inGame();
     const before = motion.state.value?.calibration;

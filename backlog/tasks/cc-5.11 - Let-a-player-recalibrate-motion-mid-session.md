@@ -1,10 +1,10 @@
 ---
 id: CC-5.11
 title: Let a player recalibrate motion mid-session
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-09-19 08:23'
-updated_date: '2026-09-21 03:08'
+updated_date: '2026-09-21 03:17'
 labels:
   - story
 dependencies:
@@ -32,9 +32,15 @@ Reported during the CC-3.24 owner replay (2026-09-19): "if you calibrated your p
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A player can trigger a fresh calibration from inside a running motion game, without a full reload or leaving the room
-- [ ] #2 Recalibrating doesn't lose the player's seat, score, or connection
+- [x] #1 A player can trigger a fresh calibration from inside a running motion game, without a full reload or leaving the room
+- [x] #2 Recalibrating doesn't lose the player's seat, score, or connection
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Add recalibrate() to MotionSession (session.ts): while flow.kind==='ready' && playing && !paused, reset the already-running RestCalibration (CC-5.14, motionRest) so the next quiet moment produces a guaranteed-fresh measurement, tracked as a transient recalibrating: {progress} field cleared once a fresh calibration lands or a give-up timeout passes. Add RecalibrateButton.vue (motion/) as a small fixed-position CcButton, mounted from App.vue (added to References) as an overlay sibling next to MotionResume, gated on the game being ready/playing/unpaused. No changes to packages/motion or the calibration screens folder (unrelated TV-lag calibration).
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 
