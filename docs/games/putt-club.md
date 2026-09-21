@@ -283,7 +283,7 @@ as in every top-down Couchcade world.
 | Part | Spec | Why |
 |---|---|---|
 | Ball | `circleBody({ radius: 0.0213, density: 32.2, friction: 0.2, restitution: 0.5, damping: 0, bullet: true })`, 45.9 g | A real golf ball is 42.67 mm across and 45.93 g; `density × π r²` gives that mass. At 5 m/s it crosses two ball widths per step, so it must be a bullet. Damping is 0 because friction is not damping here — see below. |
-| Kerbs | `wallLoop(hole.walls, { friction: 0.2, restitution: 0.5 })` around the playable area, `wallPath` for interior baffles | `wallLoop`'s own doc in `packages/physics/src/helpers.ts` already says "an arena, a lane or **a putting green**". Mini-golf walls are "concrete, metal, or fiberglass"; 0.5 gives a bank shot that works and costs you something. |
+| Kerbs | One `WallSpec` per entry in `hole.walls`: `wallLoop(wall.points, { friction: 0.2, restitution: wall.restitution ?? 0.5 })` for the closed boundary, `wallPath(wall.points, …)` for an interior baffle | `wallLoop`'s own doc in `packages/physics/src/helpers.ts` already says "an arena, a lane or **a putting green**". Mini-golf walls are "concrete, metal, or fiberglass"; 0.5 gives a bank shot that works and costs you something. |
 | Wall material | A hole's wall may override `restitution`: 0.15 for a dead felt backboard, 0.8 for a rubber bumper | The course designer's only material knob, and CC-13.8's main way of making holes feel different without slopes |
 | Rolling friction | **Not `floorFriction`.** Each step, while the ball is moving, the rules apply `Push { fx, fy } = −m × ROLL_DECEL × v̂` with `ROLL_DECEL = 1.5 m/s²`. When a step's deceleration would reverse the ball, or its speed is under `STOP_SPEED = 0.05 m/s`, the rules set its velocity to zero. | `floorFriction` is exponential damping: it halves the speed every half-life and never reaches zero, so a putt would creep for ten seconds. A ball on carpet slows at a roughly constant rate and stops. See [finding 1](#found-while-writing-this-spec). |
 | Cup | Not a body. Each step the rules test the **segment** the ball travelled against a circle of `hole.captureRadius` around `hole.cup` | `@couchcade/physics` has only circles and walls, and no sensors ([finding 8](#found-while-writing-this-spec)). Testing the segment, not the end point, is what stops a fast ball skipping straight over the cup ([finding 2](#found-while-writing-this-spec)). |
@@ -580,10 +580,12 @@ Only the player on the clock has controls. Every other phone shows a watch scree
 - **The pad follows the game's recentre moments.** When a turn opens, the controller recentres the pad just
   as it recentres the detector. This is the parity motion.md asks for and Target Range does not yet have
   ([finding 4](#found-while-writing-this-spec)).
-- **Swipe to putt.** The big action becomes the swipe pad, `createSwingSwipe({ emitOn: "peak", minPeak: … })`.
-  Touching it locks the line (the same `line` message), a swipe of at least 60 px up the pad putts, and the
-  finger's speed from 300 to 2,400 px/s is `speed`. A shorter or downward swipe unlocks and hints "Swipe
-  further up". The swipe pad ignores touches that start on the aim pad.
+- **Swipe to putt.** The big action becomes the swipe pad, `createSwingSwipe({ emitOn: "peak" })`. Touching
+  it locks the line (the same `line` message), a swipe of at least 60 px up the pad putts, and the finger's
+  speed from 300 to 2,400 px/s is `speed`. A shorter or downward swipe unlocks and hints "Swipe further
+  up". The swipe pad ignores touches that start on the aim pad. `SwingSwipeOptions` has no `minPeak` — the
+  pad's floor is `minSwipePx`, not a rotation rate — so the touch path needs none of the detector's
+  retuning, and a 60 px swipe already maps to the bottom of the same 0-to-1 `speed` scale.
 - **Why swipe and not tap.** `createSwingTap` emits a fixed `speed` of 0.7 and an angle of ±60 by pad half.
   Fixed power is the one thing a putter cannot have — 0.7 is a 4.4 m putt, every time. The swipe keeps the
   whole power range, which is the only number Putt Club's swing actually carries. (The CC-13 epic says
