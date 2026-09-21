@@ -1,0 +1,31 @@
+{
+  "name": "@couchcade/game-putt-club",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Putt Club: point the phone where you want the ball to go, hold to lock the line, then swing like a putter. Spec in docs/games/putt-club.md.",
+  "type": "module",
+  "sideEffects": false,
+  "scripts": {
+    "typecheck": "vue-tsc",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@couchcade/game-sdk": "workspace:*",
+    "@couchcade/physics": "workspace:*",
+    "@couchcade/protocol": "workspace:*",
+    "@couchcade/stage": "workspace:*",
+    "@couchcade/theme": "workspace:*",
+    "@couchcade/ui": "workspace:*",
+    "@couchcade/utils": "workspace:*",
+    "phaser": "catalog:",
+    "vue": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@couchcade/config": "workspace:*",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:",
+    "vue-tsc": "catalog:"
+  }
+}
