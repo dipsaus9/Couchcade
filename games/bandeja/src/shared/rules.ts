@@ -38,7 +38,7 @@ import {
   whiffErrorMs,
   whiffMaxZ,
 } from "./constants.ts";
-import type { Grade, Side, SlotName } from "./constants.ts";
+import type { Grade, Side, SlotName, SlotSpec } from "./constants.ts";
 import { applyFloorBounceDrag, predict, stepBallPlan, stepHeight } from "./physics.ts";
 import type { SwingInput } from "./input.ts";
 import {
@@ -81,6 +81,16 @@ function effectiveReach(baseReach: number, shots: number): number {
   if (shots < squeezeStartShots) return baseReach;
   const extraSteps = 1 + Math.floor((shots - squeezeStartShots) / squeezeStepShots);
   return Math.max(squeezeMinReach, baseReach * squeezeStepFactor ** extraSteps);
+}
+
+/** `matchSlotSpecs`, with every reach shrunk for `shots` (rule 9): what `predict` looks ahead
+ * for, so a slot's arrival window agrees with the same squeeze `applySwing`'s own reach check
+ * uses — the closing ring CC-23.4 draws and the auto-return in `performAutoHit` both read it. */
+function squeezedSlotSpecs(state: BandejaState, shots: number): SlotSpec[] {
+  return matchSlotSpecs(state).map((spec) => ({
+    ...spec,
+    reach: effectiveReach(spec.reach, shots),
+  }));
 }
 
 // --- onPlayerInput -------------------------------------------------------------------------------
@@ -169,13 +179,9 @@ function launchBall(
   const y = state.ball.body.y;
   const z = state.ball.z;
   const vz = spec.lift;
-  const leg = predict({ x, y, z, vx, vy, vz }, tickMs, nowMs, matchSlotSpecs(state));
-  const rally: RallyState = {
-    shots: (state.rally?.shots ?? 0) + 1,
-    bounces: 0,
-    bounceSide: null,
-    pointSettleAtMs: null,
-  };
+  const shots = (state.rally?.shots ?? 0) + 1;
+  const leg = predict({ x, y, z, vx, vy, vz }, tickMs, nowMs, squeezedSlotSpecs(state, shots));
+  const rally: RallyState = { shots, bounces: 0, bounceSide: null, pointSettleAtMs: null };
   return {
     ...state,
     ball: { body: { id: ballId, x, y, vx, vy, a: 0, w: 0 }, z, vz, leg },
@@ -259,7 +265,7 @@ function tickBall(state: BandejaState, dtMs: number, nowMs: number): BandejaStat
         { x: body.x, y: body.y, z, vx: body.vx, vy: body.vy, vz },
         tickMs,
         nowMs,
-        matchSlotSpecs(state),
+        squeezedSlotSpecs(state, rally.shots),
       )
     : ball.leg;
 
@@ -369,7 +375,7 @@ function startServe(state: BandejaState, nowMs: number): BandejaState {
   const x = serverSpec.home[0];
   const y = serverSpec.home[1];
   const z = serveContactZ;
-  const leg = predict({ x, y, z, vx, vy, vz }, tickMs, nowMs, matchSlotSpecs(state));
+  const leg = predict({ x, y, z, vx, vy, vz }, tickMs, nowMs, squeezedSlotSpecs(state, 1));
   const rally: RallyState = { shots: 1, bounces: 0, bounceSide: null, pointSettleAtMs: null };
 
   return {

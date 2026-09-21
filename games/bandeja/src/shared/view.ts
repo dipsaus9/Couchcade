@@ -1,5 +1,6 @@
 import type { Player } from "@couchcade/game-sdk/contract";
 import type { ControllerView } from "@couchcade/protocol";
+import { targetPoints } from "./constants.ts";
 import { slotSpec } from "./state.ts";
 import { findPlayerBySlot, isAutoSlot, matchSlots, otherSide } from "./state.ts";
 import type { BandejaPlayer, BandejaState } from "./state.ts";
@@ -78,7 +79,7 @@ export function view(state: BandejaState, player: Player): BandejaControllerView
     side: current?.side ?? "a",
     slot: current === undefined ? "solo" : slotPart(current.slot),
     scores: [state.scores.a, state.scores.b],
-    target: 7,
+    target: targetPoints,
     point: state.point,
     partner: current === undefined ? null : partnerName(state, current),
     opponents: current === undefined ? [] : opponentNames(state, current),
