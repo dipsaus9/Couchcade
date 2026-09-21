@@ -2,6 +2,11 @@ import { audio } from "@couchcade/audio";
 import type { StoredDisplayLag } from "@couchcade/game-sdk/clock";
 import type { RelayToHostMessage } from "@couchcade/protocol";
 import { onBeforeUnmount, ref, shallowRef } from "vue";
+import {
+  createAttractState,
+  type AttractPreview,
+  type AttractState,
+} from "../attract/attract-state.ts";
 import { ApiError, createRoom } from "../net/api.ts";
 import {
   connectRelay,
@@ -19,6 +24,7 @@ import {
   type ResultsScreenState,
 } from "../runtime/host-runtime.ts";
 import { phaserStage } from "../runtime/stage.ts";
+import { scheduleTimeout } from "../runtime/timing.ts";
 import {
   applyRelayMessage,
   initialLobby,
@@ -69,7 +75,12 @@ export type HostScreen =
       lobby: LobbyState;
       connection: ConnectionStatus;
       results: ResultsScreenState;
-    };
+    }
+  /**
+   * The lobby sat empty for 60 s (CC-9.3, `attract-state.ts`): the TV cycles game previews like
+   * an arcade cabinet's demo loop until someone joins, which returns it to `lobby` at once.
+   */
+  | { name: "attract"; lobby: LobbyState; connection: ConnectionStatus; preview: AttractPreview };
 
 /**
  * The TV's session: passcode, room creation, the relay socket, the lobby state and the game
@@ -84,6 +95,7 @@ export function useHostSession() {
   const quotaReached = ref(false);
   let relay: RelayConnection | null = null;
   let runtime: HostRuntime | null = null;
+  let attract: AttractState | null = null;
   let moderation: Moderation | null = null;
   // The invisible Turnstile widget. It loads and runs only when the passcode is submitted.
   const turnstile = createTurnstile({ action: "create" });
@@ -91,6 +103,7 @@ export function useHostSession() {
   function enterRoom(session: StoredSession, ticket: string | null): void {
     relay?.close();
     runtime?.dispose();
+    attract?.dispose();
     let lobby = initialLobby(session.code);
     let connection: ConnectionStatus = "connecting";
     const roomRuntime = createHostRuntime({
@@ -104,6 +117,16 @@ export function useHostSession() {
       reducedMotion: () => settings.value.reducedMotion,
     });
     runtime = roomRuntime;
+    // CC-9.3: attract mode is a TV-only cosmetic layered on top of the plain lobby -- the relay and
+    // `roomRuntime` never leave the "lobby" phase for it, so it needs no place in `host-runtime.ts`.
+    // `lobbyChanged` runs on every `show()` (its own no-op guard keeps that cheap), so the 60 s idle
+    // timer starts the moment the lobby is first seen empty and a join always cancels it at once.
+    const roomAttract = createAttractState({
+      games: metaRegistry.games,
+      schedule: scheduleTimeout,
+      onChange: () => show(),
+    });
+    attract = roomAttract;
     const show = () => {
       const menu = roomRuntime.menu;
       const results = roomRuntime.results;
@@ -114,7 +137,12 @@ export function useHostSession() {
       else if (results) screen.value = { name: "results", lobby, connection, results };
       else if (calibration) screen.value = { name: "calibration", lobby, connection, calibration };
       else if (roomRuntime.running) screen.value = { name: "playing", lobby, connection };
-      else screen.value = { name: "lobby", lobby, connection, displayLag: roomRuntime.displayLag };
+      else {
+        roomAttract.lobbyChanged(lobby.players.length === 0);
+        screen.value = roomAttract.preview
+          ? { name: "attract", lobby, connection, preview: roomAttract.preview }
+          : { name: "lobby", lobby, connection, displayLag: roomRuntime.displayLag };
+      }
     };
     show();
 
@@ -152,6 +180,8 @@ export function useHostSession() {
         relay = null;
         roomRuntime.dispose();
         runtime = null;
+        roomAttract.dispose();
+        attract = null;
         moderation = null;
         clearSession();
         screen.value = { name: "passcode", notice: endNotice(reason) };
@@ -216,6 +246,7 @@ export function useHostSession() {
 
   onBeforeUnmount(() => {
     runtime?.dispose();
+    attract?.dispose();
     relay?.close();
   });
 
