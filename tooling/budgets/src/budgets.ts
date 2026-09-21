@@ -74,6 +74,10 @@ interface BuildOutput {
         fileName: string;
         facadeModuleId: string | null;
         moduleIds: readonly string[];
+        /** Other chunks (by `fileName`) this chunk statically imports. */
+        imports: readonly string[];
+        /** Other chunks (by `fileName`) this chunk reaches through a dynamic `import()`. */
+        dynamicImports: readonly string[];
         code: string;
       }
     | { type: "asset"; fileName: string; source: string | Uint8Array }
@@ -117,6 +121,8 @@ async function buildApp(rootDir: string, app: BudgetCheckConfig["app"]): Promise
               fileName: item.fileName,
               facadeModuleId: item.facadeModuleId,
               moduleIds: item.moduleIds,
+              imports: item.imports,
+              dynamicImports: item.dynamicImports,
               code: item.code,
             }
           : { type: "asset", fileName: item.fileName, source: item.source },

@@ -1,0 +1,31 @@
+{
+  "name": "@couchcade/game-bandeja",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Bandeja: watch the ball, swing left or right, at exactly the right moment. Spec in docs/games/bandeja.md.",
+  "type": "module",
+  "sideEffects": false,
+  "scripts": {
+    "typecheck": "vue-tsc",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@couchcade/game-sdk": "workspace:*",
+    "@couchcade/physics": "workspace:*",
+    "@couchcade/protocol": "workspace:*",
+    "@couchcade/stage": "workspace:*",
+    "@couchcade/theme": "workspace:*",
+    "@couchcade/ui": "workspace:*",
+    "@couchcade/utils": "workspace:*",
+    "phaser": "catalog:",
+    "vue": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@couchcade/config": "workspace:*",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:",
+    "vue-tsc": "catalog:"
+  }
+}
