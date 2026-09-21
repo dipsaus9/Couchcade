@@ -59,7 +59,7 @@ written, and the spec follows them.
 | Movement | Nobody moves in v1. Each player holds a fixed home spot and covers a circle around it. Automatic movement and a proper CPU partner arrive with **CC-23.8**; this spec is the phase before that, not a version missing a feature. |
 | Skill | Timing, and only timing. A swing inside ±60 ms of the ball is a clean drive; ±140 ms is a loose ball that sits up for them; ±240 ms is a mishit that usually finds the net. Which way you swing places it. |
 | Fairness | The swing's `peakAt` is judged against the ball's arrival with the TV's own display lag subtracted (CC-3.8), so a laggy TV never costs you a point. |
-| Cost | About 190 requests for a typical 4-player match, about 2,100 if all four players swing flat out the whole time. |
+| Cost | About 165 requests for a typical 4-player match, about 2,000 if all four players swing flat out the whole time. |
 | Assets | CC0 sounds from Kenney and OpenGameArt, recoloured to the new `padel` palette. The court, cage, net, rackets and ball are drawn from scratch. |
 
 ---
@@ -245,11 +245,12 @@ ranges, the way Strike Night keeps its prototype targets.
 
 | Shot | From | Result |
 |---|---|---|
-| Clean drive, `a-right` at (7.4, 6.4), contact at 0.8 m, aim 0 | 14 m/s, lift 3.2 m/s | Crosses the net 0.25 s later at 1.29 m, well clear. Lands 11.8 m away at `y = 18.3`, 1.7 m short of the back glass. Its first pass through `b-right`'s reach is at `y = 15.9`, 0.67 s in and 0.74 m up: volleyable. |
-| The same drive, left alone | | Bounces at 18.3, off the back glass at 20, and is back inside `b-right`'s reach at `y ≈ 12.4` before it touches the floor again. That is 0.78 s of extra time, and the whole reason padel has walls. |
-| Loose (`ok`) return, contact at 0.7 m | 11.2 m/s, lift 2.6 m/s | Crosses the net at 1.03 m. Lands at `y = 14.6`, right on top of the defender. A gift. |
-| Mishit off a low ball, contact at 0.8 m | 7 m/s, lift 1.4 m/s | Reaches the net line 0.5 s later at 0.27 m. **Into the net.** |
-| Mishit off a high ball, contact at 1.8 m | 7 m/s, lift 1.4 m/s | Clears the net at 1.27 m but lands at `y = 11.85`, a sitter just over the net. |
+| Clean drive, `a-right` at (7.4, 6.4), contact at 0.8 m, aim 0 | 14 m/s, lift 3.2 m/s | Crosses the net 0.26 s later at 1.30 m, well clear. Lands 11.83 m away at `y = 18.2`, 1.8 m short of the back glass. |
+| The same drive, through `b-right`'s reach | | Enters the reach circle at `y = 11.2`, 0.34 s in and 1.32 m up. Closest approach, which is `arriveAt`, is at `y = 13.6`, 0.51 s in and 1.15 m up. It leaves the circle at `y = 16.0` still 0.69 m up. Volleyable for 0.34 s. |
+| The same drive, left alone | | Bounces at 18.2, comes off the back glass at 20, and is back inside `b-right`'s reach at `y = 12.5` before it touches the floor again. That is 0.78 s of extra time, and the whole reason padel has walls. |
+| Loose (`ok`) return, contact at 0.7 m | 11.2 m/s, lift 2.6 m/s | Crosses the net at 1.03 m. Lands at `y = 14.5`, right on top of the defender. A gift. |
+| Mishit off a low ball, contact at 0.8 m | 7 m/s, lift 1.4 m/s | Reaches the net line 0.51 s later at 0.22 m, against a net 0.89 m high there. **Into the net.** |
+| Mishit off a high ball, contact at 1.8 m | 7 m/s, lift 1.4 m/s | Clears the net at 1.22 m but lands at `y = 11.8`, a sitter just over the net. |
 
 The two mishit rows are the model behaving well without a special case: shank a low ball and you find the
 net, shank a high one and you float it up for them.
@@ -474,7 +475,8 @@ overlays at the TV's own resolution.
 4. **One ball, one focus.** There is only ever one ball. The rings are the only other moving overlay, and
    they only exist in the 280 ms before an arrival.
 5. **Height is legible.** The shadow, the ring and the net's 12 px band give three independent reads of how
-   high the ball is. A ball at the top of its arc is 45 px above its shadow.
+   high the ball is. The highest a ball gets in normal play is about 1.4 m, so it floats about 20 px above
+   its shadow at the top of its arc and sits on it when it lands.
 6. **Clear space.** The court's far edge sits at `sy` 52, below the scoreboard's 14% (38 px). The near edge
    at 236 leaves 34 px for the bottom panel. That is tight, and CC-23.4 should check it at 1080p before the
    panel's final height is set.
@@ -552,21 +554,21 @@ Caps from [platform.md](../architecture/platform.md#the-caps): phones at most 4 
 usually one hopeful swing from a partner: about 12 phone messages per point. The host sends 1
 `controller:state` batch per `pointEnd`.
 
-| Per match, 4 players, 12 points, about 204 s | Typical | Every phone swinging flat out |
+| Per match, 4 players, 11 points, 197 s | Typical | Every phone swinging flat out |
 |---|---|---|
-| Phone input | 12 × 12 = 144 | 4 phones × 2.5/s × 204 s = 2,040 |
-| `controller:state`: 1 at the start, 1 per `pointEnd`, 1 at the end | 14 | 14 |
-| `room:snapshot`: 1 at the start + 1 per point | 13 | 13 |
+| Phone input | 11 × 12 = 132 | 4 phones × 2.5/s × 197 s = 1,970 |
+| `controller:state`: 1 at the start, 1 per `pointEnd`, 1 at the end | 13 | 13 |
+| `room:snapshot`: 1 at the start + 1 per point | 12 | 12 |
 | `room:phase` in and out | 2 | 2 |
 | `motion:status`: 1 per phone | 4 | 4 |
-| **Total** | **about 180 in about 3.4 min** | **about 2,070** |
+| **Total** | **163 in 3.3 min** | **2,001** |
 
 | Check | Bandeja | Cap | Fits |
 |---|---|---|---|
 | Messages per phone | The swing detector's 400 ms cooldown is a hard 2.5 per second, and off-ball swings are the only way to reach it. | 4 per second | Yes, by the gesture's own cooldown |
-| Host `controller:state` | 14 in 204 s, about 0.07 per second. Batches are at least 2.6 s apart, because they only fire at `pointEnd`. | 1.5 per second, 667 ms apart | Yes, by a wide margin |
-| One hour of only Bandeja, 4 players, typical | 3,600 / 234 s (match plus menu) ≈ 15 matches × 180 = about 2,700 | platform.md plans 4 × 720 + 1,800 = 4,680 per hour for 4 phones in turn-based games | Yes, under two thirds |
-| One hour, worst case: four players swinging flat out all match | 15 × 2,070 = about 31,000 | One real-time phone for an hour is 14,400; platform.md's 4-phone real-time hour is about 64,000 | Yes, under half |
+| Host `controller:state` | 13 in 197 s, about 0.07 per second. Batches are at least 2.6 s apart, because they only fire at `pointEnd`. | 1.5 per second, 667 ms apart | Yes, by a wide margin |
+| One hour of only Bandeja, 4 players, typical | 3,600 / 234 s (match plus menu) ≈ 15 matches × 163 = about 2,450 | platform.md plans 4 × 720 + 1,800 = 4,680 per hour for 4 phones in turn-based games | Yes, under half |
+| One hour, worst case: four players swinging flat out all match | 15 × 2,001 = about 30,000 | One real-time phone for an hour is 14,400; platform.md's 4-phone real-time hour is about 64,000 | Yes, under half |
 
 `realtime` is `true`: `onTick` drives the ball, the look-ahead and the match clock. For the budget Bandeja
 is a real-time game, unlike Strike Night. But its input is event-shaped rather than a stream, so it costs
