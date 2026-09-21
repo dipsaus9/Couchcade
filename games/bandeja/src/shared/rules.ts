@@ -8,9 +8,8 @@
 import { createRng } from "@couchcade/utils";
 import type { InputContext, Player } from "@couchcade/game-sdk/contract";
 import { tickMs } from "@couchcade/game-sdk/contract";
+import { cpuShot, nextPosition } from "./ai/index.ts";
 import {
-  autoReturnAngle,
-  autoReturnSpeed,
   aimAngleGain,
   ballId,
   diagonalSlot,
@@ -191,11 +190,25 @@ function launchBall(
 
 // --- onTick ----------------------------------------------------------------------------------
 
+/** Every slot this match uses (`matchSlots`), stepped one tick toward the ball's predicted landing
+ * spot - or home, once there's no ball to chase (rule 3, CC-23.8: "Movement and a real CPU
+ * partner"). Pure; `onTick` runs it once a tick before the phase switch below, and every phase
+ * function already spreads its input state, so `positions` rides along without any of them needing
+ * their own change. */
+function steppedPositions(state: BandejaState, dtMs: number): BandejaState["positions"] {
+  const positions = { ...state.positions };
+  for (const slot of matchSlots(state)) {
+    const spec = slotSpec(slot);
+    positions[slot] = nextPosition(spec, positions[slot] ?? spec.home, state.ball, dtMs);
+  }
+  return positions;
+}
+
 /** Moves the match along at the fixed 60 Hz step. Time only comes from `dtMs`. */
 export function onTick(state: BandejaState, dtMs: number): BandejaState {
   if (state.phase === "over") return state;
   const nowMs = state.nowMs + dtMs;
-  const next: BandejaState = { ...state, nowMs };
+  const next: BandejaState = { ...state, nowMs, positions: steppedPositions(state, dtMs) };
   switch (state.phase) {
     case "intro":
       return tickIntro(next, nowMs);
@@ -313,11 +326,13 @@ function recordMiss(state: BandejaState, slot: SlotName): BandejaState {
   };
 }
 
-/** An auto-returning slot hits every ball it can reach at the `ok` grade, straight down the
- * middle (rule 10). Doesn't clear anyone's miss streak: only a real accepted swing does that. */
+/** An auto-returning slot hits every ball it can reach, at the real CPU's fixed difficulty and aim
+ * (rule 10, replaced by CC-23.8: "no movement, no difficulty, and no aim" is exactly what this
+ * stops being true of). Doesn't clear anyone's miss streak: only a real accepted swing does that. */
 function performAutoHit(state: BandejaState, slot: SlotName, nowMs: number): BandejaState {
   const spec = slotSpec(slot);
-  return launchBall(state, spec.side, "ok", autoReturnAngle, autoReturnSpeed, nowMs);
+  const shot = cpuShot(state, spec);
+  return launchBall(state, spec.side, shot.grade, shot.angleDeg, shot.speed, nowMs);
 }
 
 function awardPoint(
