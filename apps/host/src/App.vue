@@ -3,6 +3,7 @@ import { audio } from "@couchcade/audio";
 import { roomClock } from "@couchcade/game-sdk/clock";
 import { CcButton } from "@couchcade/ui";
 import { onBeforeUnmount, ref, watch } from "vue";
+import AttractScreen from "./attract/AttractScreen.vue";
 import { watchButtonPresses } from "./audio/button-press.ts";
 import { isClickForSoundVisible } from "./audio/click-for-sound.ts";
 import { applyHostSettings } from "./audio/host-settings.ts";
@@ -89,6 +90,13 @@ onBeforeUnmount(stopWatchingAudioState);
       @check-tv-lag="calibration.start"
       @kick="moderate.kick"
       @lock="moderate.lock"
+    />
+    <AttractScreen
+      v-else-if="screen.name === 'attract'"
+      :lobby="screen.lobby"
+      :connection="screen.connection"
+      :origin="origin"
+      :preview="screen.preview"
     />
     <CalibrationScreen
       v-else-if="screen.name === 'calibration'"
