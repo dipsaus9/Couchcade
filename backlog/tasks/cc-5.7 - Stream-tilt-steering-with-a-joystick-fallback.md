@@ -4,7 +4,7 @@ title: Stream tilt steering with a joystick fallback
 status: Done
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-21 03:25'
+updated_date: '2026-09-21 03:42'
 labels:
   - story
 dependencies:
@@ -15,6 +15,8 @@ references:
   - packages/motion/src/gestures/tilt.ts
   - packages/motion/src/fallbacks/tilt.ts
   - packages/motion/test/tilt/
+  - packages/motion/src/gestures/index.ts
+  - packages/motion/src/fallbacks/index.ts
 parent_task_id: CC-5
 type: feature
 ordinal: 77000
