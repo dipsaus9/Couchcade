@@ -5,6 +5,7 @@ import { motionAdapter } from "./motion/adapter.ts";
 import MotionResume from "./motion/MotionResume.vue";
 import MotionStepScreen from "./motion/MotionStepScreen.vue";
 import { enterMotionFullscreen, exitMotionFullscreen, phonePlatform } from "./motion/platform.ts";
+import RecalibrateButton from "./motion/RecalibrateButton.vue";
 import { createMotionSession } from "./motion/session.ts";
 import GameController from "./runtime/GameController.vue";
 import { showsGameController } from "./runtime/controller.ts";
@@ -78,6 +79,19 @@ const resuming = computed(() => {
 // CC-5.13: a reload lost the calibration too, not just the sensors, so "Tap to resume" says so.
 const resumeReason = computed(() => (motionGame.value?.calibration === null ? "reload" : "sleep"));
 
+// "Fix my controls" (CC-5.11): shown only while motion is actually running the game, so it never
+// appears for a touch player, before the game starts, or during a sleep/resume.
+const canRecalibrate = computed(() => {
+  const game = motionGame.value;
+  return (
+    game !== null &&
+    game.playing &&
+    !game.paused &&
+    game.flow.kind === "ready" &&
+    showsGameController(state.value)
+  );
+});
+
 onBeforeUnmount(() => {
   motion.dispose();
   session.dispose();
@@ -135,6 +149,11 @@ onBeforeUnmount(() => {
     :name="state.you.name"
     :reason="resumeReason"
     @resume="motion.resume"
+  />
+  <RecalibrateButton
+    v-if="canRecalibrate"
+    :recalibrating="motionGame?.recalibrating ?? null"
+    @recalibrate="motion.recalibrate"
   />
   <!-- Motion works whichever way the page turns, so a motion game never shows the rotate panel. -->
   <RotateNotice v-if="motionGame === null" />

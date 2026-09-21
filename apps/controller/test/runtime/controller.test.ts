@@ -215,6 +215,7 @@ describe("controllerMotion", () => {
     capability: "full",
     playing: true,
     paused: false,
+    recalibrating: null,
     ...patch,
   });
 

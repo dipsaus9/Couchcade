@@ -42,4 +42,10 @@ export const motionCopy = {
     action: "Tap to resume",
     hint: "Your turn is safe. Nobody skipped you.",
   },
+  /** "Fix my controls" (CC-5.11): the manual recalibration fast-path during a running game. */
+  recalibrate: {
+    action: "Fix my controls",
+    /** While the still detector re-measures after the tap. `percent` is 0 to 100. */
+    active: (percent: number) => `Holding still… ${percent}%`,
+  },
 } as const;
