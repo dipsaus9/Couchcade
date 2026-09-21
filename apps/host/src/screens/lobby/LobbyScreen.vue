@@ -22,6 +22,11 @@ defineEmits<{ end: []; checkTvLag: []; kick: [id: string]; lock: [locked: boolea
 const seatList = computed(() => seats(props.lobby));
 const playerCount = computed(() => seatedPlayers(props.lobby).length);
 const watching = computed(() => audience(props.lobby).length);
+// 16 phones total: 8 players and 8 audience (docs/architecture/platform.md close code 4012,
+// apps/server/src/room/audience.ts's maxPhones). apps/host can't import apps/server across the
+// app tier boundary, so this small constant is mirrored here.
+const maxPhones = seatCount * 2;
+const full = computed(() => playerCount.value + watching.value >= maxPhones);
 const leader = computed(() => vip(props.lobby));
 const online = computed(() => props.connection === "open");
 const hint = computed(() =>
@@ -64,7 +69,11 @@ const hint = computed(() =>
           <h1 class="title">Players</h1>
           <p class="count">{{ playerCount }}/{{ seatCount }}</p>
           <p v-if="watching > 0" class="body">{{ watching }} watching</p>
-          <p v-if="lobby.locked" class="locked" role="status">Room locked</p>
+          <p v-if="lobby.locked" class="signal-tag" role="status">Room locked</p>
+          <!-- "Room full" (docs/design/platform-screens.md, "Errors": Signal badges for stop
+               situations) -- the TV counterpart to the phone's Room is full screen; the room
+               itself never turns any joiner away, the Worker does, before the host hears about it. -->
+          <p v-if="full" class="signal-tag" role="status">Room full</p>
           <p class="body hint">{{ hint }}</p>
         </div>
         <div class="grid">
@@ -121,7 +130,7 @@ const hint = computed(() =>
 .icon path {
   fill: none;
 }
-.locked {
+.signal-tag {
   margin: 0;
   padding: 0 var(--cc-space-3);
   font: 700 var(--cc-text-small-tv) var(--cc-text-small-font);
