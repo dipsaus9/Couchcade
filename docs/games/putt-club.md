@@ -8,8 +8,7 @@ the button to lock that line and swing your arm to decide how hard. Bank it off 
 and try not to run past the cup. 1 to 4 players in turns, lowest total wins, about 4 minutes alone and
 13 with four.
 
-**For the owner.** Read [At a glance](#at-a-glance) and [Owner decisions](#owner-decisions-2026-09-21) at
-the end. That takes about 5 minutes.
+**For the owner.** Approved 2026-09-21 — see [Owner decisions](#owner-decisions-2026-09-21) at the end.
 
 **For agents.** Everything below is binding for CC-13.2 to CC-13.8.
 [platform.md](../architecture/platform.md), [motion.md](../architecture/motion.md),
@@ -17,9 +16,9 @@ the end. That takes about 5 minutes.
 [HOUSE_STYLE.md](../HOUSE_STYLE.md) and [platform-screens.md](../design/platform-screens.md) still apply.
 Where this spec and a story disagree, stop and flag it.
 
-Status: **awaiting the owner** (CC-13.1). The four decisions in
-[Owner decisions](#owner-decisions-2026-09-21) were settled by the owner on 2026-09-21 *before* this spec
-was written, and the spec follows them. Nothing else here is approved yet.
+Status: **approved** (CC-13.1). The six decisions in [Owner decisions](#owner-decisions-2026-09-21) were
+settled by the owner on 2026-09-21 — the first four before this spec was written, the fifth and sixth
+(other players' balls, and match length) alongside its approval — and the spec follows them.
 
 **Not in this spec: the nine holes.** This spec fixes the *shape* of a hole — par, walls, hazards, cup,
 capture radius — and the physics every hole obeys. **CC-13.8 designs the nine actual holes** inside that
@@ -985,17 +984,19 @@ reading.**
 | 7 | `@couchcade/stage` | Still has no bottom instruction panel, counter chip or scorecard overlay; Quick Draw, Target Range, Strike Night and Bandeja each built game-local ones. | CC-13.4 follows that pattern. A shared panel belongs in a stage story. |
 | 8 | `@couchcade/physics` shapes | Only `CircleBodySpec` exists, and there are no sensor fixtures. So the cup and every hazard are rules-level tests, and a **moving obstacle — the windmill mini-golf is famous for — has nowhere to live.** CC-13.8's nine holes are static. | Out of scope for v1. A moving-body kind in `@couchcade/physics` would be the v2 story, and it would unlock slopes' cousin too. |
 | 9 | Kenney licences | Every `kenney.nl` URL failed to fetch from this environment on 21 September 2026 (TLS error through the proxy), exactly as Bandeja found. The Kenney rows in the [asset shortlist](#cc0-asset-shortlist) are carried over from the two shipped `CREDITS.md` files; Tiny Town was additionally confirmed CC0 on its OpenGameArt mirror this session. | CC-13.5 re-checks each pack's page and its `License.txt` at download time. |
-| **10** | **Other players' balls** | **An assumption, not a decision.** Only the putter's ball is a physics body; the others are drawn as ghosts and cannot be hit. That is the fair reading (nobody loses a stroke to a ball someone else left in the way, and real golf lets a ball in the way be marked and lifted) and it halves the physics. The alternative — four live balls on the green, knocking each other about — is undeniably funnier and would make turn order matter a lot more. **It is the one rule in this spec the owner might enjoy overruling.** | **Recommendation: ghosts for v1.** If the owner prefers live balls, it is a change to CC-13.2's world build and nothing else in this spec moves. |
+| **10** | **Other players' balls** | **Decided.** Only the putter's ball is a physics body; the others are drawn as ghosts and cannot be hit. That is the fair reading (nobody loses a stroke to a ball someone else left in the way, and real golf lets a ball in the way be marked and lifted) and it halves the physics. | The owner approved the ghosts recommendation alongside the spec on 2026-09-21 ([owner decision 5](#owner-decisions-2026-09-21)). |
 | 11 | `outcome.score` | Every shipped game puts a higher-is-better number in `score`. Putt Club's is a stroke total, where lower is better. `apps/host/src/screens/results/results.ts` only prints it next to `place`, and `place` comes from the game's own `compare`, so nothing breaks — but it is the first time the platform's `score` means the opposite of what it has meant so far. | **None.** Noted so a future results-screen story does not start sorting by `score`. |
-| 12 | Match length at 4 players | 13.1 minutes typical is the second-longest game in the catalogue, behind Strike Night's 14. The 6-stroke cap is what keeps it there, and the turn timer is the only other knob, because 9 holes is the epic's shape and CC-13.8's contract. | CC-13.7's playtest decides whether `turnTimerMs` comes down from 15 s. |
+| 12 | Match length at 4 players | 13.1 minutes typical is the second-longest game in the catalogue, behind Strike Night's 14. The 6-stroke cap is what keeps it there, and the turn timer is the only other knob, because 9 holes is the epic's shape and CC-13.8's contract. | **Decided.** The owner approved keeping it as designed alongside the spec on 2026-09-21 ([owner decision 6](#owner-decisions-2026-09-21)). CC-13.7's playtest can still revisit `turnTimerMs` if it plays long. |
 | 13 | `maxTurns` is 216 | 4 players × 9 holes × 6 strokes. It is a much bigger turn counter than Strike Night's 80 or Target Range's 12, and it is the number the input schema's `turn` is bounded by. | **None.** It is arithmetic, not a choice, and it falls straight out of the cap. |
 
 ---
 
 ## Owner decisions (2026-09-21)
 
-The owner settled all four **before** this spec was written; the spec above follows them and does not
-re-open them. The spec itself is **not approved yet**: it awaits the CC-13.1 owner gate.
+The owner settled the first four **before** this spec was written; the spec above follows them. The
+fifth (other players' balls) and sixth (match length) were decided alongside the spec's approval,
+choosing the recommendations from [finding 10](#found-while-writing-this-spec) and
+[finding 12](#found-while-writing-this-spec). The spec is **approved**.
 
 1. **Aim is a separate step before the swing.** The player first aims a direction line towards the hole, then
    swings for power. This is *not* the "the swing's own angle is the direction" pattern Bandeja and Strike
@@ -1019,3 +1020,11 @@ re-open them. The spec itself is **not approved yet**: it awaits the CC-13.1 own
    `6 × playerCount` strokes a hole and `54 × playerCount` a match. With it, 4-player rounds land at about
    **13.1 minutes typical** and 53 minutes in the worst realistic case; without it there is no ceiling at
    all. The full arithmetic is in [Stroke flow and timings](#stroke-flow-and-timings).
+5. **Other players' balls are ghosts, not obstacles.** Only the putter's ball is a physics body; everyone
+   else's ball is drawn as a ghost and cannot be hit or hit off course. Live, collidable balls were
+   considered and rejected for v1 — funnier, but it would cost a stroke to a ball someone else left in the
+   way, and it doubles the physics. See [finding 10](#found-while-writing-this-spec).
+6. **Match length stays as designed.** 13.1 minutes typical at four players (53 minutes worst realistic
+   case) is close enough to Strike Night's 14-minute precedent, and the format — 9 holes, turns, a 6-stroke
+   cap — is fixed by the epic. `turnTimerMs` (15 s) is left at CC-13.7's playtest to revisit if it plays
+   long. See [finding 12](#found-while-writing-this-spec).
