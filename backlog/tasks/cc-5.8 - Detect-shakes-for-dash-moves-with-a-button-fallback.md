@@ -4,7 +4,7 @@ title: Detect shakes for dash moves with a button fallback
 status: To Do
 assignee: []
 created_date: '2026-09-16 12:24'
-updated_date: '2026-09-16 12:28'
+updated_date: '2026-09-21 03:41'
 labels:
   - story
 dependencies:
@@ -13,6 +13,8 @@ references:
   - packages/motion/src/gestures/shake.ts
   - packages/motion/src/fallbacks/shake.ts
   - packages/motion/test/shake/
+  - packages/motion/src/gestures/index.ts
+  - packages/motion/src/fallbacks/index.ts
 parent_task_id: CC-5
 type: feature
 ordinal: 78000
