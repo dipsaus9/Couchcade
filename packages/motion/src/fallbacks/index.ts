@@ -6,8 +6,10 @@
  * - `flick.ts`: `createFlickSwipe`, the swipe pad for flick (CC-5.6)
  * - `swing.ts`: `createSwingSwipe` and `createSwingTap`, the swipe and tap pads for swing (CC-5.4)
  * - `tilt.ts`: `createTiltJoystick`, the joystick pad for tilt (CC-5.7)
+ * - `shake.ts`: `createShakeButton`, the dash button for shake (CC-5.8)
  */
 export * from "./aim.ts";
 export * from "./flick.ts";
+export * from "./shake.ts";
 export * from "./swing.ts";
 export * from "./tilt.ts";
