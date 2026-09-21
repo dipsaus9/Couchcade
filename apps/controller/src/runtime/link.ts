@@ -12,7 +12,10 @@
  * (`LinkPeer`, `LinkChannel`), so a test can inject a fake pair (built on `createFakeLink`) without
  * a real WebRTC stack, the same way `state-machine.ts` takes an injectable clock and scheduler.
  */
-import { toHostTime as roomToHostTime } from "@couchcade/game-sdk/clock";
+import {
+  setLinkOffset as roomSetLinkOffset,
+  toHostTime as roomToHostTime,
+} from "@couchcade/game-sdk/clock";
 import type { GameInput, InputChannel, InputChannelPath } from "@couchcade/game-sdk/contract";
 import {
   createInputChannel,
@@ -25,6 +28,7 @@ import {
   encodeDescription,
   frameBytesOf,
   linkClockSampleOf,
+  linkOffsetToRoom,
   maxFrameBytes as linkFrameByteCap,
   type LinkScheduler,
   type LinkState,
@@ -100,6 +104,12 @@ export interface ControllerLinkOptions {
   clock?: LocalClock;
   /** Converts a local (`clock`) timestamp to room time. Defaults to the shared room clock. */
   toHostTime?: (localTimestamp: number) => number;
+  /**
+   * Feeds the room clock the link's own phone-to-room offset while direct, and `null` once the
+   * link leaves direct (docs/architecture/realtime-link.md, "Refining a phone's clock over the
+   * link", CC-3.23). Defaults to the shared room clock's `setLinkOffset`.
+   */
+  setLinkOffset?: (linkOffsetMs: number | null) => void;
   /** Defaults to `setTimeout`/`clearTimeout`. */
   schedule?: LinkScheduler;
   /** True while the page is visible. Defaults to `document.visibilityState !== "hidden"`. */
@@ -256,6 +266,7 @@ async function gatherAndOffer(pc: LinkPeer, schedule: LinkScheduler): Promise<st
 export function createControllerLink(options: ControllerLinkOptions): ControllerLink {
   const clock: LocalClock = options.clock ?? globalThis.performance;
   const toHostTime = options.toHostTime ?? roomToHostTime;
+  const setLinkOffset = options.setLinkOffset ?? roomSetLinkOffset;
   const schedule = options.schedule ?? defaultSchedule;
   const warn = options.warn ?? ((message: string) => globals.console.warn(message));
   const enabled = options.enabled ?? realtimeLinkEnabled;
@@ -332,11 +343,17 @@ export function createControllerLink(options: ControllerLinkOptions): Controller
     }
     const result = linkPong.safeParse(parsed);
     if (!result.success) return;
-    const { t0, t1, t2 } = result.data.d;
+    const { t0, t1, t2, r } = result.data.d;
     const t3 = clock.now();
     const sample = linkClockSampleOf({ t0, t1, t2, t3 });
     rttSamples = [...rttSamples, sample.rttMs].slice(-rttSampleWindow);
     machine.pong();
+    // Once (still) direct, this pong's offset is fresher than the last: feed the room clock so
+    // toHostTime uses it instead of the relay-derived offset (AC1, CC-3.23). The `onChange`
+    // handler below clears it back to null the moment the link leaves direct.
+    if (machine.state === "direct") {
+      setLinkOffset(linkOffsetToRoom(sample.offsetPHMs, r));
+    }
   }
 
   function teardownPeer(): void {
@@ -464,6 +481,10 @@ export function createControllerLink(options: ControllerLinkOptions): Controller
 
   machine.onChange((next) => {
     notifyPathChange();
+    // Leaving direct (-> connecting, stale, relay or off): the room clock's own `setLinkOffset`
+    // is a no-op unless it was previously set, so this is safe to call on every non-direct state
+    // (AC2, CC-3.23) -- it resumes the relay clock sample at once, then every 30 s.
+    if (next !== "direct") setLinkOffset(null);
     if (next === "connecting") startAttempt();
     else if (next === "off" || next === "relay") teardownPeer();
   });

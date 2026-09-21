@@ -6,6 +6,12 @@
  * it each `clock:pong`, and tells it when the socket closes. Tests inject the local clock and the
  * scheduler, so they run on virtual time.
  *
+ * While a phone's WebRTC link is `direct`, it already has a link-derived room offset from
+ * `link:ping`/`link:pong` (docs/architecture/realtime-link.md, "Refining a phone's clock over the
+ * link"), fed in through `setLinkOffset`. `toHostTime` prefers that offset, and the periodic
+ * resync `clock:ping` this module would otherwise send every 30 s pauses -- the burst of 5 on
+ * connect still happens either way, so a phone always has room time before its link comes up.
+ *
  * ```ts
  * socket.on("room:welcome", () => roomClock.connect((d) => socket.send(encode({ t: "clock:ping", d }))));
  * socket.on("clock:pong", (d) => roomClock.receive(d));
@@ -64,6 +70,15 @@ export interface RoomClock {
    * Converts a local timestamp to room time, as an integer. See the exported `toHostTime`.
    */
   toHostTime(localTimestamp: number): number;
+  /**
+   * Feeds the link-derived phone-to-room offset while the phone's WebRTC link is `direct`
+   * (docs/architecture/realtime-link.md, "Refining a phone's clock over the link"): `toHostTime`
+   * prefers it over the relay-derived `offsetMs`, and the periodic resync `clock:ping` (every
+   * `clockResyncMs`) is skipped while it is set. The burst of `clockBurstSamples` on connect is
+   * unaffected. Pass `null` when the link leaves `direct` (stale or relay): the next relay sample
+   * goes at once, and the 30 s rhythm resumes from that moment.
+   */
+  setLinkOffset(linkOffsetMs: number | null): void;
 }
 
 interface TimerGlobals {
@@ -96,18 +111,56 @@ export function createRoomClock(options: RoomClockOptions = {}): RoomClock {
   const pending = new Map<number, number>();
   const cancels = new Set<() => void>();
 
-  const after = (delayMs: number, callback: () => void): void => {
+  // Set by `connect`, cleared by `disconnect`: the current connection's send, so `setLinkOffset`
+  // can act on it (send a relay sample at once) without connect/disconnect owning that closure.
+  let currentSend: ((ping: ClockPing) => void) | null = null;
+  // The link-derived room offset while the link is `direct`, `null` on the relay/stale path.
+  let linkOffsetMs: number | null = null;
+  let resyncCancel: (() => void) | null = null;
+
+  const after = (delayMs: number, callback: () => void): (() => void) => {
     const cancel = schedule(() => {
       cancels.delete(cancel);
       callback();
     }, delayMs);
     cancels.add(cancel);
+    return cancel;
+  };
+
+  const sendPing = (): void => {
+    if (currentSend === null) return;
+    const id = nextId++;
+    const t0 = now();
+    pending.set(id, t0);
+    currentSend({ id, t0 });
+  };
+
+  // Ticks every `clockResyncMs` for as long as the connection lives. While the link is direct
+  // (`linkOffsetMs` set) the tick is skipped -- AC1's "no periodic clock:ping reaches the room" --
+  // but the cadence itself keeps running so a later stale/relay switch resumes it without a gap
+  // longer than one tick (`setLinkOffset` restarts it "at once" instead, for AC2).
+  const armResync = (): void => {
+    resyncCancel = after(clockResyncMs, () => {
+      resyncCancel = null;
+      if (linkOffsetMs === null) sendPing();
+      armResync();
+    });
+  };
+
+  const cancelResync = (): void => {
+    if (resyncCancel === null) return;
+    resyncCancel();
+    cancels.delete(resyncCancel);
+    resyncCancel = null;
   };
 
   const disconnect = (): void => {
     for (const cancel of cancels) cancel();
     cancels.clear();
     pending.clear();
+    currentSend = null;
+    resyncCancel = null;
+    linkOffsetMs = null;
   };
 
   return {
@@ -125,23 +178,13 @@ export function createRoomClock(options: RoomClockOptions = {}): RoomClock {
       disconnect();
       samples = [];
       synced = false;
+      currentSend = send;
 
-      const ping = (): void => {
-        const id = nextId++;
-        const t0 = now();
-        pending.set(id, t0);
-        send({ id, t0 });
-      };
-      const resync = (): void => {
-        ping();
-        after(clockResyncMs, resync);
-      };
-
-      ping();
+      sendPing();
       for (let sample = 1; sample < clockBurstSamples; sample++) {
-        after(sample * clockBurstGapMs, ping);
+        after(sample * clockBurstGapMs, sendPing);
       }
-      after(clockResyncMs, resync);
+      armResync();
     },
 
     disconnect,
@@ -177,7 +220,19 @@ export function createRoomClock(options: RoomClockOptions = {}): RoomClock {
     },
 
     toHostTime(localTimestamp) {
-      return Math.round(localTimestamp + (offsetMs ?? 0));
+      return Math.round(localTimestamp + (linkOffsetMs ?? offsetMs ?? 0));
+    },
+
+    setLinkOffset(next) {
+      const wasDirect = linkOffsetMs !== null;
+      linkOffsetMs = next;
+      if (wasDirect && next === null && currentSend !== null) {
+        // Leaving direct (AC2): don't wait for whatever's left of the paused cadence, sample now
+        // and restart the 30 s rhythm from this moment.
+        cancelResync();
+        sendPing();
+        armResync();
+      }
     },
   };
 }
@@ -198,4 +253,13 @@ export const roomClock: RoomClock = createRoomClock();
  */
 export function toHostTime(localTimestamp: number): number {
   return roomClock.toHostTime(localTimestamp);
+}
+
+/**
+ * Feeds `roomClock.setLinkOffset` (see `RoomClock.setLinkOffset`). The controller runtime's link
+ * calls this with its own link-derived phone-to-room offset while direct, and `null` once it
+ * leaves direct (docs/architecture/realtime-link.md, "Refining a phone's clock over the link").
+ */
+export function setLinkOffset(linkOffsetMs: number | null): void {
+  roomClock.setLinkOffset(linkOffsetMs);
 }
