@@ -1,0 +1,74 @@
+name: Smoke
+
+# Runs the same live-site check deploy.yml runs after a deploy (tooling/smoke/), on a schedule, so
+# a broken site is noticed even on a day nobody plays. Opens (or reuses) a GitHub issue on failure.
+on:
+  schedule:
+    # 06:00 UTC: outside normal play hours, after any overnight deploy has settled.
+    - cron: "0 6 * * *"
+  workflow_dispatch: {}
+
+# One run at a time; a manual run never races the scheduled one.
+concurrency:
+  group: smoke
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  # Least-privilege default is to deny this; the failure step below needs it to read and file
+  # issues (never anything else on the issue tracker).
+  issues: write
+
+env:
+  ISSUE_TITLE: "Scheduled smoke test failed"
+
+jobs:
+  smoke:
+    name: smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # Actions are pinned to full commit SHAs. Renovate keeps the SHA and version comment current.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # The same tooling/smoke/ script deploy.yml runs after a deploy: creates a room with the
+      # passcode and the smoke token (skips only Turnstile), opens its socket, closes the room
+      # again with 4004. Any failure fails this step.
+      - name: smoke test
+        run: pnpm --filter @couchcade/smoke run smoke
+        env:
+          SMOKE_URL: https://couchcade.dipsaus9.workers.dev
+          SMOKE_HOST_PASSCODE: ${{ secrets.SMOKE_HOST_PASSCODE }}
+          SMOKE_TOKEN: ${{ secrets.SMOKE_TOKEN }}
+
+      # Runs only when a previous step failed. Searches for an already-open issue with the same
+      # fixed title first, so a site that's still broken tomorrow doesn't get a second issue.
+      - name: open an issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          existing=$(gh issue list --repo "$REPO" --search "\"$ISSUE_TITLE\" in:title is:open" --json number --jq 'length')
+          if [ "$existing" -gt 0 ]; then
+            echo "::notice::An open issue titled \"$ISSUE_TITLE\" already exists, not filing another."
+            exit 0
+          fi
+          gh issue create --repo "$REPO" --title "$ISSUE_TITLE" --body "$(cat <<EOF
+          The scheduled smoke test (tooling/smoke/) failed against https://couchcade.dipsaus9.workers.dev.
+
+          Run: $RUN_URL
+          EOF
+          )"
