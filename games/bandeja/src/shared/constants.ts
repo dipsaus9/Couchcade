@@ -135,8 +135,12 @@ export const squeezeStepShots = 6;
 export const squeezeStepFactor = 0.9;
 export const squeezeMinReach = 0.8;
 /** A rally this long ends the point outright (rule 9's own safety valve; never hit in the worked
- * model, since the squeeze makes a double bounce or net fault near-certain long before this). */
-export const squeezeForceEndShots = 120;
+ * model, since the squeeze makes a double bounce or net fault near-certain long before this).
+ * 60 is still 7-10x the longest realistic rally in "Point flow and timings" (about 6-8 shots
+ * typical, low double digits at worst) — comfortable margin over real play, while bounding how
+ * long a pathological rally (two away/auto slots trading `ok`-grade returns forever, as a fuzzed
+ * contract-test session can produce) keeps re-running predict's 150-step look-ahead on every hit. */
+export const squeezeForceEndShots = 60;
 /** A slot with no swing within 240 ms of its last 3 arrival moments is away (rule 10). */
 export const awayAfterMisses = 3;
 /** Straight down the middle, at the `ok` grade (rule 10). */

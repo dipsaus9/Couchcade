@@ -210,6 +210,7 @@ export function predict(
     if (heightStep.bounced) body = applyFloorBounceDrag(body);
     const tMs = nowMs + (step + 1) * dtMs;
 
+    let anyOpen = false;
     for (const spec of slots) {
       const span = spans.get(spec.slot) as ReachSpan;
       if (span.exited) continue;
@@ -224,7 +225,11 @@ export function predict(
       } else if (span.entered) {
         span.exited = true;
       }
+      if (!span.exited) anyOpen = true;
     }
+    // Every slot's first window has already opened and closed: nothing later in the flight can
+    // change any arrival, so the rest of the (potentially long) bounce path costs nothing further.
+    if (!anyOpen) break;
   }
 
   const arrivals: Partial<Record<SlotName, number>> = {};
