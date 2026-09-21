@@ -4,7 +4,7 @@ title: Let a player recalibrate motion mid-session
 status: To Do
 assignee: []
 created_date: '2026-09-19 08:23'
-updated_date: '2026-09-20 11:41'
+updated_date: '2026-09-21 03:08'
 labels:
   - story
 dependencies:
@@ -12,6 +12,7 @@ dependencies:
 references:
   - apps/controller/src/motion/
   - apps/controller/src/screens/calibration/
+  - apps/controller/src/App.vue
   - apps/controller/test/
 parent_task_id: CC-5
 type: feature
