@@ -7,8 +7,17 @@ function chunk(
   fileName: string,
   facadeModuleId: string | null,
   moduleIds: string[] = [],
+  edges: { imports?: string[]; dynamicImports?: string[] } = {},
 ): BuiltItem {
-  return { type: "chunk", fileName, facadeModuleId, moduleIds, code: `// ${fileName}\n` };
+  return {
+    type: "chunk",
+    fileName,
+    facadeModuleId,
+    moduleIds,
+    imports: edges.imports,
+    dynamicImports: edges.dynamicImports,
+    code: `// ${fileName}\n`,
+  };
 }
 
 function asset(fileName: string, byteLength = 100): BuiltItem {
@@ -77,6 +86,56 @@ describe("measureApp", () => {
     const items = [chunk("index-abc.js", "/repo/apps/host/src/main.ts")];
     const { vendorGzipBytes } = measureApp(items, ["phaser"]);
     expect(vendorGzipBytes.get("phaser")).toBe(0);
+  });
+
+  it("excludes a shared chunk from platform once two or more games are its only importers", () => {
+    // The shape a shared rules dependency takes once a second game also depends on it (CC-23.2):
+    // no facade module of its own, reached only through each game's own lazily-loaded entry.
+    const items = [
+      chunk("index-abc.js", "/repo/apps/host/src/main.ts", [], {
+        dynamicImports: ["src-strike.js", "src-bandeja.js"],
+      }),
+      chunk("src-strike.js", "/repo/games/strike-night/src/index.ts", [], {
+        imports: ["physics-shared.js"],
+      }),
+      chunk("src-bandeja.js", "/repo/games/bandeja/src/index.ts", [], {
+        imports: ["physics-shared.js"],
+      }),
+      chunk("physics-shared.js", null),
+    ];
+    const { platformGzipBytes, perGame } = measureApp(items, []);
+    expect(platformGzipBytes).toBe(gzipSize("// index-abc.js\n"));
+    expect(perGame.get("strike-night")).toBe(gzipSize("// src-strike.js\n"));
+    expect(perGame.get("bandeja")).toBe(gzipSize("// src-bandeja.js\n"));
+    // physics-shared.js counts nowhere: not platform (it never loads before a game is chosen),
+    // and not duplicated into either game's own total.
+  });
+
+  it("still counts a shared chunk as platform when any importer isn't a game's own chunk", () => {
+    // The platform's own boot sequence also code-splits through a dynamic import() it calls
+    // unconditionally at startup, so a shared chunk reached that way must stay in the platform
+    // total: only a chunk whose *every* importer is a recognised game entry is exempted.
+    const items = [
+      chunk("index-abc.js", "/repo/apps/host/src/main.ts", [], {
+        dynamicImports: ["boot.js", "src-strike.js"],
+      }),
+      chunk("boot.js", "/repo/apps/host/src/stage/boot.ts", [], { imports: ["vendor-shared.js"] }),
+      chunk("src-strike.js", "/repo/games/strike-night/src/index.ts", [], {
+        imports: ["vendor-shared.js"],
+      }),
+      chunk("vendor-shared.js", null),
+    ];
+    const { platformGzipBytes, perGame } = measureApp(items, []);
+    expect(perGame.get("strike-night")).toBe(gzipSize("// src-strike.js\n"));
+    expect(platformGzipBytes).toBe(
+      gzipSize("// index-abc.js\n") + gzipSize("// boot.js\n") + gzipSize("// vendor-shared.js\n"),
+    );
+  });
+
+  it("still counts an unreferenced shared-looking chunk as platform (no importers found)", () => {
+    const items = [chunk("mystery-shared.js", null)];
+    const { platformGzipBytes } = measureApp(items, []);
+    expect(platformGzipBytes).toBe(gzipSize("// mystery-shared.js\n"));
   });
 
   it("does not confuse a path that merely contains the substring 'games' with games/", () => {
