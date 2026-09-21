@@ -15,6 +15,19 @@ Every CC0 asset Couchcade uses, collected from each game's `CREDITS.md` and ever
 | Foul buzzer (`audio/foul.ogg`, "Wrong Buzzer") | KevinVG207 | https://freesound.org/people/KevinVG207/sounds/331912/ | CC0 |
 | Lobby loop (`audio/lobby-loop.ogg`, "Adventure Begins Loop", Happy Chiptunes (Collection)) | Holizna | https://opengameart.org/content/happy-chiptunes-collection | CC0 |
 
+## Bandeja
+
+| Asset | Author | Source | Licence |
+| --- | --- | --- | --- |
+| Racket on ball, mishit/ok grade x5 (`assets/sounds/racket-pock-1.ogg` to `-5.ogg`, Impact Sounds `impactWood_light_000` to `_004`, reused from `games/strike-night/assets/sounds/pin-crash-light-*.ogg`) | Kenney | https://kenney.nl/assets/impact-sounds | CC0 |
+| Ball on mesh, the side panels x5 (`assets/sounds/mesh-rattle-1.ogg` to `-5.ogg`, Impact Sounds `impactMetal_light_000` to `_004`, reused from `games/strike-night/assets/sounds/sweep-clunk-*.ogg`) | Kenney | https://kenney.nl/assets/impact-sounds | CC0 |
+| Ball on glass, the back and corner walls (`assets/sounds/glass-ping.ogg`, Interface Sounds `glass_001`, reused from `games/strike-night/assets/sounds/spare-ding.ogg`) | Kenney | https://kenney.nl/assets/interface-sounds | CC0 |
+| Point ding (`assets/sounds/point-ding.ogg`, Interface Sounds `bong_001`, reused from `games/target-range/assets/sounds/bullseye-ding.ogg`) | Kenney | https://kenney.nl/assets/interface-sounds | CC0 |
+| Match end jingle (`assets/sounds/match-end.ogg`, Music Jingles "Hit jingles/jingles_HIT02", reused from `games/strike-night/assets/sounds/match-end.ogg`) | Kenney | https://kenney.nl/assets/music-jingles | CC0 |
+| Net flub, slowed (`assets/sounds/net-flub.mp3`, Impact Sounds `impactSoft_heavy_000`, source reused from `games/target-range/assets/sounds/arrow-thud-straw.ogg`, re-processed with `ffmpeg asetrate=0.75x`) | Kenney | https://kenney.nl/assets/impact-sounds | CC0 |
+| Game music loop (`assets/sounds/game-music-loop.ogg`, "Summer Park – 8bit tune (loop)", already Target Range's loop) | Scribe (Daniel Stephens) | https://opengameart.org/content/summer-park-8bit-tune-loop | CC0 |
+| Music backup (`assets/sounds/music-backup.mp3`, "Happy Adventure (Loop)", already Strike Night's backup) | TinyWorlds | https://opengameart.org/content/happy-adventure-loop | CC0 |
+
 ## Quick Draw
 
 | Asset | Author | Source | Licence |
