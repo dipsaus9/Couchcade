@@ -1,7 +1,7 @@
 import { audio } from "@couchcade/audio";
 import type { StoredDisplayLag } from "@couchcade/game-sdk/clock";
 import type { RelayToHostMessage } from "@couchcade/protocol";
-import { onBeforeUnmount, shallowRef } from "vue";
+import { onBeforeUnmount, ref, shallowRef } from "vue";
 import { ApiError, createRoom } from "../net/api.ts";
 import {
   connectRelay,
@@ -78,6 +78,10 @@ export type HostScreen =
  */
 export function useHostSession() {
   const screen = shallowRef<HostScreen>({ name: "passcode", notice: null });
+  // True once opening a room hit the Cloudflare Workers Free daily request budget
+  // (errors/QuotaScreen.vue, errors/classify.ts): shown as its own screen instead of an inline
+  // passcode notice, since there's nothing to retry until the next day's reset.
+  const quotaReached = ref(false);
   let relay: RelayConnection | null = null;
   let runtime: HostRuntime | null = null;
   let moderation: Moderation | null = null;
@@ -163,6 +167,7 @@ export function useHostSession() {
       });
       const { code, ticket, rejoinToken } = await createRoom(passcode, token);
       const session: StoredSession = { code, playerId: "host", rejoinToken };
+      quotaReached.value = false;
       saveSession(session);
       enterRoom(session, ticket);
       return null;
@@ -170,6 +175,10 @@ export function useHostSession() {
       const code = error instanceof ApiError ? error.code : "unexpected";
       // A 403 means the token was refused and is spent (security.md, "Where Turnstile runs").
       if (code.startsWith("turnstile")) turnstile.reset();
+      if (code === "quota") {
+        quotaReached.value = true;
+        return null;
+      }
       return createErrorCopy(code);
     }
   }
@@ -210,7 +219,7 @@ export function useHostSession() {
     relay?.close();
   });
 
-  return { screen, openRoom, endRoom, calibration, moderate, endGameEarly };
+  return { screen, openRoom, endRoom, calibration, moderate, endGameEarly, quotaReached };
 }
 
 interface Moderation {
