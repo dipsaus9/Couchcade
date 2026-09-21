@@ -10,6 +10,7 @@ import {
   toHostTime,
 } from "@couchcade/game-sdk/clock";
 import type { ClockPing } from "@couchcade/game-sdk/clock";
+import { linkClockSampleOf, linkOffsetToRoom } from "@couchcade/game-sdk/link";
 import { createVirtualTime } from "./virtual-time.ts";
 
 const localEpoch = 1_789_000_000_000;
@@ -190,6 +191,147 @@ describe("toHostTime", () => {
     expect(roomClock.synced).toBe(false);
     expect(toHostTime(localEpoch + 0.6)).toBe(localEpoch + 1);
     expect(toHostTime(localEpoch + 0.6)).toBe(roomClock.toHostTime(localEpoch + 0.6));
+  });
+});
+
+describe("link offset (CC-3.23)", () => {
+  it("prefers the link offset over the relay-derived offset while it is set", () => {
+    const { time, clock, send, answerAll } = createManualRig();
+    clock.connect(send);
+    for (const at of [0, 200, 400, 600, 800]) {
+      time.advanceTo(at);
+      answerAll(1_000);
+    }
+    expect(clock.offsetMs).toBe(1_000);
+    expect(clock.toHostTime(localEpoch)).toBe(localEpoch + 1_000);
+
+    clock.setLinkOffset(250);
+    expect(clock.toHostTime(localEpoch)).toBe(localEpoch + 250);
+    // The relay-derived offset keeps updating underneath, it's just not used while direct.
+    time.advanceTo(clockResyncMs);
+    expect(clock.offsetMs).toBe(1_000);
+
+    clock.setLinkOffset(null);
+    expect(clock.toHostTime(localEpoch)).toBe(localEpoch + 1_000);
+  });
+
+  it("works before any relay sync at all -- toHostTime falls back to 0, not the link offset's absence", () => {
+    const { clock } = createManualRig();
+    expect(clock.toHostTime(localEpoch + 10)).toBe(localEpoch + 10);
+    clock.setLinkOffset(500);
+    expect(clock.toHostTime(localEpoch + 10)).toBe(localEpoch + 510);
+    // Calling it with no connection at all (link torn down before the room socket ever opened) is
+    // harmless: nothing to send, nothing to schedule.
+    clock.setLinkOffset(null);
+    expect(clock.toHostTime(localEpoch + 10)).toBe(localEpoch + 10);
+  });
+
+  it("pauses the periodic resync clock:ping while a link offset is set (AC1)", () => {
+    const { time, clock, sent, send } = createManualRig();
+    clock.connect(send);
+    time.advanceTo(800);
+    expect(sent.length).toBe(clockBurstSamples);
+
+    clock.setLinkOffset(123);
+    time.advanceTo(3 * clockResyncMs);
+    // Three resync ticks came and went at 30/60/90 s; none of them reached the room.
+    expect(sent.length).toBe(clockBurstSamples);
+  });
+
+  it("sends a relay sample at once, then resumes the 30 s rhythm, on leaving direct (AC2)", () => {
+    const { time, clock, sent, send } = createManualRig();
+    clock.connect(send);
+    time.advanceTo(800);
+    clock.setLinkOffset(123);
+    time.advanceTo(3 * clockResyncMs);
+    expect(sent.length).toBe(clockBurstSamples); // still just the burst
+
+    const clearedAt = 3 * clockResyncMs + 5_000;
+    time.advanceTo(clearedAt);
+    clock.setLinkOffset(null);
+    expect(sent.map((ping) => ping.at)).toEqual([0, 200, 400, 600, 800, clearedAt]);
+
+    // The 30 s rhythm resumes from the moment it was cleared, not from the paused schedule.
+    time.advanceTo(clearedAt + clockResyncMs);
+    expect(sent.at(-1)!.at).toBe(clearedAt + clockResyncMs);
+  });
+
+  it("still takes the 5-sample burst on connect even with a leftover link offset (AC3)", () => {
+    const { time, clock, sent, send } = createManualRig();
+    clock.setLinkOffset(999);
+    clock.connect(send);
+    time.advanceTo(800);
+    expect(sent.length).toBe(clockBurstSamples);
+    // A fresh connect always starts back on the relay path.
+    expect(clock.toHostTime(localEpoch)).toBe(localEpoch);
+  });
+});
+
+/**
+ * A phone linked directly to the host over WebRTC (docs/architecture/realtime-link.md, "Refining
+ * a phone's clock over the link"). Forward and return delays are deliberately asymmetric -- 30 to
+ * 34 ms one way, 10 to 14 ms the other -- never symmetric: a naive offset that halved the round
+ * trip (or otherwise ignored the host's actual receive/send timestamps `t1`/`t2`) would carry the
+ * full asymmetry as error here, not just half of it. `linkClockSampleOf`/`linkOffsetToRoom`
+ * (test/link/clock.test.ts) already prove the maths in isolation; this rig proves the wiring this
+ * story adds -- `setLinkOffset` feeding `toHostTime` -- holds up over the same kind of path.
+ */
+/** The phone's true offset to the room, drifting the way a real device clock does. */
+const phoneRoomOffsetMs = (v: number) => 12_345.5 + v * 8e-6;
+
+function createLinkRig(seed: number) {
+  const time = createVirtualTime();
+  const rng = createRng(seed);
+  const roomEpoch = 1_789_000_000_000;
+  const roomAt = (v: number) => roomEpoch + v;
+  // The host already knows its own room clock offset (a different story's concern, CC-1.14) and
+  // reports it as `r` on every link:pong. Non-zero and not a round number, so a test bug that
+  // silently drops `r` would show up as a large, obvious error rather than passing by accident.
+  const hostRoomOffsetMs = -842.25;
+  const hostLocalAt = (v: number) => roomAt(v) - hostRoomOffsetMs;
+  const phoneLocalAt = (v: number) => roomAt(v) - phoneRoomOffsetMs(v);
+
+  const clock = createRoomClock({ now: () => phoneLocalAt(time.now), schedule: time.schedule });
+  const forwardMs = () => 30 + rng.next() * 4;
+  const returnMs = () => 10 + rng.next() * 4;
+
+  const pingOnce = (): void => {
+    const t0 = phoneLocalAt(time.now);
+    time.at(time.now + forwardMs(), () => {
+      const t1 = hostLocalAt(time.now);
+      const t2 = t1; // the host answers at once
+      time.at(time.now + returnMs(), () => {
+        const t3 = phoneLocalAt(time.now);
+        const sample = linkClockSampleOf({ t0, t1, t2, t3 });
+        clock.setLinkOffset(linkOffsetToRoom(sample.offsetPHMs, hostRoomOffsetMs));
+      });
+    });
+  };
+
+  return {
+    time,
+    pingOnce,
+    /** How far the phone's link-derived room time is from the true room time right now. */
+    errorMs: () => clock.toHostTime(phoneLocalAt(time.now)) - roomAt(time.now),
+  };
+}
+
+describe("link offset accuracy (CC-3.23, AC4)", () => {
+  it("keeps link-derived room time within 15 ms over an asymmetric link", () => {
+    const worst: number[] = [];
+    for (let seed = 1; seed <= 5; seed++) {
+      const rig = createLinkRig(seed);
+      let seedWorst = 0;
+      // 200 pings at the link's "playing" cadence (250 ms, realtime-link.md "Channels, messages
+      // and rates"): 50 s of a running game.
+      for (let i = 0; i < 200; i++) {
+        rig.pingOnce();
+        rig.time.advanceBy(250);
+        seedWorst = Math.max(seedWorst, Math.abs(rig.errorMs()));
+      }
+      worst.push(seedWorst);
+    }
+    expect(Math.max(...worst)).toBeLessThan(15);
   });
 });
 
