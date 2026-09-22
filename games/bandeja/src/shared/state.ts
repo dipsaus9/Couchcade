@@ -41,6 +41,10 @@ export interface BallState {
   z: number;
   vz: number;
   leg: BallLeg;
+  /** Where this flight will first hit the floor (`ai/landing.ts`'s `predictLanding`, CC-23.8),
+   * recomputed at the same path-change events `leg` is, not every tick - `ai/positions.ts` reads
+   * it straight off here to walk a slot toward it. */
+  landing: { x: number; y: number; tMs: number } | null;
 }
 
 export interface RallyState {

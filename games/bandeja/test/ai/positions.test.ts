@@ -7,12 +7,20 @@ import type { BallState } from "../../src/shared/state.ts";
 const aRight = doublesSlots.find((spec) => spec.slot === "a-right");
 if (aRight === undefined) throw new Error("a-right must exist");
 
-function ball(x: number, y: number, z: number, vx: number, vy: number, vz: number): BallState {
+/**
+ * `nextPosition` reads its target straight off `ball.landing` (cached by `rules.ts` at the same
+ * path-change events `leg` is - see `ai/positions.ts`'s own doc comment), so these tests supply it
+ * directly rather than deriving it from a real trajectory: `ai/landing.test.ts` already covers
+ * whether `predictLanding` itself gets the physics right. `body`/`z`/`vz` are still filled in for a
+ * realistic `BallState`, even though `nextPosition` doesn't read them.
+ */
+function ball(landing: BallState["landing"]): BallState {
   return {
-    body: { id: ballId, x, y, vx, vy, a: 0, w: 0 },
-    z,
-    vz,
+    body: { id: ballId, x: 5, y: 10, vx: 0, vy: 0, a: 0, w: 0 },
+    z: 0.5,
+    vz: 0,
     leg: { arrivals: {}, timedOut: [] },
+    landing,
   };
 }
 
@@ -30,18 +38,23 @@ describe("nextPosition", () => {
     expect(next).toEqual(aRight.home);
   });
 
+  it("drifts back to home when a ball's live but can't be landed inside the horizon", () => {
+    const next = nextPosition(aRight, [8.5, 8.0], ball(null), tickMs);
+    expect(next[0]).toBeLessThan(8.5);
+    expect(next[0]).toBeGreaterThan(7.4);
+  });
+
   it("walks toward the ball's predicted landing spot while a ball's live", () => {
-    // A ball crossing a-right's side of the court (y < 10) heading left, from (9.0, 2.0) at
-    // 6 m/s leftward: it lands well to the left of a-right's home (7.4, 6.4), so the slot should
-    // step left to meet it.
-    const inFlight = ball(9.0, 2.0, 0.8, -6, 2, 3.2);
+    // A landing spot to the left of a-right's home (7.4, 6.4): the slot should step left to meet
+    // it.
+    const inFlight = ball({ x: 3.9, y: 3.7, tMs: 850 });
     const next = nextPosition(aRight, aRight.home, inFlight, tickMs);
     expect(next[0]).toBeLessThan(aRight.home[0]);
   });
 
   it("never moves the slot outside its own reach circle, however far the ball lands", () => {
     // A landing spot far outside a-right's 2.4 m reach of (7.4, 6.4).
-    const inFlight = ball(9.9, 19.9, 0.05, 0, 0, -0.01);
+    const inFlight = ball({ x: 9.9, y: 19.9, tMs: 20 });
     let position = aRight.home;
     for (let i = 0; i < 600; i++) position = nextPosition(aRight, position, inFlight, tickMs);
     const distance = Math.hypot(position[0] - aRight.home[0], position[1] - aRight.home[1]);

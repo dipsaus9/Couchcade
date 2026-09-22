@@ -13,6 +13,8 @@ import {
   onTick,
   outcome,
   predict,
+  predictLanding,
+  predictSteps,
   restore,
   snapshot,
   view,
@@ -122,8 +124,8 @@ export function arriveAtFor(state: BandejaState, slot: SlotName): number {
 /**
  * A `base` state (from `init`, optionally with its own overrides already applied) with a ball
  * already in flight mid-rally, for tests that want to drop a shot straight into a specific spot on
- * the court rather than choreograph a whole serve. `predict` runs for real, exactly as `onTick`
- * would after a live hit, so `leg.arrivals` is genuine.
+ * the court rather than choreograph a whole serve. `predict` and `predictLanding` both run for
+ * real, exactly as `onTick` would after a live hit, so `leg.arrivals` and `landing` are genuine.
  */
 export function ralliedState(
   base: BandejaState,
@@ -131,6 +133,7 @@ export function ralliedState(
   rallyOverrides: Partial<RallyState> = {},
 ): BandejaState {
   const leg = predict(ball, tickMs, base.nowMs, matchSlotSpecs(base));
+  const landing = predictLanding(ball, tickMs, predictSteps);
   return {
     ...base,
     phase: "rally",
@@ -140,6 +143,7 @@ export function ralliedState(
       z: ball.z,
       vz: ball.vz,
       leg,
+      landing,
     },
     rally: { shots: 1, bounces: 0, bounceSide: null, pointSettleAtMs: null, ...rallyOverrides },
   };

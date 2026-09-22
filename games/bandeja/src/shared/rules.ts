@@ -8,7 +8,8 @@
 import { createRng } from "@couchcade/utils";
 import type { InputContext, Player } from "@couchcade/game-sdk/contract";
 import { tickMs } from "@couchcade/game-sdk/contract";
-import { cpuShot, nextPosition } from "./ai/index.ts";
+import { cpuShot, nextPosition, predictLanding } from "./ai/index.ts";
+import type { Landing } from "./ai/index.ts";
 import {
   aimAngleGain,
   ballId,
@@ -24,6 +25,7 @@ import {
   paceSpeedGain,
   pointEndMs,
   pointSettleMs,
+  predictSteps,
   serveContactZ,
   serveFlightS,
   serveJitterX,
@@ -56,6 +58,24 @@ import type { BallState, BandejaPlayer, BandejaState, PointReason, RallyState } 
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+/** Where a ball on this flight will first hit the floor (`ai/landing.ts`, CC-23.8), computed once
+ * per flight segment at exactly the same trigger points `leg` is (a serve, a connected swing, a
+ * wall or floor bounce) and cached on `BallState` alongside it, not recomputed every tick: the
+ * ball's path is a straight-line-then-gravity segment between those events, so the landing spot a
+ * segment ends at doesn't change tick to tick within it, and calling `predictLanding` for every
+ * slot on every tick priced a 60 Hz game loop like a "handful of times per rally" one (see
+ * physics.ts's own `predict`, which the spec already holds to that budget). */
+function computeLanding(ball: {
+  x: number;
+  y: number;
+  z: number;
+  vx: number;
+  vy: number;
+  vz: number;
+}): Landing | null {
+  return predictLanding(ball, tickMs, predictSteps);
 }
 
 /** ≤60 ms clean, ≤140 ms ok, ≤240 ms mishit, anything more is a whiff. */
@@ -180,10 +200,11 @@ function launchBall(
   const vz = spec.lift;
   const shots = (state.rally?.shots ?? 0) + 1;
   const leg = predict({ x, y, z, vx, vy, vz }, tickMs, nowMs, squeezedSlotSpecs(state, shots));
+  const landing = computeLanding({ x, y, z, vx, vy, vz });
   const rally: RallyState = { shots, bounces: 0, bounceSide: null, pointSettleAtMs: null };
   return {
     ...state,
-    ball: { body: { id: ballId, x, y, vx, vy, a: 0, w: 0 }, z, vz, leg },
+    ball: { body: { id: ballId, x, y, vx, vy, a: 0, w: 0 }, z, vz, leg, landing },
     rally,
   };
 }
@@ -273,16 +294,13 @@ function tickBall(state: BandejaState, dtMs: number, nowMs: number): BandejaStat
   }
 
   const pathChanged = heightStep.bounced || planStep.wallContact;
+  const flight = { x: body.x, y: body.y, z, vx: body.vx, vy: body.vy, vz };
   const leg = pathChanged
-    ? predict(
-        { x: body.x, y: body.y, z, vx: body.vx, vy: body.vy, vz },
-        tickMs,
-        nowMs,
-        squeezedSlotSpecs(state, rally.shots),
-      )
+    ? predict(flight, tickMs, nowMs, squeezedSlotSpecs(state, rally.shots))
     : ball.leg;
+  const landing = pathChanged ? computeLanding(flight) : ball.landing;
 
-  const ballState: BallState = { body, z, vz, leg };
+  const ballState: BallState = { body, z, vz, leg, landing };
   let next: BandejaState = { ...state, ball: ballState, rally };
   next = resolveArrivals(next, nowMs);
 
@@ -391,13 +409,14 @@ function startServe(state: BandejaState, nowMs: number): BandejaState {
   const y = serverSpec.home[1];
   const z = serveContactZ;
   const leg = predict({ x, y, z, vx, vy, vz }, tickMs, nowMs, squeezedSlotSpecs(state, 1));
+  const landing = computeLanding({ x, y, z, vx, vy, vz });
   const rally: RallyState = { shots: 1, bounces: 0, bounceSide: null, pointSettleAtMs: null };
 
   return {
     ...state,
     phase: "serve",
     phaseAtMs: nowMs,
-    ball: { body: { id: ballId, x, y, vx, vy, a: 0, w: 0 }, z, vz, leg },
+    ball: { body: { id: ballId, x, y, vx, vy, a: 0, w: 0 }, z, vz, leg, landing },
     rally,
     lastServeSlot: { ...state.lastServeSlot, [side]: servingSlot },
     rng: rng.state,
