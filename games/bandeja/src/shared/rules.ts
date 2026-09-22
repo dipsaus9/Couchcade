@@ -8,9 +8,9 @@
 import { createRng } from "@couchcade/utils";
 import type { InputContext, Player } from "@couchcade/game-sdk/contract";
 import { tickMs } from "@couchcade/game-sdk/contract";
+import { cpuShot, nextPosition, predictLanding } from "./ai/index.ts";
+import type { Landing } from "./ai/index.ts";
 import {
-  autoReturnAngle,
-  autoReturnSpeed,
   aimAngleGain,
   ballId,
   diagonalSlot,
@@ -25,6 +25,7 @@ import {
   paceSpeedGain,
   pointEndMs,
   pointSettleMs,
+  predictSteps,
   serveContactZ,
   serveFlightS,
   serveJitterX,
@@ -57,6 +58,24 @@ import type { BallState, BandejaPlayer, BandejaState, PointReason, RallyState } 
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+/** Where a ball on this flight will first hit the floor (`ai/landing.ts`, CC-23.8), computed once
+ * per flight segment at exactly the same trigger points `leg` is (a serve, a connected swing, a
+ * wall or floor bounce) and cached on `BallState` alongside it, not recomputed every tick: the
+ * ball's path is a straight-line-then-gravity segment between those events, so the landing spot a
+ * segment ends at doesn't change tick to tick within it, and calling `predictLanding` for every
+ * slot on every tick priced a 60 Hz game loop like a "handful of times per rally" one (see
+ * physics.ts's own `predict`, which the spec already holds to that budget). */
+function computeLanding(ball: {
+  x: number;
+  y: number;
+  z: number;
+  vx: number;
+  vy: number;
+  vz: number;
+}): Landing | null {
+  return predictLanding(ball, tickMs, predictSteps);
 }
 
 /** ≤60 ms clean, ≤140 ms ok, ≤240 ms mishit, anything more is a whiff. */
@@ -181,21 +200,36 @@ function launchBall(
   const vz = spec.lift;
   const shots = (state.rally?.shots ?? 0) + 1;
   const leg = predict({ x, y, z, vx, vy, vz }, tickMs, nowMs, squeezedSlotSpecs(state, shots));
+  const landing = computeLanding({ x, y, z, vx, vy, vz });
   const rally: RallyState = { shots, bounces: 0, bounceSide: null, pointSettleAtMs: null };
   return {
     ...state,
-    ball: { body: { id: ballId, x, y, vx, vy, a: 0, w: 0 }, z, vz, leg },
+    ball: { body: { id: ballId, x, y, vx, vy, a: 0, w: 0 }, z, vz, leg, landing },
     rally,
   };
 }
 
 // --- onTick ----------------------------------------------------------------------------------
 
+/** Every slot this match uses (`matchSlots`), stepped one tick toward the ball's predicted landing
+ * spot - or home, once there's no ball to chase (rule 3, CC-23.8: "Movement and a real CPU
+ * partner"). Pure; `onTick` runs it once a tick before the phase switch below, and every phase
+ * function already spreads its input state, so `positions` rides along without any of them needing
+ * their own change. */
+function steppedPositions(state: BandejaState, dtMs: number): BandejaState["positions"] {
+  const positions = { ...state.positions };
+  for (const slot of matchSlots(state)) {
+    const spec = slotSpec(slot);
+    positions[slot] = nextPosition(spec, positions[slot] ?? spec.home, state.ball, dtMs);
+  }
+  return positions;
+}
+
 /** Moves the match along at the fixed 60 Hz step. Time only comes from `dtMs`. */
 export function onTick(state: BandejaState, dtMs: number): BandejaState {
   if (state.phase === "over") return state;
   const nowMs = state.nowMs + dtMs;
-  const next: BandejaState = { ...state, nowMs };
+  const next: BandejaState = { ...state, nowMs, positions: steppedPositions(state, dtMs) };
   switch (state.phase) {
     case "intro":
       return tickIntro(next, nowMs);
@@ -260,16 +294,13 @@ function tickBall(state: BandejaState, dtMs: number, nowMs: number): BandejaStat
   }
 
   const pathChanged = heightStep.bounced || planStep.wallContact;
+  const flight = { x: body.x, y: body.y, z, vx: body.vx, vy: body.vy, vz };
   const leg = pathChanged
-    ? predict(
-        { x: body.x, y: body.y, z, vx: body.vx, vy: body.vy, vz },
-        tickMs,
-        nowMs,
-        squeezedSlotSpecs(state, rally.shots),
-      )
+    ? predict(flight, tickMs, nowMs, squeezedSlotSpecs(state, rally.shots))
     : ball.leg;
+  const landing = pathChanged ? computeLanding(flight) : ball.landing;
 
-  const ballState: BallState = { body, z, vz, leg };
+  const ballState: BallState = { body, z, vz, leg, landing };
   let next: BandejaState = { ...state, ball: ballState, rally };
   next = resolveArrivals(next, nowMs);
 
@@ -313,11 +344,13 @@ function recordMiss(state: BandejaState, slot: SlotName): BandejaState {
   };
 }
 
-/** An auto-returning slot hits every ball it can reach at the `ok` grade, straight down the
- * middle (rule 10). Doesn't clear anyone's miss streak: only a real accepted swing does that. */
+/** An auto-returning slot hits every ball it can reach, at the real CPU's fixed difficulty and aim
+ * (rule 10, replaced by CC-23.8: "no movement, no difficulty, and no aim" is exactly what this
+ * stops being true of). Doesn't clear anyone's miss streak: only a real accepted swing does that. */
 function performAutoHit(state: BandejaState, slot: SlotName, nowMs: number): BandejaState {
   const spec = slotSpec(slot);
-  return launchBall(state, spec.side, "ok", autoReturnAngle, autoReturnSpeed, nowMs);
+  const shot = cpuShot(state, spec);
+  return launchBall(state, spec.side, shot.grade, shot.angleDeg, shot.speed, nowMs);
 }
 
 function awardPoint(
@@ -376,13 +409,14 @@ function startServe(state: BandejaState, nowMs: number): BandejaState {
   const y = serverSpec.home[1];
   const z = serveContactZ;
   const leg = predict({ x, y, z, vx, vy, vz }, tickMs, nowMs, squeezedSlotSpecs(state, 1));
+  const landing = computeLanding({ x, y, z, vx, vy, vz });
   const rally: RallyState = { shots: 1, bounces: 0, bounceSide: null, pointSettleAtMs: null };
 
   return {
     ...state,
     phase: "serve",
     phaseAtMs: nowMs,
-    ball: { body: { id: ballId, x, y, vx, vy, a: 0, w: 0 }, z, vz, leg },
+    ball: { body: { id: ballId, x, y, vx, vy, a: 0, w: 0 }, z, vz, leg, landing },
     rally,
     lastServeSlot: { ...state.lastServeSlot, [side]: servingSlot },
     rng: rng.state,

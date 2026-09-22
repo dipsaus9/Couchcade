@@ -36,7 +36,13 @@ function stepToTick(target: Room, atMs: number): void {
  * the recording replays to the exact same final state and outcome.
  */
 describe("recorded match", () => {
-  it("replays to the exact final state and outcome", () => {
+  // Steps a real match through several hundred real game ticks (each one now also advancing every
+  // slot's position toward the ball's predicted landing spot, CC-23.8). Locally that's 500-700 ms,
+  // comfortably inside Vitest's 5 s default, but GitHub-hosted runners can be slower and
+  // contended enough to blow that budget on an otherwise-passing, fully deterministic (fixed
+  // seed = 7) run, exactly the class of flake `packages/game-sdk/testing/contract.ts` already
+  // budgets 60 s for. Same fix here.
+  it("replays to the exact final state and outcome", { timeout: 30_000 }, () => {
     const players = createPlayers(2);
     const room: Room = createFakeRoom(game, { players, seed: 7 });
 

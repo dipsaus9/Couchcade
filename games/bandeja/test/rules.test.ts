@@ -113,17 +113,25 @@ describe("rules and scoring", () => {
     expect(isAutoSlot(state, "b-right")).toBe(true);
   });
 
-  it("an empty slot auto-hits every ball it can reach, straight down the middle (rule 10)", () => {
-    const [alice, bob, carol] = players3();
-    const base = init([alice, bob, carol], 1);
-    // a-right's home is (7.4, 6.4); a clean drive with aim 0 travels straight down x = 7.4,
-    // exactly through b-right's (empty, auto) reach at (7.4, 13.6).
-    const state = ralliedState(base, { x: 7.4, y: 6.4, z: 0.8, vx: 0, vy: 14, vz: 3.2 });
-    const hit = tickUntil(state, (s) => (s.rally?.shots ?? 0) >= 2, 200);
-    expect(hit.phase).toBe("rally");
-    expect(hit.ball).not.toBeNull();
-    expect(Math.abs(hit.ball?.body.vx ?? 1)).toBeLessThan(0.01); // aim 0: straight back
-  });
+  it(
+    "an empty slot auto-hits every ball it can reach, aiming centre when the receiving side's " +
+      "coverage is even (rule 10, CC-23.8's real CPU)",
+    () => {
+      const [alice, bob, carol] = players3();
+      const base = init([alice, bob, carol], 1);
+      // a-right's home is (7.4, 6.4); a clean drive with aim 0 travels straight down x = 7.4,
+      // exactly through b-right's (empty, auto) reach at (7.4, 13.6). Side A is a-left and a-right,
+      // both real players, symmetric about the centre line, so ai/cpu.ts's weakerSideSign has no
+      // gap to aim at and returns 0 - the same shape rule 10's old stand-in always produced, now for
+      // a real reason instead of a fixed constant. games/bandeja/test/ai/cpu.test.ts covers the
+      // asymmetric case where it does pick a side.
+      const state = ralliedState(base, { x: 7.4, y: 6.4, z: 0.8, vx: 0, vy: 14, vz: 3.2 });
+      const hit = tickUntil(state, (s) => (s.rally?.shots ?? 0) >= 2, 200);
+      expect(hit.phase).toBe("rally");
+      expect(hit.ball).not.toBeNull();
+      expect(Math.abs(hit.ball?.body.vx ?? 1)).toBeLessThan(0.01);
+    },
+  );
 
   it("any accepted swing clears an away slot at once (rule 10)", () => {
     const [alice, bob] = players2();

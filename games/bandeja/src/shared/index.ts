@@ -2,6 +2,7 @@
  * Bandeja's rules as pure functions over plain JSON state (docs/games/bandeja.md). The TV scene,
  * the phone controller and the tests all read the game from here.
  */
+export * from "./ai/index.ts";
 export * from "./constants.ts";
 export * from "./input.ts";
 export * from "./outcome.ts";

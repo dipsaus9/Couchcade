@@ -41,6 +41,10 @@ export interface BallState {
   z: number;
   vz: number;
   leg: BallLeg;
+  /** Where this flight will first hit the floor (`ai/landing.ts`'s `predictLanding`, CC-23.8),
+   * recomputed at the same path-change events `leg` is, not every tick - `ai/positions.ts` reads
+   * it straight off here to walk a slot toward it. */
+  landing: { x: number; y: number; tMs: number } | null;
 }
 
 export interface RallyState {
@@ -81,6 +85,12 @@ export interface BandejaState {
   lastPoint: LastPoint | null;
   /** Seeded RNG state: the only randomness in the game is the serve's aim jitter. */
   rng: number;
+  /** Every slot this match uses (`matchSlots`), on court right now (rule 3, CC-23.8: "Movement and
+   * a real CPU partner"). Advanced once a tick by `rules.ts`'s `onTick` through
+   * `ai/positions.ts`'s `nextPosition`. Not part of `snapshot`/`restore`: like the ball, the point
+   * in progress is lost on a restore, and every slot starts back at its home spot (rule 3's own
+   * home-spot table) exactly as a new point does. */
+  positions: Record<SlotName, readonly [x: number, y: number]>;
 }
 
 export function otherSide(side: Side): Side {
@@ -157,6 +167,10 @@ export function init(players: readonly Player[], seed: number): BandejaState {
       missStreak: 0,
     };
   });
+  const matchSlotNames = slotsForCount(count === 2 ? 2 : 4);
+  const positions = Object.fromEntries(
+    matchSlotNames.map((slot) => [slot, slotSpec(slot).home] as const),
+  ) as Record<SlotName, readonly [number, number]>;
   return {
     phase: "intro",
     nowMs: 0,
@@ -170,5 +184,6 @@ export function init(players: readonly Player[], seed: number): BandejaState {
     rally: null,
     lastPoint: null,
     rng: createRng(seed).state,
+    positions,
   };
 }
