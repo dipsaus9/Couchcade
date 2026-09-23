@@ -76,7 +76,10 @@ describe("Putt Club TV scene", () => {
 
   it(
     "renders the 480×270 world at a whole-number zoom and plays a full match without errors",
-    { timeout: 60_000 },
+    // ~13-15s locally, but CI's shared, software-GPU runner needs real headroom for a full
+    // 2-player, 9-hole match -- the same CI-only timeout gap CC-23.4 (Bandeja's TV scene boot
+    // test) hit and fixed the same way.
+    { timeout: 180_000 },
     async () => {
       const originalError = console.error;
       const originalWarn = console.warn;
