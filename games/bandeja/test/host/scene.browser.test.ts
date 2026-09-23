@@ -57,7 +57,11 @@ describe("Bandeja TV scene", () => {
 
   it(
     "renders the 480×270 world at a whole-number zoom and plays a full match without errors",
-    { timeout: 90_000 },
+    // CI runs this alongside every other game's browser suite on a shared 2-core runner, and a
+    // full match now ticks each pip's live movement/CPU AI (CC-23.8) every frame; 90 s was too
+    // tight there (observed ~120 s) though it's ~10 s in isolation. Matches quick-draw's and
+    // target-range's headroom for their own heaviest full-match tests.
+    { timeout: 180_000 },
     async () => {
       const originalError = console.error;
       const originalWarn = console.warn;
