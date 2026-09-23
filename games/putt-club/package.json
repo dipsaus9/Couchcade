@@ -7,7 +7,7 @@
   "sideEffects": false,
   "scripts": {
     "typecheck": "vue-tsc",
-    "test": "vitest run"
+    "test": "playwright install chromium-headless-shell && vitest run"
   },
   "dependencies": {
     "@couchcade/game-sdk": "workspace:*",
@@ -23,6 +23,10 @@
   },
   "devDependencies": {
     "@couchcade/config": "workspace:*",
+    "@vitejs/plugin-vue": "catalog:",
+    "@vitest/browser-playwright": "catalog:",
+    "jsdom": "catalog:",
+    "playwright": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:",
