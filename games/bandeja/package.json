@@ -12,6 +12,7 @@
   "dependencies": {
     "@couchcade/audio": "workspace:*",
     "@couchcade/game-sdk": "workspace:*",
+    "@couchcade/motion": "workspace:*",
     "@couchcade/physics": "workspace:*",
     "@couchcade/protocol": "workspace:*",
     "@couchcade/stage": "workspace:*",
@@ -24,7 +25,10 @@
   },
   "devDependencies": {
     "@couchcade/config": "workspace:*",
+    "@vitejs/plugin-vue": "catalog:",
     "@vitest/browser-playwright": "catalog:",
+    "@vue/test-utils": "catalog:",
+    "jsdom": "catalog:",
     "playwright": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
