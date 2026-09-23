@@ -7,9 +7,8 @@ import { defineGameMeta } from "@couchcade/game-sdk/contract";
  * once a room starts it) imports this file and spreads it into `defineGame`, so the two never
  * drift apart.
  *
- * `hidden: true` until CC-23.6 registers Bandeja (controller, TV scene and the bot-match E2E
- * test all still need to exist first): the menu never lists it and nothing can start it, exactly
- * as `GameMeta.hidden`'s own doc comment describes. CC-23.6 removes the flag.
+ * Registered in CC-23.6: the controller (CC-23.3), TV scene (CC-23.4) and CPU partner (CC-23.8)
+ * are built, so the menu shows it and the game can be started.
  */
 export default defineGameMeta({
   id: "bandeja",
@@ -18,5 +17,4 @@ export default defineGameMeta({
   realtime: true,
   needsMotion: true,
   scene: "padel",
-  hidden: true,
 });

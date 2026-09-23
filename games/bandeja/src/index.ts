@@ -23,8 +23,8 @@ import {
  * the tick their message happened to arrive on. `packages/game-sdk/src/rewind/with-rewind.ts`
  * names Bandeja (alongside Duck Season) as exactly this case.
  *
- * `hidden: true` in `./meta.ts` until CC-23.6 registers Bandeja: no controller or TV scene exist
- * yet (CC-23.3, CC-23.4), so `hostScene` below is the scaffold's own placeholder.
+ * Registered in CC-23.6: the controller (CC-23.3) and TV scene (CC-23.4) are built, so `hostScene`
+ * below loads the real scene rather than a placeholder.
  */
 const rules = withRewind(
   { init, onPlayerInput, onTick, onPlayerLeft },
