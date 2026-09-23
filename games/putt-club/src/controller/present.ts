@@ -112,6 +112,7 @@ function puttScreen(data: PuttClubView, local: LocalState): PuttClubPresentation
         actionLabel: "—",
         statusLine: "Putt away!",
         hint: watchTv,
+        cue: "press",
       };
     case "locked":
       return {

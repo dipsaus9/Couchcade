@@ -133,13 +133,14 @@ describe("present: docs/games/putt-club.md, Screens", () => {
     expect(p.pad).toBe(true);
   });
 
-  it("pc-putt, away: disabled until the next turn", () => {
+  it("pc-putt, away: disabled until the next turn, with a press cue the instant it arrives", () => {
     const p = present("pc-putt", view(), local({ phase: "away" }));
     expect(p).toMatchObject({
       state: "disabled",
       actionLabel: "—",
       statusLine: "Putt away!",
       hint: "Watch the TV",
+      cue: "press",
     });
     expect(p.pad).toBe(false);
   });
