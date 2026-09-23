@@ -6,7 +6,7 @@ import { configDefaults } from "vitest/config";
 /** Tests that boot Phaser. They need a real browser: Phaser reads window, document and a canvas. */
 const browserTests = "test/**/*.browser.test.ts";
 /** The phone controller's component tests: jsdom is enough, the same split Bandeja's, Strike
- * Night's and Target Range's `vitest.config.ts` use. Empty until CC-13.3 lands its own. */
+ * Night's and Target Range's `vitest.config.ts` use. */
 const controllerTests = "test/controller/**/*.test.ts";
 
 // Rules, flight, view, snapshot, contract, the hole shape, the recorded replay and the TV

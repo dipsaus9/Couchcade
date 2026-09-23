@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@couchcade/game-sdk": "workspace:*",
+    "@couchcade/motion": "workspace:*",
     "@couchcade/physics": "workspace:*",
     "@couchcade/protocol": "workspace:*",
     "@couchcade/stage": "workspace:*",
@@ -25,6 +26,7 @@
     "@couchcade/config": "workspace:*",
     "@vitejs/plugin-vue": "catalog:",
     "@vitest/browser-playwright": "catalog:",
+    "@vue/test-utils": "catalog:",
     "jsdom": "catalog:",
     "playwright": "catalog:",
     "typescript": "catalog:",
