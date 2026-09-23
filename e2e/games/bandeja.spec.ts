@@ -12,15 +12,18 @@ import { playMotionTrace, type MotionTrace } from "../src/motion.ts";
 // `window.__couchcadeMotion` (e2e/README.md, "Motion sensors").
 //
 // Ana's browser denies motion, so she plays with touch, and she is the whole test's bot: every time
-// the ball becomes reachable at her slot (`a-solo`), she taps the pad's left half the instant the
-// true arrival moment passes, read straight off the host's own running state (rules.ts grades a
-// swing against `ctx.atMs - ctx.displayLagMs`, and a fresh E2E room never runs the CC-3.8 TV-lag
-// calibration, so `displayLagMs` is always 0 -- the state's own arrival moment is exactly what a
-// swing is judged against). A tap always emits a full `angle: -60` aim (docs/games/bandeja.md,
-// "Aim, forehand and backhand"): "over a clean drive's 11.8 m of flight, full aim moves the ball
-// 4.8 m sideways, half the width of the court, which is enough to place it past a defender". A
-// singles slot's reach is only 3.6 m, so every ball Ana actually connects with sails straight past
-// whoever's on the other side and double-bounces there unreturned.
+// a genuine incoming ball gets a predicted arrival at her slot (`a-solo`), she taps the pad's left
+// half the instant that true arrival moment passes, read straight off the host's own running state
+// (rules.ts grades a swing against `ctx.atMs - ctx.displayLagMs`, and a fresh E2E room never runs
+// the CC-3.8 TV-lag calibration, so `displayLagMs` is always 0 -- the state's own arrival moment is
+// exactly what a swing is judged against). `defendMatch` skips the phantom near-zero-lead arrival
+// every one of her own hits also creates for her own slot (`predict` always finds the launching
+// player's own slot "entered" on its first stepped tick), since acting on that only risks a net
+// fault on a shot that needed no swing at all. A tap always emits a full `angle: -60` aim
+// (docs/games/bandeja.md, "Aim, forehand and backhand"): "over a clean drive's 11.8 m of flight,
+// full aim moves the ball 4.8 m sideways, half the width of the court, which is enough to place it
+// past a defender". A singles slot's reach is only 3.6 m, so every ball Ana actually connects with
+// sails straight past whoever's on the other side and double-bounces there unreturned.
 //
 // Ben's browser grants motion, and his phone just rests in his hand the whole match: he never
 // swings at all. His side loses every rally it's on, whether that's Ben himself failing to
@@ -167,7 +170,16 @@ async function defendMatch(host: Page, ana: Page): Promise<TvState> {
     const arriveAt = state.ball?.leg.arrivals["a-solo"];
     if (arriveAt !== undefined && arriveAt !== scheduledFor) {
       scheduledFor = arriveAt;
-      void scheduleTap(button, Math.max(0, arriveAt - state.nowMs));
+      // `predict` (games/bandeja/src/shared/physics.ts) always finds the *launching* player's own
+      // slot "entered" at its very first stepped tick, because the ball starts each new leg right
+      // at the launcher's position (distance ~0). So every single leg Ana's own hits create --
+      // her serve included -- carries a phantom `a-solo` arrival with essentially zero lead. Acting
+      // on it risks a near-impossible-to-time swing that can net-fault a shot that needed no swing
+      // at all. A genuine incoming ball (crossing meters of court at 7-14 m/s) never arrives with
+      // less than ~100 ms of lead, so anything tighter than this margin is that artifact, not a
+      // real shot to defend, and is worth skipping rather than gambling on.
+      const lead = arriveAt - state.nowMs;
+      if (lead >= 80) void scheduleTap(button, lead);
     }
     await host.waitForTimeout(20);
   }
