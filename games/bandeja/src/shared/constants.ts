@@ -143,9 +143,9 @@ export const squeezeMinReach = 0.8;
 export const squeezeForceEndShots = 60;
 /** A slot with no swing within 240 ms of its last 3 arrival moments is away (rule 10). */
 export const awayAfterMisses = 3;
-/** Straight down the middle, at the `ok` grade (rule 10). */
+/** The auto-returning CPU's base pace (`ai/cpu.ts`'s `cpuShot`); rule 10's original stand-in used
+ * this at a fixed `aim 0`, which CC-23.8 replaces with `ai/cpu.ts`'s own read of the court. */
 export const autoReturnSpeed = 0.5;
-export const autoReturnAngle = 0;
 
 // --- Point flow and timings ("Point flow and timings") -----------------------------------------
 
