@@ -20,7 +20,7 @@ allowBuilds:
 catalog:
   # Toolchain
   typescript: ^6.0.3
-  vite: ^8.3.0
+  vite: ^8.3.3
   vitest: ~4.1.11 # Held below 4.2 and 5: @cloudflare/vitest-plugin needs Vitest 4.1
   vue-tsc: ^3.3.11
   oxlint: ^1.83.0
